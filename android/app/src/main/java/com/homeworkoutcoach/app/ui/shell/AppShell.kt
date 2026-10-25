@@ -26,7 +26,11 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +63,7 @@ import com.homeworkoutcoach.app.ui.setup.SetupScreen
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.week.WeekScreen
+import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
 import kotlinx.coroutines.launch
 
 /** Screens in the side menu, in the prototype's order. */
@@ -79,8 +84,11 @@ fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Un
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
     val c = AppTheme.colors
+    // A workout with logged sets in progress; leaving it asks first.
+    var workoutActive by remember { mutableStateOf(false) }
+    var leaveTo by remember { mutableStateOf<Dest?>(null) }
 
-    fun go(d: Dest) {
+    fun navigate(d: Dest) {
         scope.launch { drawer.close() }
         if (current == d.route) return
         nav.navigate(d.route) {
@@ -88,6 +96,18 @@ fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Un
             launchSingleTop = true
         }
     }
+
+    fun go(d: Dest) {
+        if (workoutActive && current == Dest.Today.route && d != Dest.Today) {
+            leaveTo = d
+            scope.launch { drawer.open() }
+            return
+        }
+        navigate(d)
+    }
+
+    // Closing the menu cancels a pending leave.
+    LaunchedEffect(drawer.isClosed) { if (drawer.isClosed) leaveTo = null }
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -102,6 +122,14 @@ fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Un
                     appName = appName,
                     settings = settings,
                     current = current,
+                    leavePrompt = leaveTo != null,
+                    onStay = { scope.launch { drawer.close() } },
+                    onLeave = {
+                        val d = leaveTo ?: Dest.Week
+                        workoutActive = false
+                        leaveTo = null
+                        navigate(d)
+                    },
                     onClose = { scope.launch { drawer.close() } },
                     onGo = ::go,
                     onTheme = onTheme,
@@ -111,13 +139,24 @@ fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Un
     ) {
         Column(Modifier.fillMaxSize().background(c.bg)) {
             TopBar(appName) { scope.launch { drawer.open() } }
-            AppNavHost(nav, appName, settings.started, ::go)
+            AppNavHost(
+                nav, appName, settings.started, ::go,
+                onWorkoutActive = { workoutActive = it },
+                onLeaveRequest = { go(Dest.Week) },
+            )
         }
     }
 }
 
 @Composable
-private fun AppNavHost(nav: NavHostController, appName: String, started: Boolean, go: (Dest) -> Unit) {
+private fun AppNavHost(
+    nav: NavHostController,
+    appName: String,
+    started: Boolean,
+    go: (Dest) -> Unit,
+    onWorkoutActive: (Boolean) -> Unit,
+    onLeaveRequest: () -> Unit,
+) {
     NavHost(nav, startDestination = if (started) Dest.Week.route else Dest.Setup.route) {
         composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Today) }) }
         composable(Dest.Setup.route) {
@@ -128,7 +167,9 @@ private fun AppNavHost(nav: NavHostController, appName: String, started: Boolean
             })
         }
         composable(Dest.How.route) { HowItWorks(appName, started) { go(if (started) Dest.Week else Dest.Setup) } }
-        composable(Dest.Today.route) { ComingNext("Today’s workout", "The workout screen is built next.") }
+        composable(Dest.Today.route) {
+            WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = { go(Dest.Week) })
+        }
         composable(Dest.Progress.route) { ComingNext("Progress", "Charts per exercise are built after the workout screen.") }
         composable(Dest.Profile.route) { ComingNext("History and profile", "Saved workouts and your profile are built after the workout screen.") }
     }
@@ -165,6 +206,9 @@ private fun MenuContent(
     appName: String,
     settings: UserSettings,
     current: String?,
+    leavePrompt: Boolean,
+    onStay: () -> Unit,
+    onLeave: () -> Unit,
     onClose: () -> Unit,
     onGo: (Dest) -> Unit,
     onTheme: (ThemeMode) -> Unit,
@@ -183,6 +227,15 @@ private fun MenuContent(
             )
         }
         Small("Progressive overload, set by set.", Modifier.padding(horizontal = 6.dp))
+        if (leavePrompt) {
+            Column(Modifier.clip(RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp)) {
+                Body("Leave this workout? Sets you logged will be lost.", strong = true)
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { PrimaryButton("Stay", onStay, alt = true, compact = true) }
+                    Box(Modifier.weight(1f)) { PrimaryButton("Leave", onLeave, compact = true) }
+                }
+            }
+        }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Dest.entries.filter { settings.started || it.beforeSetup }.forEach { d ->
                 val on = current == d.route

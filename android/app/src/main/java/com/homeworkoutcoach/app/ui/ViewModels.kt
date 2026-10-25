@@ -14,7 +14,9 @@ import com.homeworkoutcoach.app.plan.PlanActions
 import com.homeworkoutcoach.app.plan.SetupDraft
 import com.homeworkoutcoach.app.ui.week.WeekPresenter
 import com.homeworkoutcoach.app.ui.week.WeekUi
+import com.homeworkoutcoach.app.ui.workout.WorkoutViewModel
 import com.homeworkoutcoach.engine.ConcernMapper
+import com.homeworkoutcoach.engine.KeywordSetParser
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 import kotlinx.coroutines.Dispatchers
@@ -107,6 +109,13 @@ object Factories {
     val Week = viewModelFactory {
         initializer {
             app(this).let { WeekViewModel(it.settings, it.training, WeekPresenter(it.library, it.planner), it.actions) }
+        }
+    }
+    val Workout = viewModelFactory {
+        initializer {
+            app(this).let {
+                WorkoutViewModel(it.library, it.planner, it.settings, it.training, it.actions, KeywordSetParser)
+            }
         }
     }
     val Setup = viewModelFactory {

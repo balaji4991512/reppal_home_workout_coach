@@ -77,6 +77,21 @@ class PlanActions(
     suspend fun swap(baseId: String, chosenId: String) =
         training.setSwap(baseId, chosenId.takeUnless { it == baseId })
 
+    /**
+     * Save a finished workout: the record and next-session states together, then move the week on and leave out
+     * anything that hurt (kept even if the concern text changes later).
+     */
+    suspend fun finishWorkout(result: SessionResult) {
+        training.saveWorkout(result.workout, result.nextStates)
+        settings.update { s ->
+            s.copy(
+                sessionIndex = s.sessionIndex + 1,
+                excluded = (s.excluded + result.painIds).distinct(),
+                painExcluded = (s.painExcluded + result.painIds).distinct(),
+            )
+        }
+    }
+
     suspend fun setTheme(mode: ThemeMode) = settings.update { it.copy(theme = mode) }
 
     suspend fun storeStates(states: Map<String, ExerciseState>) {

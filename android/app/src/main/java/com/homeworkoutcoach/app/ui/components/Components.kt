@@ -25,6 +25,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -117,22 +119,33 @@ fun Chips(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 }
 
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, alt: Boolean = false) {
+fun PrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    alt: Boolean = false,
+    /** Smaller, with no top margin, for buttons side by side. */
+    compact: Boolean = false,
+) {
     val c = AppTheme.colors
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
-            .padding(top = 14.dp)
+            .padding(top = if (compact) 0.dp else 14.dp)
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .heightIn(min = if (compact) 44.dp else 52.dp)
             .clip(shape)
             .background(if (alt) Color.Transparent else c.acc)
             .then(if (alt) Modifier.border(BorderStroke(1.dp, c.bd), shape) else Modifier)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(14.dp),
+            .padding(if (compact) 10.dp else 14.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (alt) c.fg else c.on, style = AppTheme.type.bodyStrong)
+        Text(
+            text,
+            color = if (alt) c.fg else c.on,
+            style = if (compact) AppTheme.type.bodyStrong.copy(fontSize = 15.sp) else AppTheme.type.bodyStrong,
+        )
     }
 }
 
@@ -144,6 +157,8 @@ fun Field(
     modifier: Modifier = Modifier,
     minLines: Int = 1,
     label: String = placeholder,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     val c = AppTheme.colors
     BasicTextField(
@@ -154,6 +169,8 @@ fun Field(
         cursorBrush = SolidColor(c.fg),
         minLines = minLines,
         singleLine = minLines == 1,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         decorationBox = { inner ->
             Box(
                 Modifier

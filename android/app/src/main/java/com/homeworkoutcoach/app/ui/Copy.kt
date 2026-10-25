@@ -3,7 +3,11 @@ package com.homeworkoutcoach.app.ui
 import com.homeworkoutcoach.engine.Exercise
 import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Level
+import com.homeworkoutcoach.engine.LiveAdjustment
+import com.homeworkoutcoach.engine.LiveTarget
+import com.homeworkoutcoach.engine.NextSession
 import com.homeworkoutcoach.engine.Split
+import kotlin.math.roundToLong
 
 /** Wording and number formats shared by screens. Text follows the prototype. */
 object Copy {
@@ -15,6 +19,43 @@ object Copy {
         "${s.sets} × ${s.targetReps}" + if (e.bodyweight) "" else " at ${kg(s.weightKg)} kg"
 
     fun count(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"
+
+    /** One line after each set saying what the next set will be [adjust]. Null after a pain report. */
+    fun liveNote(e: Exercise, cp: LiveTarget, a: LiveAdjustment): String? {
+        val u = if (e.bodyweight) "" else "${kg(a.next.weightKg)} kg, "
+        return when (a) {
+            is LiveAdjustment.Pain -> null
+            is LiveAdjustment.ShortOfTarget -> "Short of ${cp.targetReps}, so the next set stays at $u${cp.targetReps} reps."
+            is LiveAdjustment.NotEasy -> "Next set stays at $u${cp.targetReps} reps."
+            is LiveAdjustment.AddRep -> "Easy, so the next set goes up to ${a.next.targetReps} reps" +
+                (if (e.bodyweight) "" else " at ${kg(a.next.weightKg)} kg") + "."
+            is LiveAdjustment.MoveUp -> "Easy at the top of the range, so the next set moves up to ${kg(a.next.weightKg)} kg for ${a.next.targetReps} reps."
+            is LiveAdjustment.NothingHeavier -> "Easy, but there is nothing heavier to move up to, so the next set stays at $u${cp.targetReps} reps."
+        }
+    }
+
+    /** Why the next session changes, or not [progress]. */
+    fun nextSessionNote(e: Exercise, n: NextSession): String {
+        val u = if (e.bodyweight) "reps" else "kg"
+        val got = n.actualVolume.roundToLong()
+        val exp = n.plannedVolume.roundToLong()
+        return when (n) {
+            is NextSession.Repeat -> "Volume was $got of $exp $u, short of the target, so the same plan again."
+            is NextSession.Progressed -> "Volume was $got $u" +
+                (if (n.actualVolume > n.plannedVolume + 0.001) " (plan was $exp)" else "") +
+                ", so next time aims for about 10% more than that: ${n.nextVolume.roundToLong()} $u (+${n.increasePercent}%)."
+            is NextSession.NoOption -> "Volume target met at $got $u, but there is no heavier option or room for another set, so the same plan again."
+        }
+    }
+
+    const val PAIN_NEXT = "You reported pain, so this exercise is removed from your plan. Check with your doctor or physio before trying it again."
+
+    /** "up 12% from last time", or null without an earlier figure. */
+    fun change(now: Double, before: Double?): String? {
+        if (before == null || before == 0.0) return null
+        val pct = kotlin.math.abs(kotlin.math.floor((now - before) / before * 100 + 0.5).toLong())
+        return "${if (now >= before) "up" else "down"} $pct% from last time"
+    }
 
     fun levelName(l: Level) = when (l) {
         Level.BEGINNER -> "Beginner"
