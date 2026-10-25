@@ -1,0 +1,831 @@
+{
+  "muscles": [
+    {
+      "key": "chest",
+      "label": "Chest"
+    },
+    {
+      "key": "shoulders",
+      "label": "Shoulders"
+    },
+    {
+      "key": "reardelts",
+      "label": "Rear delts"
+    },
+    {
+      "key": "lats",
+      "label": "Lats and back"
+    },
+    {
+      "key": "biceps",
+      "label": "Biceps"
+    },
+    {
+      "key": "triceps",
+      "label": "Triceps"
+    },
+    {
+      "key": "quads",
+      "label": "Quads"
+    },
+    {
+      "key": "hams",
+      "label": "Hamstrings"
+    },
+    {
+      "key": "glutes",
+      "label": "Glutes"
+    },
+    {
+      "key": "abs",
+      "label": "Abs"
+    }
+  ],
+  "exercises": [
+    {
+      "id": "bench",
+      "name": "Dumbbell bench press",
+      "needs": [
+        "db",
+        "bench"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "triceps",
+        "shoulders"
+      ]
+    },
+    {
+      "id": "incl",
+      "name": "Incline dumbbell press",
+      "needs": [
+        "db",
+        "adj"
+      ],
+      "bodyweight": false,
+      "startKg": 6,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ]
+    },
+    {
+      "id": "ohp",
+      "name": "Dumbbell overhead press",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 5,
+      "primary": [
+        "shoulders"
+      ],
+      "secondary": [
+        "triceps"
+      ]
+    },
+    {
+      "id": "pushup",
+      "name": "Push-up",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "triceps",
+        "shoulders"
+      ]
+    },
+    {
+      "id": "row",
+      "name": "Single-arm dumbbell row",
+      "needs": [
+        "db",
+        "bench"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "lats"
+      ],
+      "secondary": [
+        "biceps",
+        "reardelts"
+      ]
+    },
+    {
+      "id": "brow",
+      "name": "Bent-over dumbbell row",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "lats"
+      ],
+      "secondary": [
+        "biceps",
+        "reardelts"
+      ]
+    },
+    {
+      "id": "goblet",
+      "name": "Goblet squat",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "bsq",
+      "name": "Bodyweight squat",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "rdl",
+      "name": "Dumbbell Romanian deadlift",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "hams"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "bridge",
+      "name": "Glute bridge",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": [
+        "hams"
+      ]
+    },
+    {
+      "id": "dead",
+      "name": "Dead bug",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "abs"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "crow",
+      "name": "Chest-supported dumbbell row",
+      "needs": [
+        "db",
+        "adj"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "lats"
+      ],
+      "secondary": [
+        "biceps",
+        "reardelts"
+      ]
+    },
+    {
+      "id": "pull",
+      "name": "Dumbbell pullover",
+      "needs": [
+        "db",
+        "bench"
+      ],
+      "bodyweight": false,
+      "startKg": 6,
+      "primary": [
+        "lats"
+      ],
+      "secondary": [
+        "chest"
+      ]
+    },
+    {
+      "id": "rfly",
+      "name": "Reverse fly (chest-supported)",
+      "needs": [
+        "db",
+        "adj"
+      ],
+      "bodyweight": false,
+      "startKg": 3,
+      "primary": [
+        "reardelts"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "curl",
+      "name": "Dumbbell biceps curl",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 5,
+      "primary": [
+        "biceps"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "tri",
+      "name": "Dumbbell triceps extension",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 5,
+      "primary": [
+        "triceps"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "lat",
+      "name": "Dumbbell lateral raise",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 3,
+      "primary": [
+        "shoulders"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "split",
+      "name": "Dumbbell split squat",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 6,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "stepup",
+      "name": "Bench step-up",
+      "needs": [
+        "bench"
+      ],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "hcurl",
+      "name": "Towel hamstring curl",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "hams"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "hthrust",
+      "name": "Bench hip thrust",
+      "needs": [
+        "bench"
+      ],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": [
+        "hams"
+      ]
+    },
+    {
+      "id": "crunch",
+      "name": "Bicycle crunch",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "abs"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "floor",
+      "name": "Dumbbell floor press",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "triceps",
+        "shoulders"
+      ]
+    },
+    {
+      "id": "fly",
+      "name": "Dumbbell chest fly",
+      "needs": [
+        "db",
+        "bench"
+      ],
+      "bodyweight": false,
+      "startKg": 5,
+      "primary": [
+        "chest"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "ifly",
+      "name": "Incline dumbbell fly",
+      "needs": [
+        "db",
+        "adj"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders"
+      ]
+    },
+    {
+      "id": "ffly",
+      "name": "Dumbbell floor fly",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "chest"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "ipush",
+      "name": "Incline push-up (hands on bench)",
+      "needs": [
+        "bench"
+      ],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "triceps",
+        "shoulders"
+      ]
+    },
+    {
+      "id": "wpush",
+      "name": "Wide push-up",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "chest"
+      ],
+      "secondary": [
+        "shoulders",
+        "triceps"
+      ]
+    },
+    {
+      "id": "pike",
+      "name": "Pike push-up",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "shoulders"
+      ],
+      "secondary": [
+        "triceps"
+      ]
+    },
+    {
+      "id": "arn",
+      "name": "Dumbbell Arnold press",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "shoulders"
+      ],
+      "secondary": [
+        "triceps"
+      ]
+    },
+    {
+      "id": "frt",
+      "name": "Dumbbell front raise",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 3,
+      "primary": [
+        "shoulders"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "brfly",
+      "name": "Bent-over reverse fly",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 3,
+      "primary": [
+        "reardelts"
+      ],
+      "secondary": [
+        "lats"
+      ]
+    },
+    {
+      "id": "yr",
+      "name": "Prone Y raise (floor)",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "reardelts"
+      ],
+      "secondary": [
+        "lats"
+      ]
+    },
+    {
+      "id": "snow",
+      "name": "Reverse snow angel (floor)",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "lats"
+      ],
+      "secondary": [
+        "reardelts"
+      ]
+    },
+    {
+      "id": "hammer",
+      "name": "Dumbbell hammer curl",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 5,
+      "primary": [
+        "biceps"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "icurl",
+      "name": "Incline dumbbell curl",
+      "needs": [
+        "db",
+        "adj"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "biceps"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "skull",
+      "name": "Lying dumbbell triceps extension",
+      "needs": [
+        "db",
+        "bench"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "triceps"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "kick",
+      "name": "Dumbbell triceps kickback",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 3,
+      "primary": [
+        "triceps"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "cpush",
+      "name": "Close-grip push-up",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "shoulders"
+      ]
+    },
+    {
+      "id": "bdip",
+      "name": "Bench dip",
+      "needs": [
+        "bench"
+      ],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "triceps"
+      ],
+      "secondary": [
+        "chest",
+        "shoulders"
+      ]
+    },
+    {
+      "id": "sumo",
+      "name": "Dumbbell sumo squat",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes",
+        "hams"
+      ]
+    },
+    {
+      "id": "rlunge",
+      "name": "Dumbbell reverse lunge",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 5,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "blunge",
+      "name": "Bodyweight reverse lunge",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "quads"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "srdl",
+      "name": "Single-leg dumbbell RDL",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "hams"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "gm",
+      "name": "Good morning (hands on hips)",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "hams"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "hwalk",
+      "name": "Hamstring walkout",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "hams"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "whthrust",
+      "name": "Dumbbell hip thrust (back on bench)",
+      "needs": [
+        "db",
+        "bench"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": [
+        "hams"
+      ]
+    },
+    {
+      "id": "wbridge",
+      "name": "Dumbbell glute bridge",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": [
+        "hams"
+      ]
+    },
+    {
+      "id": "sbridge",
+      "name": "Single-leg glute bridge",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": [
+        "hams"
+      ]
+    },
+    {
+      "id": "donkey",
+      "name": "Donkey kick",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "hydrant",
+      "name": "Fire hydrant",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "glutes"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "bird",
+      "name": "Bird dog",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "abs"
+      ],
+      "secondary": [
+        "glutes"
+      ]
+    },
+    {
+      "id": "rcrunch",
+      "name": "Reverse crunch",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "abs"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "rtwist",
+      "name": "Dumbbell Russian twist",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 4,
+      "primary": [
+        "abs"
+      ],
+      "secondary": []
+    },
+    {
+      "id": "mclimb",
+      "name": "Mountain climber",
+      "needs": [],
+      "bodyweight": true,
+      "startKg": null,
+      "primary": [
+        "abs"
+      ],
+      "secondary": [
+        "quads"
+      ]
+    },
+    {
+      "id": "sbend",
+      "name": "Dumbbell side bend",
+      "needs": [
+        "db"
+      ],
+      "bodyweight": false,
+      "startKg": 8,
+      "primary": [
+        "abs"
+      ],
+      "secondary": []
+    }
+  ]
+}

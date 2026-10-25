@@ -1,0 +1,594 @@
+{
+  "weekSequences": {
+    "1": [
+      "F"
+    ],
+    "2": [
+      "A",
+      "B"
+    ],
+    "3": [
+      "A",
+      "B",
+      "A"
+    ],
+    "4": [
+      "U1",
+      "L1",
+      "U2",
+      "L2"
+    ],
+    "5": [
+      "U1",
+      "L1",
+      "U2",
+      "L2",
+      "X"
+    ],
+    "6": [
+      "U1",
+      "L1",
+      "X",
+      "U2",
+      "L2",
+      "Z"
+    ],
+    "7": [
+      "U1",
+      "L1",
+      "X",
+      "U2",
+      "L2",
+      "Z",
+      "F"
+    ]
+  },
+  "workoutDayIndexes": {
+    "1": [
+      0
+    ],
+    "2": [
+      0,
+      3
+    ],
+    "3": [
+      0,
+      2,
+      4
+    ],
+    "4": [
+      0,
+      1,
+      3,
+      4
+    ],
+    "5": [
+      0,
+      1,
+      3,
+      4,
+      5
+    ],
+    "6": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "7": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "dayNames": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+  ],
+  "presetPlans": {
+    "A": {
+      "Push": [
+        "bench",
+        "floor",
+        "pushup"
+      ],
+      "Pull": [
+        "row",
+        "brow"
+      ],
+      "Squat": [
+        "goblet",
+        "bsq"
+      ],
+      "Hinge": [
+        "rdl",
+        "hcurl",
+        "bridge"
+      ],
+      "Core": [
+        "dead"
+      ]
+    },
+    "B": {
+      "Push": [
+        "incl",
+        "floor",
+        "pushup"
+      ],
+      "Shoulders": [
+        "ohp"
+      ],
+      "Pull": [
+        "crow",
+        "brow",
+        "row"
+      ],
+      "Squat": [
+        "goblet",
+        "bsq"
+      ],
+      "Hinge": [
+        "rdl",
+        "hcurl",
+        "bridge"
+      ],
+      "Core": [
+        "dead"
+      ]
+    },
+    "U1": {
+      "Push": [
+        "bench",
+        "floor",
+        "pushup"
+      ],
+      "Pull": [
+        "row",
+        "brow"
+      ],
+      "Shoulders": [
+        "ohp"
+      ],
+      "Biceps": [
+        "curl",
+        "hammer"
+      ],
+      "Core": [
+        "dead"
+      ]
+    },
+    "L1": {
+      "Squat": [
+        "goblet",
+        "bsq"
+      ],
+      "Hamstrings": [
+        "rdl",
+        "hcurl"
+      ],
+      "Glutes": [
+        "bridge",
+        "hthrust"
+      ],
+      "Single leg": [
+        "stepup",
+        "split"
+      ],
+      "Core": [
+        "crunch",
+        "dead"
+      ]
+    },
+    "U2": {
+      "Push": [
+        "incl",
+        "floor",
+        "pushup"
+      ],
+      "Pull": [
+        "crow",
+        "brow",
+        "row"
+      ],
+      "Lats": [
+        "pull"
+      ],
+      "Rear delts": [
+        "rfly",
+        "brfly",
+        "yr"
+      ],
+      "Triceps": [
+        "tri",
+        "skull",
+        "kick",
+        "cpush"
+      ],
+      "Shoulders": [
+        "lat",
+        "frt"
+      ]
+    },
+    "L2": {
+      "Hips": [
+        "hthrust",
+        "bridge"
+      ],
+      "Single leg": [
+        "split",
+        "stepup"
+      ],
+      "Hamstrings": [
+        "hcurl",
+        "rdl"
+      ],
+      "Squat": [
+        "bsq",
+        "goblet"
+      ],
+      "Core": [
+        "dead",
+        "crunch"
+      ]
+    },
+    "F": {
+      "Push": [
+        "bench",
+        "floor",
+        "pushup"
+      ],
+      "Pull": [
+        "row",
+        "brow"
+      ],
+      "Squat": [
+        "goblet",
+        "bsq"
+      ],
+      "Hinge": [
+        "rdl",
+        "hcurl",
+        "bridge"
+      ],
+      "Shoulders": [
+        "ohp"
+      ],
+      "Core": [
+        "dead"
+      ]
+    },
+    "X": {
+      "Biceps": [
+        "curl",
+        "hammer"
+      ],
+      "Triceps": [
+        "tri",
+        "skull",
+        "kick",
+        "cpush"
+      ],
+      "Shoulders": [
+        "lat",
+        "frt"
+      ],
+      "Rear delts": [
+        "rfly",
+        "brfly",
+        "yr"
+      ],
+      "Core": [
+        "crunch",
+        "dead"
+      ]
+    },
+    "Z": {
+      "Glutes": [
+        "bridge",
+        "hthrust"
+      ],
+      "Hamstrings": [
+        "hcurl"
+      ],
+      "Single leg": [
+        "stepup",
+        "split"
+      ],
+      "Core": [
+        "dead",
+        "crunch"
+      ]
+    }
+  },
+  "presetNames": {
+    "F": "Full body",
+    "X": "Arms, shoulders and core",
+    "Z": "Glutes and core",
+    "A": "Full body A",
+    "B": "Full body B",
+    "U1": "Upper A",
+    "L1": "Lower A",
+    "U2": "Upper B",
+    "L2": "Lower B"
+  },
+  "musclePreferenceGroups": {
+    "chest": [
+      [
+        "bench",
+        "floor"
+      ],
+      [
+        "incl",
+        "ipush"
+      ],
+      [
+        "fly",
+        "ffly",
+        "ifly"
+      ],
+      [
+        "pushup"
+      ],
+      [
+        "wpush"
+      ]
+    ],
+    "shoulders": [
+      [
+        "ohp",
+        "pike"
+      ],
+      [
+        "lat"
+      ],
+      [
+        "arn"
+      ],
+      [
+        "frt"
+      ]
+    ],
+    "reardelts": [
+      [
+        "rfly",
+        "brfly"
+      ],
+      [
+        "yr"
+      ]
+    ],
+    "lats": [
+      [
+        "row",
+        "brow"
+      ],
+      [
+        "crow",
+        "brow"
+      ],
+      [
+        "pull"
+      ],
+      [
+        "snow"
+      ]
+    ],
+    "biceps": [
+      [
+        "curl"
+      ],
+      [
+        "hammer"
+      ],
+      [
+        "icurl"
+      ]
+    ],
+    "triceps": [
+      [
+        "tri"
+      ],
+      [
+        "skull",
+        "kick"
+      ],
+      [
+        "cpush"
+      ],
+      [
+        "bdip"
+      ]
+    ],
+    "quads": [
+      [
+        "goblet",
+        "bsq"
+      ],
+      [
+        "split",
+        "rlunge",
+        "blunge"
+      ],
+      [
+        "stepup"
+      ],
+      [
+        "sumo"
+      ]
+    ],
+    "hams": [
+      [
+        "rdl",
+        "gm"
+      ],
+      [
+        "hcurl"
+      ],
+      [
+        "srdl"
+      ],
+      [
+        "hwalk"
+      ]
+    ],
+    "glutes": [
+      [
+        "whthrust",
+        "hthrust",
+        "wbridge",
+        "bridge"
+      ],
+      [
+        "sbridge"
+      ],
+      [
+        "donkey"
+      ],
+      [
+        "hydrant"
+      ]
+    ],
+    "abs": [
+      [
+        "dead",
+        "bird"
+      ],
+      [
+        "crunch",
+        "rcrunch"
+      ],
+      [
+        "rtwist",
+        "mclimb"
+      ],
+      [
+        "sbend"
+      ]
+    ]
+  },
+  "bigMuscles": [
+    "chest",
+    "lats",
+    "quads",
+    "hams",
+    "glutes",
+    "shoulders"
+  ],
+  "smallMuscles": [
+    "shoulders",
+    "reardelts",
+    "biceps",
+    "triceps",
+    "abs"
+  ],
+  "weeklyDirectSetTargets": {
+    "beginner": [
+      9,
+      6
+    ],
+    "intermediate": [
+      13,
+      9
+    ],
+    "advanced": [
+      16,
+      12
+    ]
+  },
+  "volumeTargetsLegacy": {
+    "beginner": [
+      6,
+      10
+    ],
+    "intermediate": [
+      10,
+      16
+    ],
+    "advanced": [
+      12,
+      20
+    ]
+  },
+  "dumbbellStepsKg": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    8,
+    10,
+    12,
+    14,
+    16,
+    20,
+    24
+  ],
+  "concernKeywordsRegex": {
+    "rdl": "deadlift|romanian|rdl|hinge|back|spine|spinal|disc|sciatica|lumbar",
+    "brow": "back|spine|spinal|disc|sciatica|lumbar|bent.?over",
+    "row": "\\brows?\\b",
+    "goblet": "knee|squat",
+    "bsq": "knee|squat",
+    "ohp": "shoulder|overhead",
+    "incl": "shoulder|incline",
+    "bench": "bench press|chest press",
+    "pushup": "wrist|push.?up",
+    "bridge": "bridge",
+    "dead": "dead bug",
+    "pull": "pullover",
+    "curl": "curl|bicep",
+    "tri": "tricep",
+    "lat": "lateral|shoulder",
+    "rfly": "fly\\b",
+    "split": "split squat|lunge|knee",
+    "stepup": "step.?up|knee",
+    "hthrust": "hip thrust",
+    "hcurl": "hamstring curl",
+    "crunch": "crunch",
+    "gm": "back|spine|spinal|disc|sciatica|lumbar|good morning|hinge",
+    "srdl": "back|spine|spinal|disc|sciatica|lumbar|deadlift|rdl|single.?leg|balance",
+    "brfly": "back|spine|spinal|disc|sciatica|lumbar|bent.?over|rear delt|fly\\b",
+    "snow": "back|spine|spinal|disc|sciatica|lumbar|snow angel",
+    "floor": "floor press|chest press",
+    "fly": "\\bfly\\b|flies|chest fly",
+    "ifly": "\\bfly\\b|flies|shoulder|incline",
+    "ffly": "\\bfly\\b|flies|shoulder",
+    "ipush": "wrist|push.?up",
+    "wpush": "wrist|shoulder|push.?up",
+    "cpush": "wrist|elbow|tricep|push.?up",
+    "bdip": "wrist|shoulder|elbow|dip|tricep",
+    "pike": "wrist|shoulder|overhead|push.?up",
+    "arn": "shoulder|overhead",
+    "frt": "shoulder",
+    "yr": "shoulder|\\by raise",
+    "hammer": "elbow|curl|bicep",
+    "icurl": "elbow|curl|bicep|shoulder",
+    "skull": "elbow|tricep|skull",
+    "kick": "elbow|tricep|kickback",
+    "sumo": "knee|squat|hip",
+    "rlunge": "knee|lunge",
+    "blunge": "knee|lunge",
+    "hwalk": "hamstring",
+    "whthrust": "hip thrust|hip|back",
+    "wbridge": "bridge",
+    "sbridge": "bridge|single.?leg",
+    "donkey": "hip|donkey|kick",
+    "hydrant": "hip|hydrant",
+    "bird": "wrist|back|bird dog",
+    "rcrunch": "crunch|back|neck",
+    "rtwist": "back|twist|spine|disc",
+    "mclimb": "wrist|knee|mountain",
+    "sbend": "back|side bend|spine|disc"
+  }
+}
