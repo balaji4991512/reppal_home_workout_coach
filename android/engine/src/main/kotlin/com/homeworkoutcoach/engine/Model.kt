@@ -112,6 +112,7 @@ data class LoggedSet(
     val weightKg: Double,
     val targetReps: Int,
     val effort: Effort = Effort.JUST_RIGHT,
+    val comment: String = "",
 )
 
 const val DEFAULT_TARGET_REPS = 12
