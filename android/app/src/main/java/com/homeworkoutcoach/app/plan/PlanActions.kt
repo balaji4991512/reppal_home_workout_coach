@@ -92,6 +92,12 @@ class PlanActions(
         }
     }
 
+    /** Erase everything on this device: history, plan states, swaps and settings. */
+    suspend fun wipeAll() {
+        training.wipe()
+        settings.reset()
+    }
+
     suspend fun setTheme(mode: ThemeMode) = settings.update { it.copy(theme = mode) }
 
     suspend fun storeStates(states: Map<String, ExerciseState>) {

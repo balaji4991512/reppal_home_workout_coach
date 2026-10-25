@@ -10,8 +10,12 @@ import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.ThemeMode
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
+import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.app.plan.PlanActions
 import com.homeworkoutcoach.app.plan.SetupDraft
+import com.homeworkoutcoach.app.ui.profile.ProfilePresenter
+import com.homeworkoutcoach.app.ui.profile.ProfileUi
+import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
 import com.homeworkoutcoach.app.ui.week.WeekPresenter
 import com.homeworkoutcoach.app.ui.week.WeekUi
 import com.homeworkoutcoach.app.ui.workout.WorkoutViewModel
@@ -98,6 +102,32 @@ class SetupViewModel(
     }
 }
 
+class ProgressViewModel(training: TrainingRepository, val presenter: ProgressPresenter) : ViewModel() {
+    /** Null until loaded. */
+    val workouts: StateFlow<List<Workout>?> =
+        training.workouts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+}
+
+class ProfileViewModel(
+    settings: SettingsRepository,
+    training: TrainingRepository,
+    presenter: ProfilePresenter,
+    private val actions: PlanActions,
+) : ViewModel() {
+    val ui: StateFlow<ProfileUi?> = combine(settings.settings, training.exerciseStates(), training.workouts()) { s, states, w ->
+        presenter.present(s, states, w)
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun wipe(onDone: () -> Unit) {
+        viewModelScope.launch {
+            actions.wipeAll()
+            onDone()
+        }
+    }
+}
+
 /** Factories that pull dependencies from the [com.homeworkoutcoach.app.AppContainer]. */
 object Factories {
     private fun app(extras: androidx.lifecycle.viewmodel.CreationExtras) =
@@ -116,6 +146,14 @@ object Factories {
             app(this).let {
                 WorkoutViewModel(it.library, it.planner, it.settings, it.training, it.actions, KeywordSetParser)
             }
+        }
+    }
+    val Progress = viewModelFactory {
+        initializer { app(this).let { ProgressViewModel(it.training, ProgressPresenter(it.library)) } }
+    }
+    val Profile = viewModelFactory {
+        initializer {
+            app(this).let { ProfileViewModel(it.settings, it.training, ProfilePresenter(it.library, it.planner), it.actions) }
         }
     }
     val Setup = viewModelFactory {

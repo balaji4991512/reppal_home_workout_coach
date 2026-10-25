@@ -21,12 +21,6 @@ class AppContainer(context: Context) {
     val training: TrainingRepository by lazy { RoomTrainingRepository(TrainingDatabase.create(context)) }
     val concerns: ConcernMapper by lazy { KeywordConcernMapper(library) }
     val actions: PlanActions by lazy { PlanActions(settings, training, concerns) }
-
-    /** Erase everything on this device (History and profile, "Erase saved data"). */
-    suspend fun wipeAll() {
-        training.wipe()
-        settings.reset()
-    }
 }
 
 class HomeWorkoutCoachApp : Application() {

@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui
 
+import com.homeworkoutcoach.engine.Bench
 import com.homeworkoutcoach.engine.Exercise
 import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Level
@@ -7,6 +8,10 @@ import com.homeworkoutcoach.engine.LiveAdjustment
 import com.homeworkoutcoach.engine.LiveTarget
 import com.homeworkoutcoach.engine.NextSession
 import com.homeworkoutcoach.engine.Split
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToLong
 
 /** Wording and number formats shared by screens. Text follows the prototype. */
@@ -19,6 +24,22 @@ object Copy {
         "${s.sets} × ${s.targetReps}" + if (e.bodyweight) "" else " at ${kg(s.weightKg)} kg"
 
     fun count(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"
+
+    private val LOCALE: Locale = Locale.forLanguageTag("en-IN")
+    private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", LOCALE)
+    private val WEEKDAY_DAY_MONTH = DateTimeFormatter.ofPattern("EEE, d MMM", LOCALE)
+
+    /** "25 Oct" [fmtMD] */
+    fun dayMonth(millis: Long, zone: ZoneId): String = DAY_MONTH.format(Instant.ofEpochMilli(millis).atZone(zone))
+
+    /** "Sat, 25 Oct" [fmtD] */
+    fun weekdayDayMonth(millis: Long, zone: ZoneId): String = WEEKDAY_DAY_MONTH.format(Instant.ofEpochMilli(millis).atZone(zone))
+
+    fun benchName(b: Bench) = when (b) {
+        Bench.NONE -> "No bench"
+        Bench.FLAT -> "Flat bench"
+        Bench.ADJUSTABLE -> "Adjustable bench"
+    }
 
     /** One line after each set saying what the next set will be [adjust]. Null after a pain report. */
     fun liveNote(e: Exercise, cp: LiveTarget, a: LiveAdjustment): String? {

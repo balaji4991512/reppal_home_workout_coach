@@ -59,6 +59,9 @@ import com.homeworkoutcoach.app.ui.components.Muted
 import com.homeworkoutcoach.app.ui.components.Page
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
+import com.homeworkoutcoach.app.ui.profile.ProfileScreen
+import com.homeworkoutcoach.app.ui.progress.ExerciseProgressScreen
+import com.homeworkoutcoach.app.ui.progress.ProgressScreen
 import com.homeworkoutcoach.app.ui.setup.SetupScreen
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
@@ -170,8 +173,17 @@ private fun AppNavHost(
         composable(Dest.Today.route) {
             WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = { go(Dest.Week) })
         }
-        composable(Dest.Progress.route) { ComingNext("Progress", "Charts per exercise are built after the workout screen.") }
-        composable(Dest.Profile.route) { ComingNext("History and profile", "Saved workouts and your profile are built after the workout screen.") }
+        composable(Dest.Progress.route) { ProgressScreen(onOpen = { nav.navigate("exercise/$it") }) }
+        composable("exercise/{id}") { entry ->
+            ExerciseProgressScreen(entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
+        }
+        composable(Dest.Profile.route) {
+            ProfileScreen(
+                onWeek = { go(Dest.Week) },
+                onSetup = { go(Dest.Setup) },
+                onWiped = { nav.navigate(Dest.Setup.route) { popUpTo(nav.graph.id) { inclusive = true } } },
+            )
+        }
     }
 }
 
@@ -299,13 +311,5 @@ private fun HowItWorks(appName: String, started: Boolean, onDone: () -> Unit) {
         }
         Muted("$appName is a training log, not medical advice.", Modifier.padding(top = 12.dp))
         PrimaryButton(if (started) "Back to your week" else "Set up your plan", onDone)
-    }
-}
-
-@Composable
-private fun ComingNext(title: String, text: String) {
-    Page {
-        H1(title)
-        Muted(text)
     }
 }
