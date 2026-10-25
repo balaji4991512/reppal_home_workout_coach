@@ -7,6 +7,9 @@ import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.room.RoomTrainingRepository
 import com.homeworkoutcoach.app.data.room.TrainingDatabase
+import com.homeworkoutcoach.app.plan.PlanActions
+import com.homeworkoutcoach.engine.ConcernMapper
+import com.homeworkoutcoach.engine.KeywordConcernMapper
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 
@@ -16,6 +19,8 @@ class AppContainer(context: Context) {
     val planner: Planner by lazy { Planner(library) }
     val settings: SettingsRepository by lazy { DataStoreSettingsRepository.create(context) }
     val training: TrainingRepository by lazy { RoomTrainingRepository(TrainingDatabase.create(context)) }
+    val concerns: ConcernMapper by lazy { KeywordConcernMapper(library) }
+    val actions: PlanActions by lazy { PlanActions(settings, training, concerns) }
 
     /** Erase everything on this device (History and profile, "Erase saved data"). */
     suspend fun wipeAll() {

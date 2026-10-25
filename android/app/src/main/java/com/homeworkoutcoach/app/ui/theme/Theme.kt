@@ -1,0 +1,91 @@
+package com.homeworkoutcoach.app.ui.theme
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.homeworkoutcoach.app.data.ThemeMode
+
+/** Monochrome tokens from the prototype's CSS variables. Ink is the only accent. */
+@Immutable
+data class Tokens(
+    val bg: Color,
+    val fg: Color,
+    val mut: Color,
+    val bd: Color,
+    val acc: Color,
+    val on: Color,
+    val accs: Color,
+    val ok: Color,
+    val oks: Color,
+    val bad: Color,
+    val soft: Color,
+    val scrim: Color,
+)
+
+val LightTokens = Tokens(
+    bg = Color(0xFFFFFFFF), fg = Color(0xFF111111), mut = Color(0xFF6B6B68), bd = Color(0xFFE6E6E3),
+    acc = Color(0xFF111111), on = Color(0xFFFFFFFF), accs = Color(0xFFF2F2F0), ok = Color(0xFF157A55),
+    oks = Color(0xFFEAF5EF), bad = Color(0xFFC4372C), soft = Color(0xFFF5F5F3), scrim = Color(0x66000000),
+)
+
+val DarkTokens = Tokens(
+    bg = Color(0xFF0F0F10), fg = Color(0xFFF2F2F0), mut = Color(0xFF9A9A96), bd = Color(0xFF2A2A2C),
+    acc = Color(0xFFF2F2F0), on = Color(0xFF0F0F10), accs = Color(0xFF1C1C1E), ok = Color(0xFF4CC79A),
+    oks = Color(0xFF14291F), bad = Color(0xFFFF8A7D), soft = Color(0xFF1A1A1C), scrim = Color(0x99000000),
+)
+
+/** Type scale from the prototype: h1 30, h2 17, body 16, muted 14. Numbers use tabular figures. */
+@Immutable
+data class Type(
+    val h1: TextStyle = TextStyle(fontSize = 30.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em),
+    val h2: TextStyle = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    val body: TextStyle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
+    val bodyStrong: TextStyle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    val small: TextStyle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
+    val label: TextStyle = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+    val big: TextStyle = TextStyle(fontSize = 76.sp, lineHeight = 72.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.03).em),
+) {
+    fun tabular(style: TextStyle) = style.copy(fontFeatureSettings = "tnum")
+}
+
+private val LocalTokens = staticCompositionLocalOf { LightTokens }
+private val LocalType = staticCompositionLocalOf { Type() }
+
+object AppTheme {
+    val colors: Tokens
+        @Composable @ReadOnlyComposable get() = LocalTokens.current
+    val type: Type
+        @Composable @ReadOnlyComposable get() = LocalType.current
+}
+
+@Composable
+fun isDark(mode: ThemeMode): Boolean = when (mode) {
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+}
+
+@Composable
+fun AppTheme(mode: ThemeMode, content: @Composable () -> Unit) {
+    val dark = isDark(mode)
+    val t = if (dark) DarkTokens else LightTokens
+    // Material components (text selection, ripples) pick up the same ink.
+    val scheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
+        primary = t.acc, onPrimary = t.on, background = t.bg, onBackground = t.fg,
+        surface = t.bg, onSurface = t.fg, onSurfaceVariant = t.mut, outline = t.bd, error = t.bad,
+    )
+    CompositionLocalProvider(LocalTokens provides t, LocalType provides Type()) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
+}
