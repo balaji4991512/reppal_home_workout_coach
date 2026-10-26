@@ -7,6 +7,7 @@ import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.plan.PlanActions
 import com.homeworkoutcoach.app.plan.WorkoutSession
 import com.homeworkoutcoach.app.ui.Copy
+import com.homeworkoutcoach.app.voice.VoiceError
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
@@ -29,6 +30,8 @@ data class SetInput(
     val pain: Boolean = false,
     val preview: SetRecord? = null,
     val error: String? = null,
+    /** The microphone is open; [text] shows what has been heard so far. */
+    val listening: Boolean = false,
 )
 
 sealed interface WorkoutState {
@@ -98,6 +101,29 @@ class WorkoutViewModel(
 
     /** "Check my note" for typed or spoken text. */
     fun onCheck() = editLogging { l -> l.copy(input = read(l.session, l.input)) }
+
+    fun onVoiceListening() = editLogging { l ->
+        l.copy(input = l.input.copy(listening = true, text = "", preview = null, error = null))
+    }
+
+    fun onVoicePartial(text: String) = editLogging { l -> l.copy(input = l.input.copy(text = text)) }
+
+    /** A spoken phrase is checked at once [mic]. The chips are cleared so the spoken words are what count. */
+    fun onVoiceResult(text: String) = editLogging { l -> l.copy(input = read(l.session, SetInput(text = text))) }
+
+    fun onVoiceError(error: VoiceError) = editLogging { l ->
+        l.copy(
+            input = l.input.copy(
+                listening = false,
+                error = when (error) {
+                    VoiceError.NOT_AVAILABLE -> "Voice input isn’t available on this phone. Type instead."
+                    VoiceError.NO_PERMISSION -> "The microphone is off for this app. Type instead, or allow it in Settings."
+                    VoiceError.NOT_HEARD -> "Couldn’t hear that. Try again or type it."
+                    VoiceError.FAILED -> "Voice input stopped. Try again or type it."
+                },
+            ),
+        )
+    }
 
     /** Parse the chips (if a rep count is chosen) or the typed text, and check it against this exercise [read]. */
     private fun read(session: WorkoutSession, input: SetInput): SetInput {

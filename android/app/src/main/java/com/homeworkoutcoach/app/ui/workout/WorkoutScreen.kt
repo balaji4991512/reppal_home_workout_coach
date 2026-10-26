@@ -58,6 +58,8 @@ import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.week.SessionCard
+import com.homeworkoutcoach.app.voice.MicButton
+import com.homeworkoutcoach.app.voice.VoiceError
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.SetRecord
 import kotlinx.serialization.json.Json
@@ -95,10 +97,19 @@ fun WorkoutScreen(
             onPain = vm::onPain,
             onCheck = vm::onCheck,
             onSave = vm::onSave,
+            voice = VoiceHandlers(vm::onVoiceListening, vm::onVoicePartial, vm::onVoiceResult, vm::onVoiceError),
         )
         is WorkoutState.Done -> DoneContent(s.ui, onWeek)
     }
 }
+
+/** Voice callbacks, kept together so previews and tests can leave the Mic out. */
+class VoiceHandlers(
+    val onListening: () -> Unit,
+    val onPartial: (String) -> Unit,
+    val onResult: (String) -> Unit,
+    val onError: (VoiceError) -> Unit,
+)
 
 /** One exercise at a time [vLog]. */
 @Composable
@@ -110,6 +121,7 @@ fun LoggingContent(
     onPain: () -> Unit,
     onCheck: () -> Unit,
     onSave: () -> Unit,
+    voice: VoiceHandlers? = null,
 ) {
     val c = AppTheme.colors
     val session = state.session
@@ -141,15 +153,20 @@ fun LoggingContent(
             Text(state.note, Modifier.padding(vertical = 6.dp), color = c.ok, style = AppTheme.type.bodyStrong)
         }
 
-        Field(
-            input.text,
-            onText,
-            placeholder = "Or say or type how the set went",
-            label = "Set feedback",
-            modifier = Modifier.padding(top = 12.dp),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onCheck() }),
-        )
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Field(
+                input.text,
+                onText,
+                placeholder = if (input.listening) "Listening…" else "Or say or type how the set went",
+                label = "Set feedback",
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onCheck() }),
+            )
+            voice?.let { v ->
+                MicButton(input.listening, v.onListening, v.onPartial, v.onResult, v.onError, Modifier.heightIn(min = 50.dp))
+            }
+        }
 
         Muted("Reps you did", Modifier.padding(top = 8.dp))
         Chips {

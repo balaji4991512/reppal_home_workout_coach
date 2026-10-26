@@ -9,6 +9,7 @@ import com.homeworkoutcoach.app.ui.workout.DonePresenter
 import com.homeworkoutcoach.app.ui.workout.WorkoutState
 import com.homeworkoutcoach.app.ui.workout.WorkoutViewModel
 import com.homeworkoutcoach.app.ui.workout.recordJson
+import com.homeworkoutcoach.app.voice.VoiceError
 import com.homeworkoutcoach.engine.Bench
 import com.homeworkoutcoach.engine.Day
 import com.homeworkoutcoach.engine.DayItem
@@ -184,6 +185,41 @@ class WorkoutViewModelTest {
         assertEquals(Effort.JUST_RIGHT, vm.logging().input.preview!!.effort)
         vm.onReps(12)
         assertNull(vm.logging().input.preview)
+    }
+
+    @Test
+    fun voicePhraseIsCheckedAtOnceAndWinsOverChips() {
+        val vm = vm()
+        vm.onReps(12)
+        vm.onVoiceListening()
+        assertTrue(vm.logging().input.listening)
+        assertNull(vm.logging().input.preview)
+        vm.onVoicePartial("ten reps")
+        assertEquals("ten reps", vm.logging().input.text)
+        vm.onVoiceResult("ten reps, hard, left wrist tight")
+        val input = vm.logging().input
+        assertEquals(false, input.listening)
+        assertNull(input.reps)
+        assertEquals("ten reps, hard, left wrist tight", input.text)
+        // one-line readback before Save set: weight defaults to the current target
+        assertEquals(SetRecord(10, 6.0, Effort.HARD, comment = "left wrist tight"), input.preview)
+    }
+
+    @Test
+    fun voiceProblemsSayWhatToDo() {
+        val vm = vm()
+        vm.onVoiceListening()
+        vm.onVoiceError(VoiceError.NOT_HEARD)
+        assertEquals("Couldn’t hear that. Try again or type it.", vm.logging().input.error)
+        assertEquals(false, vm.logging().input.listening)
+        vm.onVoiceError(VoiceError.NO_PERMISSION)
+        assertEquals("The microphone is off for this app. Type instead, or allow it in Settings.", vm.logging().input.error)
+        // a phrase with no rep count gets the usual hint
+        vm.onVoiceResult("that felt fine")
+        assertEquals("I couldn’t find the rep count. Try again, like “10 reps, hard”.", vm.logging().input.error)
+        // pain words are flagged in the readback
+        vm.onVoiceResult("eight reps, sharp pain in my shoulder")
+        assertTrue(vm.logging().input.preview!!.pain)
     }
 
     @Test
