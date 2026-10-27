@@ -20,7 +20,7 @@ import java.util.zip.GZIPInputStream
  */
 class PrototypeGoldenTest {
     private val lib = Library.default
-    private val planner = Planner(lib)
+    private val planner = Planner(lib, WeeklyTargets.prototype(lib))
 
     private val golden: JsonObject by lazy {
         val stream = checkNotNull(javaClass.classLoader.getResourceAsStream("golden.json.gz"))

@@ -80,7 +80,7 @@ data class VolumeUi(
     /** "Lighter this week: biceps." or "This week covers all major muscles." */
     val headline: String,
     val rows: List<VolumeRowUi>,
-    /** "Target for beginner: about 6 to 10 sets a week for big muscles." */
+    /** "Weekly set targets for beginners. ..." Each row shows its muscle's own target. */
     val setTarget: String,
 )
 
@@ -163,9 +163,8 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
     }
 
     private fun volume(settings: UserSettings, week: List<Day>, state: (String) -> ExerciseState): VolumeUi {
-        val v = Volume.plannedWeek(lib, settings.level, week, state)
+        val v = Volume.plannedWeek(lib, settings.level, week, state, planner.targets)
         val low = v.filterValues { it.status == SetCountStatus.LOW }.keys.map { lib.muscleLabels.getValue(it).lowercase() }
-        val range = lib.weeklySetRanges.getValue(settings.level)
         return VolumeUi(
             headline = if (low.isNotEmpty()) "Lighter this week: ${low.joinToString(", ")}." else "This week covers all major muscles.",
             rows = v.map { (m, w) ->
@@ -176,7 +175,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
                 VolumeRowUi(
                     muscle = lib.muscleLabels.getValue(m),
                     load = parts.joinToString(", ").ifEmpty { "none" },
-                    sets = "${Copy.kg(w.sets)} sets, " + when (w.status) {
+                    sets = "${Copy.kg(w.sets)} of ${planner.targets.sets(m, settings.level)} sets, " + when (w.status) {
                         SetCountStatus.LOW -> "Low"
                         SetCountStatus.HIGH -> "High"
                         SetCountStatus.ON_TARGET -> "On target"
@@ -184,7 +183,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
                     status = w.status,
                 )
             },
-            setTarget = "Target for ${settings.level.key}: about ${range.low} to ${range.high} sets a week for big muscles.",
+            setTarget = "Weekly set targets for ${settings.level.key}s. Sets where a muscle only helps count as half.",
         )
     }
 }

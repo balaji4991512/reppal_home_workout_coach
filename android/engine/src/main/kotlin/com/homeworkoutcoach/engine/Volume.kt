@@ -36,8 +36,6 @@ data class MuscleWeek(
 )
 
 object Volume {
-    private val HALF_RANGE_MUSCLES = setOf(Muscle.REAR_DELTS, Muscle.BICEPS, Muscle.TRICEPS)
-
     /** External load only: bodyweight sets count 0 kg. */
     fun setKg(exercise: Exercise, reps: Int, weightKg: Double): Double = if (exercise.bodyweight) 0.0 else reps * weightKg
 
@@ -106,7 +104,13 @@ object Volume {
     }
 
     /** Planned volume for the week per muscle [volCard]. Every muscle is present in the result. */
-    fun plannedWeek(lib: Library, level: Level, week: List<Day>, stateOf: (String) -> ExerciseState): Map<Muscle, MuscleWeek> {
+    fun plannedWeek(
+        lib: Library,
+        level: Level,
+        week: List<Day>,
+        stateOf: (String) -> ExerciseState,
+        targets: WeeklyTargets = WeeklyTargets.PER_MUSCLE,
+    ): Map<Muscle, MuscleWeek> {
         val sets = mutableMapOf<Muscle, Double>()
         val kg = mutableMapOf<Muscle, Double>()
         val reps = mutableMapOf<Muscle, Int>()
@@ -118,17 +122,16 @@ object Volume {
             if (e.bodyweight) e.primary.forEach { reps.merge(it, s.sets * s.targetReps, Int::plus) }
             else e.primary.forEach { kg.merge(it, s.sets * s.targetReps * s.weightKg, Double::plus) }
         }
-        val range = lib.weeklySetRanges.getValue(level)
         return Muscle.entries.associateWith { m ->
-            val f = if (m in HALF_RANGE_MUSCLES) 0.5 else 1.0
+            val range = targets.range(m, level)
             val v = jsRound((sets[m] ?: 0.0) * 2) / 2.0
             MuscleWeek(
                 kg = kg[m] ?: 0.0,
                 reps = reps[m] ?: 0,
                 sets = v,
                 status = when {
-                    v < range.low * f -> SetCountStatus.LOW
-                    v > range.high * f -> SetCountStatus.HIGH
+                    v < range.low -> SetCountStatus.LOW
+                    v > range.high -> SetCountStatus.HIGH
                     else -> SetCountStatus.ON_TARGET
                 },
             )

@@ -132,7 +132,7 @@ class AcceptanceTest {
                 val ids = day.items.map { it.exerciseId }
                 assertEquals("$s ${day.label}", ids.size, ids.toSet().size)
                 assertTrue(ids.all { s.equipment.canDo(lib.exercise(it)) })
-                if (day.label.startsWith("M:")) assertTrue(ids.size <= if (level == Level.BEGINNER) 6 else 7)
+                if (day.label.startsWith("M:")) assertTrue(ids.size <= planner.targets.dayCap(level))
             }
         }
     }

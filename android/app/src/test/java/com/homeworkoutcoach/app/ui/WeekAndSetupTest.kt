@@ -112,7 +112,8 @@ class WeekPresenterTest {
         assertEquals("864 kg", chest.load)
         assertEquals(10, ui.volume.rows.size)
         assertTrue(ui.volume.headline.startsWith("Lighter this week:"))
-        assertEquals("Target for beginner: about 6 to 10 sets a week for big muscles.", ui.volume.setTarget)
+        assertTrue(ui.volume.setTarget.startsWith("Weekly set targets for beginners."))
+        assertEquals("9 of 11 sets, On target", chest.sets)
         assertEquals(SetCountStatus.ON_TARGET, chest.status)
     }
 

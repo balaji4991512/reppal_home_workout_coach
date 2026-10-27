@@ -30,7 +30,11 @@ data class DayItem(val slot: String, val exerciseId: String, val baseId: String 
 /** A built training day. [missing] lists slots nothing in the user's equipment covers. */
 data class Day(val label: String, val items: List<DayItem>, val missing: List<String>)
 
-class Planner(private val lib: Library = Library.default) {
+class Planner(
+    private val lib: Library = Library.default,
+    /** Weekly sets per muscle; [WeeklyTargets.prototype] reproduces the web prototype. */
+    val targets: WeeklyTargets = WeeklyTargets.PER_MUSCLE,
+) {
 
     // ---- Weekly schedule [wkSeq, occ] ----
 
@@ -93,13 +97,11 @@ class Planner(private val lib: Library = Library.default) {
         val parts = label.substring(2).split('#')
         val occurrence = parts.getOrNull(1)?.toIntOrNull() ?: 0
         val muscles = parseMuscles(parts[0]).sortedBy { if (it in lib.bigMuscles) 0 else 1 }
-        val cap = if (s.level == Level.BEGINNER) 6 else 7
-        val targets = lib.weeklyDirectSetTargets.getValue(s.level)
+        val cap = targets.dayCap(s.level)
         val sequence = weekSequence(s)
 
         val count = muscles.associateWith { m ->
-            val weekly = if (m in lib.smallMuscles) targets.small else targets.big
-            maxOf(1, jsRound(weekly.toDouble() / frequency(m, sequence) / 3))
+            maxOf(1, jsRound(targets.sets(m, s.level).toDouble() / frequency(m, sequence) / 3))
         }.toMutableMap()
         while (count.values.sum() > cap) {
             val most = muscles.maxOf { count.getValue(it) }
