@@ -10,6 +10,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.content.ContextCompat
 
 enum class ScanProblem {
@@ -58,7 +59,13 @@ class ScaleScanner(private val context: Context) : ScaleSource {
         val scanner = adapter?.bluetoothLeScanner ?: return onProblem(ScanProblem.BLUETOOTH_OFF)
         val cb = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                Flexscale.parse(result.scanRecord?.getManufacturerSpecificData(Flexscale.COMPANY_ID))?.let(onReading)
+                val data = result.scanRecord?.getManufacturerSpecificData(Flexscale.COMPANY_ID)
+                val reading = Flexscale.parse(data)
+                // Off unless enabled with: adb shell setprop log.tag.Flexscale DEBUG
+                if (Log.isLoggable(TAG, Log.DEBUG)) {
+                    Log.d(TAG, "data=${data?.joinToString("") { "%02x".format(it) }} raw=${result.scanRecord?.bytes?.size} -> $reading")
+                }
+                reading?.let(onReading)
             }
 
             override fun onBatchScanResults(results: MutableList<ScanResult>) = results.forEach { onScanResult(0, it) }
@@ -74,6 +81,10 @@ class ScaleScanner(private val context: Context) : ScaleSource {
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             .build()
         scanner.startScan(listOf(filter), settings, cb)
+    }
+
+    private companion object {
+        const val TAG = "Flexscale"
     }
 
     @SuppressLint("MissingPermission")
