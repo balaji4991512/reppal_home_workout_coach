@@ -9,12 +9,16 @@ import org.junit.Test
 class FlexscaleTest {
     private fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
-    /** The scale's broadcasts from a real capture, in order. */
-    private val capture: List<ByteArray> by lazy {
-        javaClass.classLoader!!.getResource("flexscale_capture.txt")!!.readText().lines()
+    private fun load(name: String): List<ByteArray> =
+        javaClass.classLoader!!.getResource(name)!!.readText().lines()
             .filter { it.isNotBlank() && !it.startsWith("#") }
             .map { hex(it.split(' ')[1]) }
-    }
+
+    /** The scale's broadcasts while the Flexnest app weighed (83.50, then 84.05), in order. */
+    private val capture by lazy { load("flexscale_capture.txt") }
+
+    /** The scale's broadcasts while RepPal listened: phase byte 0x10 throughout, settled at 83.55. */
+    private val reppalCapture by lazy { load("flexscale_capture_reppal.txt") }
 
     @Test
     fun parsesWeightStatusAndScale() {
@@ -43,7 +47,7 @@ class FlexscaleTest {
         capture.forEach { Flexscale.parse(it)?.let(first::accept) }
         assertEquals(WeighInState.Settled(83.50, "ED:67:39:DA:91:0B"), first.state)
 
-        // Listening after that reading (while the scale still repeats it): the next weigh-in gives 84.05.
+        // Listening after that reading, during the body-fat part: the next weigh-in gives 84.05.
         val afterFirst = capture.indexOfFirst { Flexscale.parse(it)!!.phase != 0 }
         val second = WeighInTracker()
         capture.drop(afterFirst).forEach { Flexscale.parse(it)?.let(second::accept) }
@@ -51,14 +55,29 @@ class FlexscaleTest {
     }
 
     @Test
-    fun aReadingAlreadyOnTheScaleIsNotSavedAgain() {
+    fun theSessionRepPalMissedNowSettles() {
+        // The first version ignored every packet here because the phase byte was 0x10.
         val t = WeighInTracker()
-        // the scale is still showing a settled 83.50 from before listening started
-        t.accept(Flexscale.parse(hex("aabbed6739da910b3665e06a3baa0223009e204ce203b013"))!!)
+        reppalCapture.forEach { Flexscale.parse(it)?.let(t::accept) }
+        assertEquals(WeighInState.Settled(83.55, "ED:67:39:DA:91:0B"), t.state)
+    }
+
+    @Test
+    fun tapsAndObjectsAreNotWeighIns() {
+        // Only the end of the RepPal capture: an object around 10 kg, then taps on the empty scale.
+        val t = WeighInTracker()
+        val afterSettle = reppalCapture.indexOfFirst { Flexscale.parse(it)!!.settled && Flexscale.parse(it)!!.weightKg > 80 }
+        reppalCapture.drop(afterSettle + 1).forEach { Flexscale.parse(it)?.let(t::accept) }
         assertEquals(WeighInState.Waiting, t.state)
-        // and repeats it afterwards with a non-zero phase
-        t.accept(Flexscale.parse(hex("aabbed6739da910b6865e06affffff02109e204ce2030514"))!!)
-        assertEquals(WeighInState.Waiting, t.state)
+    }
+
+    @Test
+    fun aWakingScaleReShowingItsLastWeightIsNotSavedAgain() {
+        // From the first capture: the scale wakes and shows 84.05 (measuring, then settled) with nothing moving.
+        val t = WeighInTracker()
+        t.accept(Flexscale.parse(hex("aabbed6739da910b9065e06affffff0200d5204ce2034614"))!!)
+        t.accept(Flexscale.parse(hex("aabbed6739da910b9165e06affffff0300d5204ce2034114"))!!)
+        assertEquals(WeighInState.Live(84.05), t.state)
     }
 
     @Test
