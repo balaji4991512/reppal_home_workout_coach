@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -34,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.homeworkoutcoach.app.R
 import com.homeworkoutcoach.app.ui.Factories
 import com.homeworkoutcoach.app.ui.ProfileViewModel
 import com.homeworkoutcoach.app.ui.components.Body
@@ -57,12 +62,37 @@ fun ProfileScreen(
     vm: ProfileViewModel = viewModel(factory = Factories.Profile),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    ui?.let { ProfileContent(it, onWeek, onSetup, onWipe = { vm.wipe(onWiped) }) }
+    val exportNote by vm.exportNote.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val appName = stringResource(R.string.app_name)
+    // The system "save as" screen: the user picks Downloads, Drive or anywhere else; no storage permission needed.
+    val saveAs = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            vm.export(appName) { text ->
+                checkNotNull(context.contentResolver.openOutputStream(uri, "wt")).use { it.write(text.toByteArray()) }
+            }
+        }
+    }
+    ui?.let {
+        ProfileContent(
+            it, onWeek, onSetup,
+            onWipe = { vm.wipe(onWiped) },
+            onExport = { saveAs.launch(vm.exportFileName(appName)) },
+            exportNote = exportNote,
+        )
+    }
 }
 
 /** History and profile [vProfile]. Erasing needs a second tap. */
 @Composable
-fun ProfileContent(ui: ProfileUi, onWeek: () -> Unit, onSetup: () -> Unit, onWipe: () -> Unit) {
+fun ProfileContent(
+    ui: ProfileUi,
+    onWeek: () -> Unit,
+    onSetup: () -> Unit,
+    onWipe: () -> Unit,
+    onExport: () -> Unit = {},
+    exportNote: String? = null,
+) {
     val c = AppTheme.colors
     var confirmWipe by remember { mutableStateOf(false) }
     var open by rememberSaveable { mutableStateOf(emptyList<Long>()) }
@@ -121,6 +151,11 @@ fun ProfileContent(ui: ProfileUi, onWeek: () -> Unit, onSetup: () -> Unit, onWip
 
         PrimaryButton("Back to your week", onWeek)
         PrimaryButton("Edit equipment and plan", onSetup, alt = true)
+
+        H2("Your data")
+        Muted("Everything is stored on this phone. Save a copy of your plan, workouts and weigh-ins as a file you keep.")
+        PrimaryButton("Export my data", onExport, alt = true)
+        exportNote?.let { Text(it, Modifier.padding(top = 8.dp), color = c.fg, style = AppTheme.type.bodyStrong) }
         PrimaryButton(
             if (confirmWipe) "Tap again to erase everything" else "Erase saved data",
             { if (confirmWipe) onWipe() else confirmWipe = true },

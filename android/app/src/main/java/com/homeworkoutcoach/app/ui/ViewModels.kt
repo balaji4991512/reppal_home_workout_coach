@@ -9,6 +9,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.homeworkoutcoach.app.HomeWorkoutCoachApp
 import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.AuthRepository
+import com.homeworkoutcoach.app.data.DataExport
+import com.homeworkoutcoach.app.data.DataExporter
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.ThemeMode
@@ -40,6 +42,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 /** Shell state: settings drive the theme, the start screen and the menu footer. Null until loaded. */
 class AppViewModel(
@@ -160,7 +164,27 @@ class ProfileViewModel(
     auth: AuthRepository,
     presenter: ProfilePresenter,
     private val actions: PlanActions,
+    private val exporter: DataExporter,
 ) : ViewModel() {
+    private val _exportNote = MutableStateFlow<String?>(null)
+
+    /** Result of the last export, shown under the button. */
+    val exportNote: StateFlow<String?> = _exportNote
+
+    /** Suggested name for the export file. */
+    fun exportFileName(appName: String) = DataExport.fileName(appName, System.currentTimeMillis(), ZoneId.systemDefault())
+
+    /** Build the export and hand it to [write], which saves it where the user chose. */
+    fun export(appName: String, write: suspend (String) -> Unit) {
+        viewModelScope.launch {
+            _exportNote.value = runCatching {
+                val r = exporter.export(appName)
+                withContext(Dispatchers.IO) { write(r.json) }
+                "Saved ${Copy.count(r.workouts, "workout")} and ${Copy.count(r.weighIns, "weigh-in")}."
+            }.getOrElse { "Couldn’t save the file. Try again, or pick another place." }
+        }
+    }
+
     val ui: StateFlow<ProfileUi?> = combine(
         settings.settings, training.exerciseStates(), training.workouts(), auth.account,
     ) { s, states, w, account ->
@@ -207,7 +231,9 @@ object Factories {
     }
     val Profile = viewModelFactory {
         initializer {
-            app(this).let { ProfileViewModel(it.settings, it.training, it.auth, ProfilePresenter(it.library, it.planner), it.actions) }
+            app(this).let {
+                ProfileViewModel(it.settings, it.training, it.auth, ProfilePresenter(it.library, it.planner), it.actions, it.exporter)
+            }
         }
     }
     val Setup = viewModelFactory {
