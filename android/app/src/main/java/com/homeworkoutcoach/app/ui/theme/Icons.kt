@@ -42,5 +42,7 @@ object AppIcons {
     val Scale = icon("scale", "M6 3.5h12a2.5 2.5 0 0 1 2.5 2.5v12a2.5 2.5 0 0 1-2.5 2.5H6a2.5 2.5 0 0 1-2.5-2.5V6A2.5 2.5 0 0 1 6 3.5z", "M8.5 9.5a3.5 3.5 0 0 1 7 0M12 9.5l1.4-2")
     val Check = icon("check", "M5 12.5l4.5 4.5L19 7.5", stroke = 2.4f)
     val SignInOut = icon("out", "M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9M15 8l4 4-4 4M19 12H9")
+    /** Six dots: a handle to drag by. */
+    val Grip = icon("grip", "M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01", stroke = 2.8f)
     val ChevronDown = icon("chev", "M6 9l6 6 6-6", stroke = 1.5f)
 }

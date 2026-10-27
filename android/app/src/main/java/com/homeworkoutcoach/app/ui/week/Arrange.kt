@@ -4,6 +4,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
+import com.homeworkoutcoach.app.ui.theme.AppIcons
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -164,6 +183,12 @@ class ArrangeViewModel(
         }
     }
 
+    /** Drag and drop: put [session] on [weekday], swapping with whatever is there. */
+    fun drop(session: Int, weekday: Int) {
+        val st = _state.value ?: return
+        _state.value = st.copy(draft = presenter.move(st.draft, session, weekday), selected = null)
+    }
+
     fun resetToDefault() {
         val st = _state.value ?: return
         _state.value = st.copy(draft = presenter.defaultDays(st.settings), selected = null)
@@ -185,10 +210,33 @@ fun ArrangeScreen(onDone: () -> Unit, vm: ArrangeViewModel = viewModel(factory =
     val s = st ?: return
     val ui = vm.presenter.present(s.settings, s.swaps, s.draft, s.selected)
     val c = AppTheme.colors
+
+    // Drag and drop: the session being dragged, how far it has moved, and where each weekday row sits on screen.
+    var dragging by remember { mutableStateOf<Int?>(null) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    var startY by remember { mutableFloatStateOf(0f) }
+    val rowBounds = remember { mutableStateMapOf<Int, Rect>() }
+    // Reads the state holders when called, so the gesture callbacks (kept across recompositions) see the latest.
+    fun targetNow() = dragging?.let { rowBounds.entries.firstOrNull { (_, b) -> startY + dragY in b.top..b.bottom }?.key }
+    val target = targetNow()
+    fun start(r: ArrangeRow) {
+        dragging = r.session
+        dragY = 0f
+        startY = rowBounds[r.weekday]?.center?.y ?: 0f
+    }
+    fun end(drop: Boolean) {
+        val session = dragging
+        val to = targetNow()
+        if (drop && session != null && to != null) vm.drop(session, to)
+        dragging = null
+        dragY = 0f
+    }
+    val onDrag = { change: PointerInputChange, amount: Offset -> change.consume(); dragY += amount.y }
+
     Page {
         H1("Rearrange days")
         Muted(
-            if (s.selected == null) "Tap a workout, then tap the day to move it to. Days swap if both have a workout."
+            if (s.selected == null) "Drag a workout by its handle to another day, or tap it and then tap the day. Days swap if both have a workout."
             else "Now tap the day to move it to.",
         )
 
@@ -196,26 +244,63 @@ fun ArrangeScreen(onDone: () -> Unit, vm: ArrangeViewModel = viewModel(factory =
             ui.rows.forEachIndexed { i, r ->
                 if (i > 0) Box(Modifier.padding(start = 16.dp).fillMaxWidth().heightIn(min = 1.dp).background(c.bd))
                 val shape = RoundedCornerShape(12.dp)
+                val lifted = dragging != null && r.session == dragging
+                val hovered = target == r.weekday && !lifted
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 60.dp)
-                        .clickable(role = Role.Button, enabled = r.session != null || s.selected != null) { vm.tap(r) }
+                        .onGloballyPositioned { rowBounds[r.weekday] = it.boundsInRoot() }
+                        .zIndex(if (lifted) 1f else 0f)
+                        .graphicsLayer { if (lifted) translationY = dragY }
+                        .then(if (hovered) Modifier.background(c.accs) else Modifier)
+                        .clickable(role = Role.Button, enabled = dragging == null && (r.session != null || s.selected != null)) { vm.tap(r) }
                         .semantics { selected = r.selected }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(r.day.take(3), Modifier.width(52.dp).padding(start = 8.dp), color = c.mut, style = AppTheme.type.label.copy(fontWeight = FontWeight.SemiBold))
-                    Box(
-                        Modifier.weight(1f).clip(shape)
-                            .then(if (r.selected) Modifier.background(c.acc) else if (r.session != null) Modifier.border(1.dp, c.bd, shape).background(c.bg) else Modifier)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    Row(
+                        Modifier.weight(1f)
+                            .then(if (lifted) Modifier.shadow(8.dp, shape) else Modifier)
+                            .clip(shape)
+                            .then(if (r.selected || lifted) Modifier.background(c.acc) else if (r.session != null) Modifier.border(1.dp, c.bd, shape).background(c.bg) else Modifier)
+                            .then(
+                                // A long press anywhere on the card also picks it up.
+                                if (r.session != null) Modifier.pointerInput(r.session, r.weekday) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = { start(r) }, onDragEnd = { end(true) }, onDragCancel = { end(false) }, onDrag = onDrag,
+                                    )
+                                } else Modifier,
+                            )
+                            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (r.title != null) {
-                            Column {
-                                Text(r.title, color = if (r.selected) c.on else c.fg, style = AppTheme.type.bodyStrong)
-                                r.detail?.let { Text(it, color = if (r.selected) c.on else c.mut, style = AppTheme.type.small) }
+                            val on = r.selected || lifted
+                            Column(Modifier.weight(1f)) {
+                                Text(r.title, color = if (on) c.on else c.fg, style = AppTheme.type.bodyStrong)
+                                r.detail?.let { Text(it, color = if (on) c.on else c.mut, style = AppTheme.type.small) }
                             }
+                            Icon(
+                                AppIcons.Grip,
+                                contentDescription = "Drag ${r.title}",
+                                tint = if (on) c.on else c.mut,
+                                modifier = Modifier.size(48.dp).padding(12.dp).pointerInput(r.session, r.weekday) {
+                                    detectDragGestures(
+                                        onDragStart = { start(r) }, onDragEnd = { end(true) }, onDragCancel = { end(false) }, onDrag = onDrag,
+                                    )
+                                },
+                            )
                         } else {
-                            Text(if (s.selected != null) "Rest · tap to move here" else "Rest", color = c.mut, style = AppTheme.type.body)
+                            Text(
+                                when {
+                                    hovered -> "Drop here"
+                                    s.selected != null -> "Rest · tap to move here"
+                                    else -> "Rest"
+                                },
+                                Modifier.padding(end = 12.dp),
+                                color = c.mut,
+                                style = AppTheme.type.body,
+                            )
                         }
                     }
                 }
