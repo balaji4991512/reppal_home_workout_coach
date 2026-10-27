@@ -32,9 +32,26 @@ fill and its progress; the rest of the app stays black and white. Colours are ch
 - *Habits list*: today's habits first, one-tap tick; a number or time habit opens a small box to add to today's amount.
 - *Habit page*: month calendar (days fill in when done), this week "4 of 5", this month and all-time counts. Past days
   can be edited.
-- *Add / edit habit*: name, icon, colour, tracking type, target, schedule. Starting suggestions (water, sleep, reading, yoga,
-  meditation, walking) that the user can ignore.
+- *Add / edit habit*: name, icon, colour, tracking type, target, schedule. Starting suggestions (list below) that the
+  user can ignore.
 - *Archive* a habit to hide it and keep its history; *Delete* removes its history too (asks first).
+
+**Starting suggestions** (the user picks any, edits them or ignores them all):
+
+| Habit | Tracked as | Ticks itself when |
+|---|---|---|
+| Workout | done / not done | a workout is finished in the app |
+| Morning routine | done / not done | the Morning routine is completed |
+| Night routine | done / not done | the Night routine is completed |
+| Journal | done / not done | ticked by hand (until the journal step exists) |
+| Water | number, 8 glasses | |
+| Sleep | time, 7 hours | |
+| Reading | time, 20 min | |
+| Meditation | time, 10 min | |
+| Yoga | time, 20 min | |
+| Walking | time, 30 min | |
+
+Habits that tick themselves can still be ticked or unticked by hand.
 
 **Rules (engine)**
 - A habit is due on a day if its schedule says so (N-times-a-week habits are due every day until the week's N is met).
@@ -100,4 +117,4 @@ AI, Indian-language text, festival and fasting days. Each gets its own short spe
 ## Questions for you
 1. ~~Colour~~ Decided: one accent colour per habit (the project's "monochrome" rule is relaxed for habits only).
 2. ~~Home screen~~ Decided: Today is the first screen.
-3. **Habit suggestions:** is the starting list (water, sleep, reading, yoga, meditation, walking) right, or what else?
+3. ~~Habit suggestions~~ Decided: the list above (workout, journal and the two routines included).
