@@ -10,6 +10,7 @@ import com.homeworkoutcoach.engine.Habit
 import com.homeworkoutcoach.engine.HabitKind
 import com.homeworkoutcoach.engine.HabitLog
 import com.homeworkoutcoach.engine.HabitSchedule
+import com.homeworkoutcoach.engine.RoutineDone
 import com.homeworkoutcoach.engine.Habits
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -173,6 +174,26 @@ class HabitLogsTest {
         assertEquals(setOf(DAY), HabitLogs.workoutDays(listOf(workout(late)), ist))
         assertEquals(setOf(DAY.plusDays(1)), HabitLogs.workoutDays(listOf(workout(late)), ZoneOffset.ofHours(9)))
         assertEquals(setOf(DAY), HabitLogs.workoutDays(listOf(workout(late), workout(late + 1000)), ist))
+    }
+
+    @Test
+    fun theRoutineHabitsTickOnDaysTheirRoutinesWereFinished() {
+        val morning = com.homeworkoutcoach.engine.Routine("m", "Morning", com.homeworkoutcoach.engine.DayPart.MORNING, listOf(com.homeworkoutcoach.engine.RoutineItem("a", "A")))
+        val evening = com.homeworkoutcoach.engine.Routine("e", "Evening", com.homeworkoutcoach.engine.DayPart.EVENING, listOf(com.homeworkoutcoach.engine.RoutineItem("b", "B")))
+        val done = listOf(RoutineDone("m", DAY), RoutineDone("e", DAY.minusDays(1)))
+        val days = HabitLogs.routineDays(listOf(morning, evening), done)
+        assertEquals(setOf(DAY), days.getValue(AutoSource.MORNING_ROUTINE))
+        assertEquals(setOf(DAY.minusDays(1)), days.getValue(AutoSource.NIGHT_ROUTINE))
+
+        val morningHabit = storedHabit("mh", auto = AutoSource.MORNING_ROUTINE).habit
+        val nightHabit = storedHabit("nh", auto = AutoSource.NIGHT_ROUTINE).habit
+        assertTrue(Habits.isDone(morningHabit, HabitLogs.log(morningHabit, emptyMap(), emptySet(), days), DAY))
+        assertFalse(Habits.isDone(nightHabit, HabitLogs.log(nightHabit, emptyMap(), emptySet(), days), DAY))
+        assertTrue(Habits.isDone(nightHabit, HabitLogs.log(nightHabit, emptyMap(), emptySet(), days), DAY.minusDays(1)))
+        // unticked by hand wins here too
+        assertFalse(Habits.isDone(morningHabit, HabitLogs.log(morningHabit, mapOf(DAY to 0), emptySet(), days), DAY))
+        // and without routines nothing ticks
+        assertFalse(Habits.isDone(morningHabit, HabitLogs.log(morningHabit, emptyMap(), emptySet(), HabitLogs.routineDays(emptyList(), done)), DAY))
     }
 
     @Test

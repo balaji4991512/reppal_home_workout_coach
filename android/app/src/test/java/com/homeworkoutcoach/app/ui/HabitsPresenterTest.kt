@@ -80,6 +80,19 @@ class HabitsPresenterTest {
     }
 
     @Test
+    fun theMorningRoutineHabitTicksItselfFromAFinishedRoutine() {
+        val habit = storedHabit("mr", name = "Morning routine", auto = AutoSource.MORNING_ROUTINE)
+        val routineDays = mapOf(AutoSource.MORNING_ROUTINE to setOf(WED))
+        val ui = presenter.present(listOf(habit), emptyMap(), emptySet(), WED, routineDays)
+        assertTrue(ui.today.single().done)
+        assertTrue(ui.today.single().auto)
+        assertFalse(presenter.present(listOf(habit), emptyMap(), emptySet(), WED).today.single().done)
+        // the habit page's calendar sees it too
+        val detail = HabitDetailPresenter().present(habit, emptyMap(), emptySet(), WED, YearMonth.of(2026, 10), routineDays)
+        assertEquals(1, detail.monthDays)
+    }
+
+    @Test
     fun aTimesAWeekHabitLeavesTodayOnceTheWeekIsMet() {
         val run = storedHabit("run", schedule = HabitSchedule.TimesPerWeek(2))
         val log = entries("run" to mapOf(WED.minusDays(2) to 1, WED.minusDays(1) to 1))

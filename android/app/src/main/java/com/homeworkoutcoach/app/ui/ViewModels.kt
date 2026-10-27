@@ -326,10 +326,10 @@ object Factories {
         }
     }
     val HabitList = viewModelFactory {
-        initializer { app(this).let { HabitsViewModel(it.habits, it.training) } }
+        initializer { app(this).let { HabitsViewModel(it.habits, it.training, it.routines) } }
     }
     fun habitDetail(id: String) = viewModelFactory {
-        initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training) } }
+        initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training, it.routines) } }
     }
     fun habitEdit(id: String?) = viewModelFactory {
         initializer { app(this).let { HabitEditViewModel(id, it.habits) } }

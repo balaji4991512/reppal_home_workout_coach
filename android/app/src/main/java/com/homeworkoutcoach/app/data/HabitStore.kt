@@ -2,7 +2,11 @@ package com.homeworkoutcoach.app.data
 
 import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.Habit
+import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.HabitLog
+import com.homeworkoutcoach.engine.Routine
+import com.homeworkoutcoach.engine.RoutineDone
+import com.homeworkoutcoach.engine.Routines
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.time.LocalDate
@@ -49,12 +53,26 @@ object HabitLogs {
     fun workoutDays(workouts: List<Workout>, zone: ZoneId): Set<LocalDate> =
         workouts.map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
 
-    fun log(habit: Habit, entries: Map<LocalDate, Int>, workoutDays: Set<LocalDate>): HabitLog = HabitLog(
+    /**
+     * The days the Morning and Night routine habits tick themselves: days every Morning (or Evening) routine was
+     * finished. Deleting a routine takes its finished days with it, so those days stop counting.
+     */
+    fun routineDays(routines: List<Routine>, done: Collection<RoutineDone>): Map<AutoSource, Set<LocalDate>> = mapOf(
+        AutoSource.MORNING_ROUTINE to Routines.autoDays(routines, done, DayPart.MORNING),
+        AutoSource.NIGHT_ROUTINE to Routines.autoDays(routines, done, DayPart.EVENING),
+    )
+
+    fun log(
+        habit: Habit,
+        entries: Map<LocalDate, Int>,
+        workoutDays: Set<LocalDate>,
+        routineDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+    ): HabitLog = HabitLog(
         entries = entries,
         autoDays = when (habit.auto) {
             AutoSource.WORKOUT -> workoutDays
-            // Routines are not built yet; their habits tick by hand until they are.
-            AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE, AutoSource.NONE -> emptySet()
+            AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE -> routineDays[habit.auto].orEmpty()
+            AutoSource.NONE -> emptySet()
         },
     )
 }
