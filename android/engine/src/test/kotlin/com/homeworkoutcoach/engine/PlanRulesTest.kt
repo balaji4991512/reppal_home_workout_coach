@@ -36,6 +36,20 @@ class PlanRulesTest {
     }
 
     @Test
+    fun repeatedChestDaysAreFullAtThreeSets() {
+        // 5 days of body part: chest and triceps comes round twice
+        val week = planner.buildWeek(PlanSettings(kit, daysPerWeek = 5, split = Split.BODY_PART))
+        val chestDays = week.filter { it.label.startsWith(Planner.BODY_PART[0]) }
+        assertEquals(2, chestDays.size)
+        chestDays.forEach { day ->
+            assertEquals(5, day.items.size)
+            assertTrue(day.items.all { it.sets == 3 })
+        }
+        // trained once a week, back keeps 4 sets on its big lifts
+        assertEquals(4, week.first { it.label == Planner.BODY_PART[1] }.items.first().sets)
+    }
+
+    @Test
     fun splitDaysHaveAtMostFiveExercises() {
         Split.entries.forEach { split ->
             (1..7).forEach { d ->

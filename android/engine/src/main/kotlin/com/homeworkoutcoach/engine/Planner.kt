@@ -90,7 +90,7 @@ class Planner(
         val missing = mutableListOf<String>()
         for ((slot, ids) in rules.presetSlots(lib, label)) {
             val id = ids.filter { i -> items.none { it.exerciseId == i } }.firstOrNull { available(it, s) }
-            if (id != null) items += DayItem(slot, id, sets = rules.setsPerExercise(label, lib.exercise(id).primary.first()))
+            if (id != null) items += DayItem(slot, id, sets = rules.setsPerExercise(label, lib.exercise(id).primary.first(), 1))
             else missing += slot
         }
         return Day(label, items, missing)
@@ -104,14 +104,24 @@ class Planner(
         val cap = rules.dayCap(s.level)
         val sequence = weekSequence(s)
 
+        val times = muscles.associateWith { frequency(it, sequence) }
+        val setsEach = muscles.associateWith { rules.setsPerExercise(label, it, times.getValue(it)) }
         val count = muscles.associateWith { m ->
-            maxOf(1, jsRound(rules.sets(m, s.level).toDouble() / frequency(m, sequence) / rules.setsPerExercise(label, m)))
+            maxOf(1, jsRound(rules.sets(m, s.level).toDouble() / times.getValue(m) / setsEach.getValue(m)))
         }.toMutableMap()
         while (count.values.sum() > cap) {
             val most = muscles.maxOf { count.getValue(it) }
             if (most <= 1) break
             val m = muscles.last { count.getValue(it) == most }
             count[m] = most - 1
+        }
+        if (rules.fillDays) {
+            // Top the day up to the cap, one exercise at a time, for the muscle furthest below its weekly target.
+            fun share(m: Muscle) = count.getValue(m) * setsEach.getValue(m) * times.getValue(m) / rules.sets(m, s.level).toDouble()
+            while (count.values.sum() < cap) {
+                val m = muscles.filter { count.getValue(it) < lib.musclePreferenceGroups[it].orEmpty().size }.minByOrNull(::share) ?: break
+                count[m] = count.getValue(m) + 1
+            }
         }
 
         val items = mutableListOf<DayItem>()
@@ -124,7 +134,7 @@ class Planner(
                 if (got >= count.getValue(m)) break
                 val id = group.firstOrNull { id -> available(id, s) && items.none { it.exerciseId == id } }
                 if (id != null) {
-                    items += DayItem(lib.muscleLabels.getValue(m), id, sets = rules.setsPerExercise(label, m))
+                    items += DayItem(lib.muscleLabels.getValue(m), id, sets = setsEach.getValue(m))
                     got++
                 }
             }

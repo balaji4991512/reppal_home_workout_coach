@@ -17,8 +17,11 @@ interface PlanRules {
     /** Most exercises in one muscle-label day; over this, the muscle with the most gives one up. */
     fun dayCap(level: Level): Int
 
-    /** Sets each exercise starts with on day [label] when its main muscle is [m]. */
-    fun setsPerExercise(label: String, m: Muscle): Int
+    /** Sets each exercise starts with on day [label] when its main muscle is [m], trained on [timesPerWeek] days. */
+    fun setsPerExercise(label: String, m: Muscle, timesPerWeek: Int): Int
+
+    /** Whether muscle-label days are topped up to [dayCap] when their targets leave room. */
+    val fillDays: Boolean
 
     /** Slots of preset day [label] (slot -> candidate ids, in order). */
     fun presetSlots(lib: Library, label: String): Map<String, List<String>>
@@ -43,7 +46,9 @@ interface PlanRules {
 
             override fun dayCap(level: Level) = if (level == Level.BEGINNER) 6 else 7
 
-            override fun setsPerExercise(label: String, m: Muscle) = DEFAULT_SETS
+            override fun setsPerExercise(label: String, m: Muscle, timesPerWeek: Int) = DEFAULT_SETS
+
+            override val fillDays = false
 
             override fun presetSlots(lib: Library, label: String) = lib.presetPlans.getValue(label)
         }
@@ -51,7 +56,7 @@ interface PlanRules {
         /**
          * One target per muscle, a little above the prototype's. Back and the big leg and chest muscles get the most;
          * hamstrings and glutes less as they share hinges and squats; arms and rear delts less again as presses and
-         * rows already work them. Split days keep to 5 exercises and give the big lifts 4 sets to reach the targets;
+         * rows already work them. Split days hold 5 exercises; big muscles trained once a week get 4 sets to reach the targets;
          * full body days carry 6 to 7 exercises at 3 sets.
          */
         val CURRENT: PlanRules = object : PlanRules {
@@ -87,8 +92,11 @@ interface PlanRules {
 
             override fun dayCap(level: Level) = SPLIT_DAY_CAP
 
-            override fun setsPerExercise(label: String, m: Muscle) =
-                if (label !in FULL_BODY && m in bigLifts) MAX_SETS else DEFAULT_SETS
+            // 4 sets only when a big muscle gets one day a week; trained twice, 3 sets each day is plenty.
+            override fun setsPerExercise(label: String, m: Muscle, timesPerWeek: Int) =
+                if (label !in FULL_BODY && m in bigLifts && timesPerWeek == 1) MAX_SETS else DEFAULT_SETS
+
+            override val fillDays = true
 
             override fun presetSlots(lib: Library, label: String): Map<String, List<String>> {
                 val base = lib.presetPlans.getValue(label)
