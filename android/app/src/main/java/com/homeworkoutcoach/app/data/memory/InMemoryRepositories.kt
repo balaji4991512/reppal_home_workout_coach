@@ -5,6 +5,7 @@ import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.BodyWeight
+import com.homeworkoutcoach.app.data.DeleteResult
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.TrainingRepository
@@ -79,6 +80,16 @@ class InMemoryAuthRepository(initial: Account? = null) : AuthRepository {
 
     override suspend fun signOut() {
         state.value = null
+    }
+
+    /** What the next delete returns. */
+    var nextDelete: DeleteResult = DeleteResult.Deleted
+
+    override suspend fun deleteAccount(activity: Activity): DeleteResult {
+        if (state.value == null) return DeleteResult.NotSignedIn
+        val r = nextDelete
+        if (r == DeleteResult.Deleted) state.value = null
+        return r
     }
 }
 

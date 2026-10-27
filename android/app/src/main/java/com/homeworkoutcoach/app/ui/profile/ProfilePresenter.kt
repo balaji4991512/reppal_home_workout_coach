@@ -23,6 +23,8 @@ data class ProfileUi(
     /** Exercise name to next prescription, for exercises done at least once. */
     val current: List<Pair<String, String>>,
     val history: List<HistoryItemUi>,
+    /** Signed in with Google: the account can be deleted. */
+    val signedIn: Boolean = false,
 )
 
 data class HistoryItemUi(val id: Long, val title: String, val totals: String, val card: SessionCardUi)
@@ -57,6 +59,7 @@ class ProfilePresenter(
             current = lib.exercises.values.filter { it.id in states && it.id in trained && it.id !in settings.excluded }.map { e ->
                 e.name to Copy.prescription(e, Progression.resolveState(e, states[e.id], equipment, settings.level))
             },
+            signedIn = account != null,
             history = workouts.reversed().map { w ->
                 val s = Volume.summarize(lib, w.plan, w.sets, w.painIds)
                 HistoryItemUi(

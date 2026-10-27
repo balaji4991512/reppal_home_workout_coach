@@ -22,6 +22,9 @@ If you weigh in with a Bluetooth scale, RepPal listens for the readings the scal
 ## Your choices
 History and profile lets you export everything to a file you keep, restore from such a file, and erase everything on this phone. Uninstalling the app also deletes its data from this phone. You can sign out at any time from the menu, and turn off microphone or Nearby devices access in Android settings.
 
+## Deleting your account
+If you signed in, History and profile has Delete account. It deletes your account (your Google sign-in with RepPal, kept by Firebase) and erases everything on this phone. Without the app, you can ask for deletion at [contact email to be added before publishing].
+
 ## Health
 RepPal is a training log, not medical advice. If an exercise hurts, stop and check with a doctor or physio.
 

@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.profile
 
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.homeworkoutcoach.app.R
+import com.homeworkoutcoach.app.ui.DeleteUi
 import com.homeworkoutcoach.app.ui.Factories
 import com.homeworkoutcoach.app.ui.RestoreUi
 import com.homeworkoutcoach.app.ui.ProfileViewModel
@@ -82,6 +84,7 @@ fun ProfileScreen(
         }
     }
     val restore by vm.restore.collectAsStateWithLifecycle()
+    val delete by vm.delete.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     // Drive and some file apps label JSON as plain text or binary, so accept those too.
     val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -105,6 +108,8 @@ fun ProfileScreen(
             onConfirmRestore = vm::confirmRestore,
             onCancelRestore = vm::cancelRestore,
             onPrivacy = onPrivacy,
+            delete = delete,
+            onDeleteAccount = { (context as? Activity)?.let(vm::deleteAccount) },
         )
     }
 }
@@ -123,8 +128,11 @@ fun ProfileContent(
     onConfirmRestore: () -> Unit = {},
     onCancelRestore: () -> Unit = {},
     onPrivacy: () -> Unit = {},
+    delete: DeleteUi = DeleteUi(),
+    onDeleteAccount: () -> Unit = {},
 ) {
     val c = AppTheme.colors
+    var confirmDelete by remember { mutableStateOf(false) }
     var confirmWipe by remember { mutableStateOf(false) }
     var open by rememberSaveable { mutableStateOf(emptyList<Long>()) }
     Page {
@@ -213,5 +221,27 @@ fun ProfileContent(
             { if (confirmWipe) onWipe() else confirmWipe = true },
             alt = true,
         )
+
+        if (ui.signedIn) {
+            H2("Your account")
+            Muted("Deleting your account removes your Google sign-in with this app and erases everything on this phone. Export first if you want a copy.")
+            if (!confirmDelete) {
+                PrimaryButton(if (delete.busy) "Deleting…" else "Delete account", { confirmDelete = true }, alt = true)
+            } else {
+                Column(
+                    Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(14.dp),
+                ) {
+                    Body("Delete your account?", strong = true)
+                    Body("This can't be undone. Google may ask you to pick your account once more to confirm.", Modifier.padding(top = 4.dp))
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.weight(1f)) { PrimaryButton("Cancel", { confirmDelete = false }, alt = true, compact = true) }
+                        Box(Modifier.weight(1f)) {
+                            PrimaryButton("Delete", { confirmDelete = false; onDeleteAccount() }, compact = true)
+                        }
+                    }
+                }
+            }
+            delete.error?.let { Text(it, Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
+        }
     }
 }

@@ -21,6 +21,17 @@ sealed interface SignInResult {
     data class Failed(val reason: String) : SignInResult
 }
 
+sealed interface DeleteResult {
+    data object Deleted : DeleteResult
+
+    /** The user closed the account picker when asked to confirm. */
+    data object Cancelled : DeleteResult
+
+    data object NotSignedIn : DeleteResult
+
+    data class Failed(val reason: String) : DeleteResult
+}
+
 /** Sign-in state. Workout data stays on the phone either way; cloud backup is separate and later. */
 interface AuthRepository {
     /** Null when signed out. */
@@ -30,4 +41,7 @@ interface AuthRepository {
     suspend fun signInWithGoogle(activity: Activity): SignInResult
 
     suspend fun signOut()
+
+    /** Delete the account (Google may ask to confirm it once more). Signs out on success. */
+    suspend fun deleteAccount(activity: Activity): DeleteResult
 }

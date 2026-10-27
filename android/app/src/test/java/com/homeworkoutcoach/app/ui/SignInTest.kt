@@ -2,13 +2,20 @@ package com.homeworkoutcoach.app.ui
 
 import androidx.activity.ComponentActivity
 import com.homeworkoutcoach.app.data.Account
+import com.homeworkoutcoach.app.data.BodyWeight
+import com.homeworkoutcoach.app.data.DataExporter
+import com.homeworkoutcoach.app.data.DataImporter
+import com.homeworkoutcoach.app.data.DeleteResult
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.UserSettings
+import com.homeworkoutcoach.app.data.WeightSource
 import com.homeworkoutcoach.app.data.memory.InMemoryAuthRepository
+import com.homeworkoutcoach.app.data.memory.InMemoryBodyRepository
 import com.homeworkoutcoach.app.data.memory.InMemorySettingsRepository
 import com.homeworkoutcoach.app.data.memory.InMemoryTrainingRepository
 import com.homeworkoutcoach.app.plan.PlanActions
 import com.homeworkoutcoach.app.ui.profile.ProfilePresenter
+import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.KeywordConcernMapper
 import com.homeworkoutcoach.engine.Library
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +84,47 @@ class SignInTest {
         vm.signInWithGoogle(activity)
         assertEquals("Couldn’t sign in with Google. Check your connection and try again.", vm.signIn.value.error)
         assertNull(vm.account.value)
+    }
+
+    private fun profileVm(training: InMemoryTrainingRepository, body: InMemoryBodyRepository) =
+        ProfileViewModel(
+            settings, training, auth, ProfilePresenter(Library.default),
+            PlanActions(settings, training, KeywordConcernMapper(Library.default), body),
+            DataExporter(Library.default, settings, training, body, auth),
+            DataImporter(settings, training, body),
+            Library.default, body,
+        )
+
+    @Test
+    fun deletingTheAccountErasesThePhoneAndReturnsToSignIn() = runTest {
+        val training = InMemoryTrainingRepository()
+        val body = InMemoryBodyRepository()
+        val app = AppViewModel(settings, actions, auth)
+        app.signInWithGoogle(activity)
+        training.putExerciseStates(mapOf("bench" to ExerciseState(8.0)))
+        body.add(BodyWeight(dateMillis = 1, weightKg = 84.5, source = WeightSource.SCALE))
+
+        // cancelled at Google's confirm step: nothing changes
+        auth.nextDelete = DeleteResult.Cancelled
+        val vm = profileVm(training, body)
+        vm.deleteAccount(activity)
+        assertEquals(DeleteUi(), vm.delete.value)
+        assertEquals("asha@gmail.com", auth.account.value?.email)
+        assertEquals(1, body.weights().first().size)
+
+        // failed: a message, nothing erased
+        auth.nextDelete = DeleteResult.Failed("network")
+        vm.deleteAccount(activity)
+        assertEquals("Couldn’t delete your account. Check your connection and try again.", vm.delete.value.error)
+        assertEquals(1, body.weights().first().size)
+
+        // deleted: signed out, everything on the phone erased, back to the sign-in screen
+        auth.nextDelete = DeleteResult.Deleted
+        vm.deleteAccount(activity)
+        assertNull(auth.account.value)
+        assertTrue(training.exerciseStates().first().isEmpty())
+        assertTrue(body.weights().first().isEmpty())
+        assertEquals(UserSettings(), settings.settings.first())
     }
 
     @Test

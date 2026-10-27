@@ -13,6 +13,7 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,14 +46,7 @@ class FirebaseAuthRepository(private val context: Context) : AuthRepository {
         val firebase = auth
         if (clientId == null || firebase == null) return SignInResult.NotConfigured
         return try {
-            val request = GetCredentialRequest.Builder()
-                .addCredentialOption(GetSignInWithGoogleOption.Builder(clientId).build())
-                .build()
-            val credential = CredentialManager.create(activity).getCredential(activity, request).credential
-            if (credential !is CustomCredential || credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                return SignInResult.Failed("Unexpected credential type")
-            }
-            val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+            val idToken = googleIdToken(activity, clientId) ?: return SignInResult.Failed("Unexpected credential type")
             val user = firebase.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await().user
                 ?: return SignInResult.Failed("No user returned")
             SignInResult.SignedIn(user.toAccount())
@@ -67,9 +61,45 @@ class FirebaseAuthRepository(private val context: Context) : AuthRepository {
         }
     }
 
+    /** Google's account picker; returns the ID token, or null for an unexpected credential. Throws on cancel. */
+    private suspend fun googleIdToken(activity: Activity, clientId: String): String? {
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(GetSignInWithGoogleOption.Builder(clientId).build())
+            .build()
+        val credential = CredentialManager.create(activity).getCredential(activity, request).credential
+        if (credential !is CustomCredential || credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) return null
+        return GoogleIdTokenCredential.createFrom(credential.data).idToken
+    }
+
+    override suspend fun deleteAccount(activity: Activity): DeleteResult {
+        val firebase = auth
+        val user = firebase?.currentUser ?: return DeleteResult.NotSignedIn
+        return try {
+            try {
+                user.delete().await()
+            } catch (e: FirebaseAuthRecentLoginRequiredException) {
+                // Firebase only deletes after a recent sign-in: confirm the account once more, then delete.
+                val clientId = webClientId ?: return DeleteResult.Failed("No sign-in config")
+                val token = googleIdToken(activity, clientId) ?: return DeleteResult.Failed("Unexpected credential type")
+                user.reauthenticate(GoogleAuthProvider.getCredential(token, null)).await()
+                user.delete().await()
+            }
+            forgetChosenAccount()
+            DeleteResult.Deleted
+        } catch (e: GetCredentialCancellationException) {
+            DeleteResult.Cancelled
+        } catch (e: Exception) {
+            DeleteResult.Failed(e.message ?: e.javaClass.simpleName)
+        }
+    }
+
     override suspend fun signOut() {
         auth?.signOut()
-        // Forget the chosen account so the picker shows again next time.
+        forgetChosenAccount()
+    }
+
+    // Forget the chosen account so the picker shows again next time.
+    private suspend fun forgetChosenAccount() {
         runCatching { CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest()) }
     }
 

@@ -14,6 +14,7 @@ import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.DataExporter
 import com.homeworkoutcoach.app.data.DataImport
 import com.homeworkoutcoach.app.data.DataImporter
+import com.homeworkoutcoach.app.data.DeleteResult
 import com.homeworkoutcoach.app.data.ImportCheck
 import com.homeworkoutcoach.app.data.Restore
 import com.homeworkoutcoach.app.data.SettingsRepository
@@ -169,7 +170,7 @@ class ProgressViewModel(training: TrainingRepository, val presenter: ProgressPre
 class ProfileViewModel(
     settings: SettingsRepository,
     private val training: TrainingRepository,
-    auth: AuthRepository,
+    private val auth: AuthRepository,
     presenter: ProfilePresenter,
     private val actions: PlanActions,
     private val exporter: DataExporter,
@@ -177,6 +178,31 @@ class ProfileViewModel(
     private val library: Library,
     private val body: BodyRepository,
 ) : ViewModel() {
+    private val _delete = MutableStateFlow(DeleteUi())
+
+    /** Delete account: busy while Google confirms, then a message if it didn't work. */
+    val delete: StateFlow<DeleteUi> = _delete
+
+    /**
+     * Delete the Google account's sign-in with this app and erase everything on this phone. Google may show the
+     * account picker once more to confirm. Afterwards the app is back at the sign-in screen.
+     */
+    fun deleteAccount(activity: Activity) {
+        if (_delete.value.busy) return
+        _delete.value = DeleteUi(busy = true)
+        viewModelScope.launch {
+            _delete.value = when (val r = auth.deleteAccount(activity)) {
+                DeleteResult.Deleted -> {
+                    actions.wipeAll()
+                    DeleteUi()
+                }
+                DeleteResult.Cancelled -> DeleteUi()
+                DeleteResult.NotSignedIn -> DeleteUi(error = "You're not signed in, so there is no account to delete.")
+                is DeleteResult.Failed -> DeleteUi(error = "Couldn’t delete your account. Check your connection and try again.")
+            }
+        }
+    }
+
     private val _restore = MutableStateFlow<RestoreUi?>(null)
 
     /** Restore from a file: the confirm step, then the outcome. */
@@ -258,6 +284,8 @@ class ProfileViewModel(
 }
 
 data class SignInUi(val busy: Boolean = false, val error: String? = null)
+
+data class DeleteUi(val busy: Boolean = false, val error: String? = null)
 
 sealed interface RestoreUi {
     data class Confirm(val restore: Restore, val summary: String) : RestoreUi
