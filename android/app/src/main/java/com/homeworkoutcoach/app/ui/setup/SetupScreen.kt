@@ -31,7 +31,7 @@ import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Muscle
 import com.homeworkoutcoach.engine.Split
 
-/** Setup / "Equipment and plan" [vSetup]. Edits a draft; the button saves it and builds a new week. */
+/** Setup / "Plan settings" [vSetup]. Edits a draft; the button saves it and builds a new week. */
 @Composable
 fun SetupScreen(appName: String, onBuilt: () -> Unit, vm: SetupViewModel = viewModel(factory = Factories.Setup)) {
     val draft by vm.draft.collectAsStateWithLifecycle()

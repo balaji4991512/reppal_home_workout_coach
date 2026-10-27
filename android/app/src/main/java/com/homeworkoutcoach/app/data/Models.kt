@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 
-/** Everything set up on the "Equipment and plan" screen, plus app state that is not history. */
+/** Everything set up on the "Plan settings" screen, plus app state that is not history. */
 @Serializable
 data class UserSettings(
     /** True once the first plan has been built. */

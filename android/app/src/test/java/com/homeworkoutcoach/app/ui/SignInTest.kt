@@ -130,6 +130,7 @@ class SignInTest {
     @Test
     fun profileShowsTheAccountEmail() {
         val ui = ProfilePresenter(Library.default).present(UserSettings(), emptyMap(), emptyList(), Account("asha@gmail.com", null))
-        assertEquals("Account" to "asha@gmail.com", ui.rows.first())
+        assertEquals("asha@gmail.com", ui.subtitle)
+        assertTrue(ui.signedIn)
     }
 }

@@ -103,7 +103,7 @@ private fun Hero(h: HeroUi, onStart: () -> Unit) {
         )
         Small("${h.done} of ${h.total} workouts done this week", Modifier.padding(top = 6.dp))
         if (h.canStart) PrimaryButton("Start workout", onStart)
-        else Muted("Nothing to train on this day yet. Add muscles or equipment under Equipment and plan.")
+        else Muted("Nothing to train on this day yet. Add muscles or equipment under Plan settings.")
     }
 }
 

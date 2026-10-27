@@ -75,17 +75,17 @@ import com.homeworkoutcoach.app.ui.week.WeekScreen
 import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
 import kotlinx.coroutines.launch
 
-/** Route of the privacy policy, linked from the menu footer, How it works and History and profile. */
+/** Route of the privacy policy, linked from the menu footer, How it works and Profile. */
 private const val PRIVACY = "privacy"
 
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
-    Week("week", "This week", AppIcons.Calendar),
-    Today("today", "Today’s workout", AppIcons.Dumbbell),
+    Week("week", "Week", AppIcons.Calendar),
+    Today("today", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
     Body("body", "Body", AppIcons.Scale),
-    Profile("profile", "History and profile", AppIcons.User),
-    Setup("setup", "Equipment and plan", AppIcons.Sliders, beforeSetup = true),
+    Profile("profile", "Profile", AppIcons.User),
+    Setup("setup", "Plan settings", AppIcons.Sliders, beforeSetup = true),
     How("how", "How it works", AppIcons.Info, beforeSetup = true),
 }
 
@@ -209,7 +209,6 @@ private fun AppNavHost(
         composable(Dest.Body.route) { BodyScreen() }
         composable(Dest.Profile.route) {
             ProfileScreen(
-                onWeek = { go(Dest.Week) },
                 onSetup = { go(Dest.Setup) },
                 onWiped = { nav.navigate(Dest.Setup.route) { popUpTo(nav.graph.id) { inclusive = true } } },
                 onPrivacy = { nav.navigate(PRIVACY) },

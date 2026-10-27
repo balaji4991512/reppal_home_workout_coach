@@ -40,12 +40,12 @@ object PrivacyPolicy {
             "not connect to the scale and does not use Bluetooth to find your location. It saves the weight, the " +
             "time and an ID for your scale, so other people's scales nearby are ignored.",
         "Your choices" to
-            "History and profile lets you export everything to a file you keep, restore from such a file, and " +
+            "Profile lets you export everything to a file you keep, restore from such a file, and " +
             "erase everything on this phone. Uninstalling the app also deletes its data from this phone. You can " +
             "sign out at any time from the menu, and turn off microphone or Nearby devices access in Android " +
             "settings.",
         "Deleting your account" to
-            "If you signed in, History and profile has Delete account. It deletes your account (your Google " +
+            "If you signed in, Profile has Delete account. It deletes your account (your Google " +
             "sign-in with $app, kept by Firebase) and erases everything on this phone. " +
             (contact?.takeIf { it.isNotBlank() }?.let { "Without the app, you can ask for deletion at $it." } ?: ""),
         "Health" to

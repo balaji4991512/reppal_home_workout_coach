@@ -17,6 +17,7 @@ import com.homeworkoutcoach.engine.KeywordConcernMapper
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.LoggedSet
 import com.homeworkoutcoach.engine.PlannedExercise
+import com.homeworkoutcoach.engine.Split
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -101,16 +102,18 @@ class ProfilePresenterTest {
             sets = mapOf("ohp" to List(3) { LoggedSet(12, 8.0, 12) }, "dead" to List(3) { LoggedSet(10, 0.0, 12) }),
         )
         val states = mapOf("ohp" to ExerciseState(8.0, 11, 3), "curl" to ExerciseState(2.5), "rdl" to ExerciseState(8.0))
-        val ui = ProfilePresenter(lib, zone = ZoneOffset.UTC).present(settings, states, listOf(w))
+        val ui = ProfilePresenter(lib, zone = ZoneOffset.UTC).present(settings, states, listOf(w), weighIns = 5)
         assertEquals("A", ui.initial)
         assertEquals("asha", ui.title)
-        assertEquals("1 workout saved on this device.", ui.saved)
+        assertEquals("Guest, not signed in", ui.subtitle)
+        assertEquals("1 workout · 5 weigh-ins", ui.stats)
         assertEquals(
             listOf(
-                "Account" to "Guest, not signed in", "Level" to "Beginner", "Days per week" to "4", "Bench" to "No bench",
-                "Dumbbells" to "2.5, 8 kg", "Working around" to "Dumbbell Romanian deadlift",
+                "Beginner · 4 days a week · Auto plan",
+                "No bench · 2.5, 8 kg",
+                "Working around: Dumbbell Romanian deadlift",
             ),
-            ui.rows,
+            ui.setup,
         )
         // only trained exercises still in the plan: curl has no workout yet, rdl is left out
         assertEquals(listOf("Dumbbell overhead press" to "3 × 11 at 8 kg"), ui.current)
@@ -123,8 +126,19 @@ class ProfilePresenterTest {
         val ui = ProfilePresenter(lib).present(UserSettings(), emptyMap(), emptyList())
         assertEquals("R", ui.initial)
         assertEquals("Your profile", ui.title)
-        assertEquals("0 workouts saved on this device.", ui.saved)
-        assertEquals("Working around" to "Nothing", ui.rows.last())
+        assertEquals("0 workouts · 0 weigh-ins", ui.stats)
+        // nothing left out: no "Working around" line
+        assertEquals(listOf("Beginner · 3 days a week · Auto plan", "Flat bench · 5 kg"), ui.setup)
+    }
+
+    @Test
+    fun longDumbbellListsAreSummarised() {
+        val all = Library.default.dumbbellStepsKg
+        val ui = ProfilePresenter(lib).present(
+            UserSettings(bench = Bench.ADJUSTABLE, dumbbellsKg = all, split = Split.BODY_PART, daysPerWeek = 5),
+            emptyMap(), emptyList(),
+        )
+        assertEquals(listOf("Beginner · 5 days a week · Body-part", "Adjustable bench · 12 pairs, 1–24 kg"), ui.setup)
     }
 }
 

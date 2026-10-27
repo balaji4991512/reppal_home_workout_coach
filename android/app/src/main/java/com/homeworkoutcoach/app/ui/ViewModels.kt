@@ -268,9 +268,9 @@ class ProfileViewModel(
     }
 
     val ui: StateFlow<ProfileUi?> = combine(
-        settings.settings, training.exerciseStates(), training.workouts(), auth.account,
-    ) { s, states, w, account ->
-        presenter.present(s, states, w, account)
+        settings.settings, training.exerciseStates(), training.workouts(), auth.account, body.weights(),
+    ) { s, states, w, account, weights ->
+        presenter.present(s, states, w, account, weights.size)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

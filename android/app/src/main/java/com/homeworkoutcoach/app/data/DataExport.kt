@@ -15,7 +15,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * Everything the app stores, as one readable JSON file the user keeps (History and profile, "Export my data").
+ * Everything the app stores, as one readable JSON file the user keeps (Profile, "Export my data").
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {

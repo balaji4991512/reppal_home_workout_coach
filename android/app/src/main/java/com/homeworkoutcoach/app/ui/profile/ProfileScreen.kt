@@ -65,7 +65,6 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun ProfileScreen(
-    onWeek: () -> Unit,
     onSetup: () -> Unit,
     onWiped: () -> Unit,
     onPrivacy: () -> Unit = {},
@@ -99,7 +98,7 @@ fun ProfileScreen(
     }
     ui?.let {
         ProfileContent(
-            it, onWeek, onSetup,
+            it, onSetup,
             onWipe = { vm.wipe(onWiped) },
             onExport = { saveAs.launch(vm.exportFileName(appName)) },
             exportNote = exportNote,
@@ -114,11 +113,10 @@ fun ProfileScreen(
     }
 }
 
-/** History and profile [vProfile]. Erasing needs a second tap. */
+/** Profile [vProfile]: a card, training setup, current targets, history, then data and account. */
 @Composable
 fun ProfileContent(
     ui: ProfileUi,
-    onWeek: () -> Unit,
     onSetup: () -> Unit,
     onWipe: () -> Unit,
     onExport: () -> Unit = {},
@@ -135,44 +133,46 @@ fun ProfileContent(
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmWipe by remember { mutableStateOf(false) }
     var open by rememberSaveable { mutableStateOf(emptyList<Long>()) }
+    var showAll by rememberSaveable { mutableStateOf(false) }
     Page {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(56.dp).clip(CircleShape).background(c.acc), contentAlignment = Alignment.Center) {
-                Text(ui.initial, color = c.on, style = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold))
-            }
-            Column {
-                H1(ui.title)
-                Muted(ui.saved)
-            }
-        }
-
-        Column(Modifier.padding(top = 8.dp)) {
-            ui.rows.forEachIndexed { i, (label, value) ->
-                LineRow(divider = i < ui.rows.lastIndex, left = { Body(label) }) {
-                    Text(value, Modifier.weight(1f, fill = false), color = c.fg, style = AppTheme.type.body, textAlign = TextAlign.End)
+        // Who you are.
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(Modifier.size(64.dp).clip(CircleShape).background(c.acc), contentAlignment = Alignment.Center) {
+                    Text(ui.initial, color = c.on, style = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(ui.title, color = c.fg, style = TextStyle(fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold))
+                    Small(ui.subtitle)
                 }
             }
+            Hairline(Modifier.padding(top = 16.dp))
+            Body(ui.stats, Modifier.padding(top = 12.dp), strong = true)
         }
 
-        H2("Where you are now")
+        SectionHeader("Training setup", action = "Edit", onAction = onSetup)
+        ui.setup.forEach { Body(it, Modifier.padding(top = 4.dp)) }
+
+        H2("Current targets")
         if (ui.current.isEmpty()) {
-            Muted("Finish a workout and your current targets show up here.")
+            Muted("Finish a workout and your targets for next time show up here.")
         } else {
             ui.current.forEachIndexed { i, (name, presc) ->
                 LineRow(divider = i < ui.current.lastIndex, left = { Body(name) }) {
                     Text(presc, color = c.fg, style = AppTheme.type.tabular(AppTheme.type.bodyStrong))
                 }
             }
-            Muted("These are the targets for your next session of each exercise.")
         }
 
         H2("Workout history")
         if (ui.history.isEmpty()) Muted("No workouts yet.")
-        ui.history.forEach { h ->
+        val shown = if (showAll) ui.history else ui.history.take(HISTORY_PREVIEW)
+        shown.forEach { h ->
             val expanded = h.id in open
-            Column(Modifier.padding(vertical = 8.dp)) {
+            Hairline()
+            Column(Modifier.padding(vertical = 6.dp)) {
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                    Modifier.fillMaxWidth().heightIn(min = 52.dp)
                         .clickable(role = Role.Button) { open = if (expanded) open - h.id else open + h.id }
                         .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
                     verticalAlignment = Alignment.CenterVertically,
@@ -185,63 +185,101 @@ fun ProfileContent(
                 }
                 AnimatedVisibility(expanded) { SessionCard(h.card) }
             }
-            Hairline()
+        }
+        if (ui.history.isNotEmpty()) Hairline()
+        if (ui.history.size > HISTORY_PREVIEW) {
+            TextLink(if (showAll) "Show fewer" else "Show all ${ui.history.size} workouts", { showAll = !showAll })
         }
 
-        PrimaryButton("Back to your week", onWeek)
-        PrimaryButton("Edit equipment and plan", onSetup, alt = true)
-
-        H2("Your data")
-        Muted("Everything is stored on this phone. Save a copy of your plan, workouts and weigh-ins as a file you keep.")
-        TextLink("Privacy", onPrivacy)
-        PrimaryButton("Export my data", onExport, alt = true)
-        exportNote?.let { Text(it, Modifier.padding(top = 8.dp), color = c.fg, style = AppTheme.type.bodyStrong) }
-        PrimaryButton("Restore from a file", onImport, alt = true)
+        H2("Data & account")
+        Muted("Everything is stored on this phone.")
+        ActionRow("Export my data", "Save everything as a file you keep", onExport)
+        exportNote?.let { Note(it) }
+        ActionRow("Restore from a file", "Replace this phone's data with an export", onImport)
         when (restore) {
-            is RestoreUi.Confirm -> Column(
-                Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(14.dp),
-            ) {
-                Body("Restore from this file?", strong = true)
-                Body(restore.summary, Modifier.padding(top = 4.dp))
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) { PrimaryButton("Cancel", onCancelRestore, alt = true, compact = true) }
-                    Box(Modifier.weight(1f)) { PrimaryButton("Restore", onConfirmRestore, compact = true) }
-                }
-            }
-            is RestoreUi.Message -> Text(
-                restore.text,
-                Modifier.padding(top = 8.dp),
-                color = if (restore.bad) c.bad else c.fg,
-                style = AppTheme.type.bodyStrong,
+            is RestoreUi.Confirm -> ConfirmCard(
+                title = "Restore from this file?",
+                text = restore.summary,
+                confirm = "Restore",
+                onConfirm = onConfirmRestore,
+                onCancel = onCancelRestore,
             )
+            is RestoreUi.Message -> Note(restore.text, bad = restore.bad)
             null -> Unit
         }
-        PrimaryButton(
-            if (confirmWipe) "Tap again to erase everything" else "Erase saved data",
+        ActionRow("Privacy", "How your data is handled", onPrivacy)
+        ActionRow(
+            if (confirmWipe) "Tap again to erase everything" else "Erase data on this phone",
+            "Plan, workouts and weigh-ins. Export first to keep a copy.",
             { if (confirmWipe) onWipe() else confirmWipe = true },
-            alt = true,
+            danger = true,
         )
-
         if (ui.signedIn) {
-            H2("Your account")
-            Muted("Deleting your account removes your Google sign-in with this app and erases everything on this phone. Export first if you want a copy.")
-            if (!confirmDelete) {
-                PrimaryButton(if (delete.busy) "Deleting…" else "Delete account", { confirmDelete = true }, alt = true)
-            } else {
-                Column(
-                    Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(14.dp),
-                ) {
-                    Body("Delete your account?", strong = true)
-                    Body("This can't be undone. Google may ask you to pick your account once more to confirm.", Modifier.padding(top = 4.dp))
-                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) { PrimaryButton("Cancel", { confirmDelete = false }, alt = true, compact = true) }
-                        Box(Modifier.weight(1f)) {
-                            PrimaryButton("Delete", { confirmDelete = false; onDeleteAccount() }, compact = true)
-                        }
-                    }
-                }
+            ActionRow(
+                if (delete.busy) "Deleting…" else "Delete account",
+                "Removes your Google sign-in with this app and erases this phone",
+                { if (!delete.busy) confirmDelete = true },
+                danger = true,
+            )
+            if (confirmDelete) {
+                ConfirmCard(
+                    title = "Delete your account?",
+                    text = "This can't be undone. Google may ask you to pick your account once more to confirm.",
+                    confirm = "Delete",
+                    onConfirm = { confirmDelete = false; onDeleteAccount() },
+                    onCancel = { confirmDelete = false },
+                )
             }
-            delete.error?.let { Text(it, Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
+            delete.error?.let { Note(it, bad = true) }
+        }
+        Hairline()
+    }
+}
+
+private const val HISTORY_PREVIEW = 5
+
+/** A section heading with a link on the right, such as "Edit". */
+@Composable
+private fun SectionHeader(title: String, action: String, onAction: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 26.dp), verticalAlignment = Alignment.CenterVertically) {
+        H2(title, Modifier.weight(1f), top = 6.dp)
+        TextLink(action, onAction)
+    }
+}
+
+/** One tappable row in Data & account: label, a short description, an arrow. */
+@Composable
+private fun ActionRow(label: String, detail: String, onClick: () -> Unit, danger: Boolean = false) {
+    val c = AppTheme.colors
+    Hairline()
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 60.dp).clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Body(label, color = if (danger) c.bad else c.fg, strong = true)
+            Small(detail)
+        }
+        Icon(AppIcons.Forward, null, Modifier.size(18.dp), tint = c.mut)
+    }
+}
+
+@Composable
+private fun ConfirmCard(title: String, text: String, confirm: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    val c = AppTheme.colors
+    Column(Modifier.padding(bottom = 10.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(14.dp)) {
+        Body(title, strong = true)
+        Body(text, Modifier.padding(top = 4.dp))
+        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) { PrimaryButton("Cancel", onCancel, alt = true, compact = true) }
+            Box(Modifier.weight(1f)) { PrimaryButton(confirm, onConfirm, compact = true) }
         }
     }
+}
+
+@Composable
+private fun Note(text: String, bad: Boolean = false) {
+    val c = AppTheme.colors
+    Text(text, Modifier.padding(bottom = 10.dp), color = if (bad) c.bad else c.ok, style = AppTheme.type.bodyStrong)
 }
