@@ -71,6 +71,9 @@ import com.homeworkoutcoach.app.ui.progress.ProgressScreen
 import com.homeworkoutcoach.app.ui.setup.SetupScreen
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
+import com.homeworkoutcoach.app.ui.habits.HabitDetailScreen
+import com.homeworkoutcoach.app.ui.habits.HabitEditScreen
+import com.homeworkoutcoach.app.ui.habits.HabitsScreen
 import com.homeworkoutcoach.app.ui.week.ArrangeScreen
 import com.homeworkoutcoach.app.ui.week.WeekScreen
 import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
@@ -82,8 +85,14 @@ private const val PRIVACY = "privacy"
 /** Route of Rearrange days, opened from the Week page. */
 private const val ARRANGE = "arrange"
 
+/** Routes inside Habits: the habit's page, its form, and the form for a new one. */
+private const val HABIT = "habit/{id}"
+private const val HABIT_EDIT = "habit/{id}/edit"
+private const val HABIT_NEW = "habit-new"
+
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
+    Habits("habits", "Habits", AppIcons.List, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
     Today("today", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
@@ -193,6 +202,27 @@ private fun AppNavHost(
     NavHost(nav, startDestination = if (started) Dest.Week.route else Dest.Setup.route) {
         composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Today) }, onArrange = { nav.navigate(ARRANGE) }) }
         composable(ARRANGE) { ArrangeScreen(onDone = { nav.popBackStack() }) }
+        composable(Dest.Habits.route) {
+            HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
+        }
+        composable(HABIT_NEW) {
+            HabitEditScreen(id = null, onDone = { nav.popBackStack() }, onGone = { nav.popBackStack() })
+        }
+        composable(HABIT) { entry ->
+            HabitDetailScreen(
+                entry.arguments?.getString("id").orEmpty(),
+                onEdit = { nav.navigate("habit/${entry.arguments?.getString("id").orEmpty()}/edit") },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(HABIT_EDIT) { entry ->
+            HabitEditScreen(
+                id = entry.arguments?.getString("id").orEmpty(),
+                onDone = { nav.popBackStack() },
+                // archived or deleted: leave the habit's page too
+                onGone = { nav.popBackStack(Dest.Habits.route, inclusive = false) },
+            )
+        }
         composable(Dest.Setup.route) {
             SetupScreen(appName, onBuilt = {
                 nav.navigate(Dest.Week.route) {
