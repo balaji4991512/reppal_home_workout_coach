@@ -34,6 +34,10 @@ import com.homeworkoutcoach.app.ui.planner.PlannerActions
 import com.homeworkoutcoach.app.ui.planner.PlannerViewModel
 import com.homeworkoutcoach.app.ui.planner.TaskEditViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfilePresenter
+import com.homeworkoutcoach.app.ui.routines.RoutineEditViewModel
+import com.homeworkoutcoach.app.ui.routines.RoutineRunViewModel
+import com.homeworkoutcoach.app.ui.routines.RoutineRunner
+import com.homeworkoutcoach.app.ui.routines.RoutinesViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfileUi
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
 import com.homeworkoutcoach.app.ui.week.ArrangePresenter
@@ -339,6 +343,15 @@ object Factories {
     }
     fun taskEdit(id: String) = viewModelFactory {
         initializer { app(this).let { TaskEditViewModel(id, it.tasks, PlannerActions(it.tasks)) } }
+    }
+    val RoutineList = viewModelFactory {
+        initializer { app(this).let { RoutinesViewModel(it.routines) } }
+    }
+    fun routineRun(id: String) = viewModelFactory {
+        initializer { app(this).let { RoutineRunViewModel(id, it.routines, it.habits, RoutineRunner(it.habits, it.routines) { java.time.LocalDate.now() }) } }
+    }
+    fun routineEdit(id: String?) = viewModelFactory {
+        initializer { app(this).let { RoutineEditViewModel(id, it.routines, it.habits) } }
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }

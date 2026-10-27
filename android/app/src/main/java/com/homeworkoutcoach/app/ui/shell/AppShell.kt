@@ -75,6 +75,9 @@ import com.homeworkoutcoach.app.ui.habits.HabitDetailScreen
 import com.homeworkoutcoach.app.ui.habits.HabitEditScreen
 import com.homeworkoutcoach.app.ui.habits.HabitsScreen
 import com.homeworkoutcoach.app.ui.planner.PlannerScreen
+import com.homeworkoutcoach.app.ui.routines.RoutineEditScreen
+import com.homeworkoutcoach.app.ui.routines.RoutineRunScreen
+import com.homeworkoutcoach.app.ui.routines.RoutinesScreen
 import com.homeworkoutcoach.app.ui.planner.TaskEditScreen
 import com.homeworkoutcoach.app.ui.week.ArrangeScreen
 import com.homeworkoutcoach.app.ui.week.WeekScreen
@@ -95,10 +98,16 @@ private const val HABIT_NEW = "habit-new"
 /** Route of a task's edit form, opened from the Planner. */
 private const val TASK = "task/{id}"
 
+/** Routes inside Routines: running one, its form, and the form for a new one. */
+private const val ROUTINE_RUN = "routine/{id}/run"
+private const val ROUTINE_EDIT = "routine/{id}/edit"
+private const val ROUTINE_NEW = "routine-new"
+
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
     Habits("habits", "Habits", AppIcons.List, beforeSetup = true),
     Planner("planner", "Planner", AppIcons.Planner, beforeSetup = true),
+    Routines("routines", "Routines", AppIcons.Routine, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
     Today("today", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
@@ -212,6 +221,20 @@ private fun AppNavHost(
             HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
         }
         composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }) }
+        composable(Dest.Routines.route) {
+            RoutinesScreen(
+                onRun = { nav.navigate("routine/$it/run") },
+                onEdit = { nav.navigate("routine/$it/edit") },
+                onAdd = { nav.navigate(ROUTINE_NEW) },
+            )
+        }
+        composable(ROUTINE_NEW) { RoutineEditScreen(id = null, onDone = { nav.popBackStack() }, onGone = { nav.popBackStack() }) }
+        composable(ROUTINE_RUN) { entry ->
+            RoutineRunScreen(entry.arguments?.getString("id").orEmpty(), onClose = { nav.popBackStack() })
+        }
+        composable(ROUTINE_EDIT) { entry ->
+            RoutineEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() }, onGone = { nav.popBackStack() })
+        }
         composable(TASK) { entry ->
             TaskEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() })
         }

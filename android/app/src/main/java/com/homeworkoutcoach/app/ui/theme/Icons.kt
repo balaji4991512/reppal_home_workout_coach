@@ -56,6 +56,7 @@ object AppIcons {
     val Star = icon("star", "M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z")
     val List = icon("list", "M9.5 6h10.5M9.5 12h10.5M9.5 18h10.5M4 6l1.2 1.2L7.4 5M4 12l1.2 1.2L7.4 11M4 18l1.2 1.2L7.4 17")
     val Planner = icon("planner", "M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z", "M8.5 12l2.5 2.5 4.5-5")
+    val Routine = icon("routine", "M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 15M4 20v-5h5")
     val Bolt = icon("bolt", "M13 3L5.5 13.2h5.8L10.5 21l7.5-10.2h-5.8z")
     /** Six dots: a handle to drag by. */
     val Grip = icon("grip", "M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01", stroke = 2.8f)

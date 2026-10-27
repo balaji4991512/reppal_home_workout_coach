@@ -8,7 +8,7 @@ Updated 27 October 2026
 RepPal keeps your training data on your phone. There are no ads, no analytics and no tracking, and your data is never sold. Some features use Google services, explained below.
 
 ## What is stored on your phone
-Your setup (name if you give one, equipment, level, days, split, anything you asked to work around, height), your plan and progress for each exercise, your workouts with every set, any notes you typed or said, your weigh-ins, your habits with what you ticked or entered for each day, and your planner tasks. It stays in the app's private storage on this phone.
+Your setup (name if you give one, equipment, level, days, split, anything you asked to work around, height), your plan and progress for each exercise, your workouts with every set, any notes you typed or said, your weigh-ins, your habits with what you ticked or entered for each day, your planner tasks, and your routines with the days you finished them. It stays in the app's private storage on this phone.
 
 ## Signing in with Google
 Signing in is optional. If you choose it, Google confirms your account through Google Play services and Firebase Authentication, and RepPal receives your name and email address. Google keeps a record of the sign-in under its own privacy policy (https://policies.google.com/privacy). Your workouts are not uploaded: they stay on this phone either way.
