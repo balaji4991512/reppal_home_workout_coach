@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -255,3 +256,15 @@ fun Logo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
 
 @Composable
 fun VSpace(height: Dp) = Spacer(Modifier.height(height))
+
+/** A quiet underlined link with a full-size touch target, such as "Privacy". */
+@Composable
+fun TextLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.CenterStart) {
+        Text(
+            text,
+            color = AppTheme.colors.mut,
+            style = AppTheme.type.small.copy(textDecoration = TextDecoration.Underline),
+        )
+    }
+}

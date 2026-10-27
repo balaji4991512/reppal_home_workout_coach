@@ -2,4 +2,6 @@
     <!-- Working name, not final. Change it here only. -->
     <string name="app_name">RepPal</string>
     <string name="store_title">RepPal: Home Workout Coach</string>
+    <!-- Shown in the privacy policy. Set before publishing; the Contact section is hidden while empty. -->
+    <string name="privacy_contact" translatable="false"></string>
 </resources>

@@ -36,13 +36,21 @@ import com.homeworkoutcoach.app.ui.components.Logo
 import com.homeworkoutcoach.app.ui.components.Muted
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
+import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 
 /**
  * Welcome and sign-in [vAuth]: the first screen until the user signs in with Google or continues as a guest.
  */
 @Composable
-fun AuthScreen(appName: String, busy: Boolean, error: String?, onGoogle: () -> Unit, onGuest: () -> Unit) {
+fun AuthScreen(
+    appName: String,
+    busy: Boolean,
+    error: String?,
+    onGoogle: () -> Unit,
+    onGuest: () -> Unit,
+    onPrivacy: () -> Unit = {},
+) {
     val c = AppTheme.colors
     Box(
         Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()),
@@ -63,6 +71,7 @@ fun AuthScreen(appName: String, busy: Boolean, error: String?, onGoogle: () -> U
             OrDivider()
             PrimaryButton("Try without an account", onGuest, alt = true)
             Muted("New here? Continuing with Google creates your account.", Modifier.padding(top = 18.dp))
+            TextLink("Privacy", onPrivacy)
         }
     }
 }

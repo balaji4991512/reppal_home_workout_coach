@@ -60,6 +60,10 @@ import com.homeworkoutcoach.app.ui.components.Muted
 import com.homeworkoutcoach.app.ui.components.Page
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
+import com.homeworkoutcoach.app.ui.components.TextLink
+import com.homeworkoutcoach.app.ui.privacy.PrivacyScreen
+import androidx.compose.ui.res.stringResource
+import com.homeworkoutcoach.app.R
 import com.homeworkoutcoach.app.ui.body.BodyScreen
 import com.homeworkoutcoach.app.ui.profile.ProfileScreen
 import com.homeworkoutcoach.app.ui.progress.ExerciseProgressScreen
@@ -70,6 +74,9 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.week.WeekScreen
 import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
 import kotlinx.coroutines.launch
+
+/** Route of the privacy policy, linked from the menu footer, How it works and History and profile. */
+private const val PRIVACY = "privacy"
 
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
@@ -147,6 +154,10 @@ fun AppShell(
                     onGo = ::go,
                     onTheme = onTheme,
                     account = account,
+                    onPrivacy = {
+                        scope.launch { drawer.close() }
+                        if (current != PRIVACY) nav.navigate(PRIVACY)
+                    },
                     onAccount = {
                         scope.launch { drawer.close() }
                         if (account == null) onSignIn() else onSignOut()
@@ -184,7 +195,10 @@ private fun AppNavHost(
                 }
             })
         }
-        composable(Dest.How.route) { HowItWorks(appName, started) { go(if (started) Dest.Week else Dest.Setup) } }
+        composable(Dest.How.route) {
+            HowItWorks(appName, started, onPrivacy = { nav.navigate(PRIVACY) }) { go(if (started) Dest.Week else Dest.Setup) }
+        }
+        composable(PRIVACY) { PrivacyScreen(appName, stringResource(R.string.privacy_contact), onBack = { nav.popBackStack() }) }
         composable(Dest.Today.route) {
             WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = { go(Dest.Week) })
         }
@@ -198,6 +212,7 @@ private fun AppNavHost(
                 onWeek = { go(Dest.Week) },
                 onSetup = { go(Dest.Setup) },
                 onWiped = { nav.navigate(Dest.Setup.route) { popUpTo(nav.graph.id) { inclusive = true } } },
+                onPrivacy = { nav.navigate(PRIVACY) },
             )
         }
     }
@@ -242,6 +257,7 @@ private fun MenuContent(
     onTheme: (ThemeMode) -> Unit,
     account: Account?,
     onAccount: () -> Unit,
+    onPrivacy: () -> Unit,
 ) {
     val c = AppTheme.colors
     Column(
@@ -311,6 +327,7 @@ private fun MenuContent(
                     Icon(AppIcons.SignInOut, null, Modifier.size(22.dp), tint = c.mut)
                     Text(if (account == null) "Sign in" else "Sign out", color = c.mut, style = AppTheme.type.label)
                 }
+                TextLink("Privacy", onPrivacy, Modifier.padding(start = 2.dp))
             }
         }
     }
@@ -318,7 +335,7 @@ private fun MenuContent(
 
 /** How your plan adapts [vHow]. */
 @Composable
-private fun HowItWorks(appName: String, started: Boolean, onDone: () -> Unit) {
+private fun HowItWorks(appName: String, started: Boolean, onPrivacy: () -> Unit, onDone: () -> Unit) {
     Page {
         H1("How your plan adapts")
         Muted("Plain rules, so you always know why a number changed.")
@@ -337,6 +354,7 @@ private fun HowItWorks(appName: String, started: Boolean, onDone: () -> Unit) {
             }
         }
         Muted("$appName is a training log, not medical advice.", Modifier.padding(top = 12.dp))
+        TextLink("How $appName handles your data", onPrivacy)
         PrimaryButton(if (started) "Back to your week" else "Set up your plan", onDone)
     }
 }

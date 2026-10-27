@@ -24,6 +24,8 @@ import com.homeworkoutcoach.app.data.ThemeMode
 import com.homeworkoutcoach.app.ui.AppViewModel
 import com.homeworkoutcoach.app.ui.Factories
 import com.homeworkoutcoach.app.ui.auth.AuthScreen
+import com.homeworkoutcoach.app.ui.privacy.PrivacyScreen
+import androidx.compose.foundation.layout.safeDrawingPadding
 import com.homeworkoutcoach.app.ui.shell.AppShell
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.theme.isDark
@@ -54,8 +56,14 @@ class MainActivity : ComponentActivity() {
             // Guests can open the sign-in screen again from the menu.
             var signingIn by rememberSaveable { mutableStateOf(false) }
             BackHandler(enabled = signingIn) { signingIn = false }
+            // The privacy policy can be read before signing in.
+            var privacy by rememberSaveable { mutableStateOf(false) }
+            BackHandler(enabled = privacy) { privacy = false }
             when {
                 s == null -> Box(Modifier.fillMaxSize().background(AppTheme.colors.bg))
+                privacy -> Box(Modifier.fillMaxSize().background(AppTheme.colors.bg).safeDrawingPadding()) {
+                    PrivacyScreen(appName, stringResource(R.string.privacy_contact)) { privacy = false }
+                }
                 (account == null && !s.guest) || signingIn -> AuthScreen(
                     appName,
                     busy = signIn.busy,
@@ -65,6 +73,7 @@ class MainActivity : ComponentActivity() {
                         vm.continueAsGuest()
                         signingIn = false
                     },
+                    onPrivacy = { privacy = true },
                 )
                 else -> AppShell(
                     appName, s, account, vm::setTheme,

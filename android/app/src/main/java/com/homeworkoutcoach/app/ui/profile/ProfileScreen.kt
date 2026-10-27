@@ -53,6 +53,7 @@ import com.homeworkoutcoach.app.ui.components.Muted
 import com.homeworkoutcoach.app.ui.components.Page
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
+import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.week.SessionCard
@@ -65,6 +66,7 @@ fun ProfileScreen(
     onWeek: () -> Unit,
     onSetup: () -> Unit,
     onWiped: () -> Unit,
+    onPrivacy: () -> Unit = {},
     vm: ProfileViewModel = viewModel(factory = Factories.Profile),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -102,6 +104,7 @@ fun ProfileScreen(
             restore = restore,
             onConfirmRestore = vm::confirmRestore,
             onCancelRestore = vm::cancelRestore,
+            onPrivacy = onPrivacy,
         )
     }
 }
@@ -119,6 +122,7 @@ fun ProfileContent(
     restore: RestoreUi? = null,
     onConfirmRestore: () -> Unit = {},
     onCancelRestore: () -> Unit = {},
+    onPrivacy: () -> Unit = {},
 ) {
     val c = AppTheme.colors
     var confirmWipe by remember { mutableStateOf(false) }
@@ -181,6 +185,7 @@ fun ProfileContent(
 
         H2("Your data")
         Muted("Everything is stored on this phone. Save a copy of your plan, workouts and weigh-ins as a file you keep.")
+        TextLink("Privacy", onPrivacy)
         PrimaryButton("Export my data", onExport, alt = true)
         exportNote?.let { Text(it, Modifier.padding(top = 8.dp), color = c.fg, style = AppTheme.type.bodyStrong) }
         PrimaryButton("Restore from a file", onImport, alt = true)
