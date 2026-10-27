@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.plan
 
+import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.ThemeMode
 import com.homeworkoutcoach.app.data.TrainingRepository
@@ -100,6 +101,15 @@ class PlanActions(
 
     /** Use the app without an account; everything stays on this phone. */
     suspend fun continueAsGuest() = settings.update { it.copy(guest = true) }
+
+    /** After Google sign-in: use the first name if none was typed [signIn]. */
+    suspend fun signedIn(account: Account) = settings.update { s ->
+        val first = account.name?.trim()?.split(' ')?.firstOrNull().orEmpty()
+        s.copy(guest = false, name = s.name.ifBlank { first })
+    }
+
+    /** Signing out returns to the sign-in screen. Workouts stay on this phone. */
+    suspend fun signedOut() = settings.update { it.copy(guest = false) }
 
     suspend fun setTheme(mode: ThemeMode) = settings.update { it.copy(theme = mode) }
 

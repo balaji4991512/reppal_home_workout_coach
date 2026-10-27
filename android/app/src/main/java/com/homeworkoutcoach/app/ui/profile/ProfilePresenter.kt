@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.profile
 
+import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.app.ui.Copy
@@ -32,7 +33,12 @@ class ProfilePresenter(
     private val planner: Planner = Planner(lib),
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
-    fun present(settings: UserSettings, states: Map<String, ExerciseState>, workouts: List<Workout>): ProfileUi {
+    fun present(
+        settings: UserSettings,
+        states: Map<String, ExerciseState>,
+        workouts: List<Workout>,
+        account: Account? = null,
+    ): ProfileUi {
         val equipment = settings.equipment()
         val trained = workouts.flatMap { w -> w.plan.map { it.exerciseId } }.toSet()
         return ProfileUi(
@@ -40,7 +46,7 @@ class ProfilePresenter(
             title = settings.name.ifBlank { "Your profile" },
             saved = "${Copy.count(workouts.size, "workout")} saved on this device.",
             rows = listOf(
-                "Account" to "Guest, not signed in",
+                "Account" to (account?.email ?: "Guest, not signed in"),
                 "Level" to Copy.levelName(settings.level),
                 "Days per week" to "${settings.daysPerWeek}",
                 "Bench" to Copy.benchName(settings.bench),

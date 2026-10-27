@@ -47,6 +47,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.ThemeMode
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.ui.Copy
@@ -80,7 +81,14 @@ enum class Dest(val route: String, val label: String, val icon: ImageVector, val
 }
 
 @Composable
-fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Unit, onSignIn: () -> Unit) {
+fun AppShell(
+    appName: String,
+    settings: UserSettings,
+    account: Account?,
+    onTheme: (ThemeMode) -> Unit,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit,
+) {
     val nav = rememberNavController()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -136,9 +144,10 @@ fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Un
                     onClose = { scope.launch { drawer.close() } },
                     onGo = ::go,
                     onTheme = onTheme,
-                    onSignIn = {
+                    account = account,
+                    onAccount = {
                         scope.launch { drawer.close() }
-                        onSignIn()
+                        if (account == null) onSignIn() else onSignOut()
                     },
                 )
             }
@@ -228,7 +237,8 @@ private fun MenuContent(
     onClose: () -> Unit,
     onGo: (Dest) -> Unit,
     onTheme: (ThemeMode) -> Unit,
-    onSignIn: () -> Unit,
+    account: Account?,
+    onAccount: () -> Unit,
 ) {
     val c = AppTheme.colors
     Column(
@@ -279,7 +289,7 @@ private fun MenuContent(
             Hairline()
             Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 12.dp)) {
                 Body(settings.name.ifBlank { "Your plan" }, strong = true)
-                Small("Guest")
+                Small(account?.email ?: "Guest")
                 Small(
                     if (settings.started) "${Copy.levelName(settings.level)}, ${Copy.count(settings.daysPerWeek, "day")} a week"
                     else "Set up your plan to begin.",
@@ -291,12 +301,12 @@ private fun MenuContent(
                 }
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(RoundedCornerShape(10.dp))
-                        .clickable(role = Role.Button, onClick = onSignIn),
+                        .clickable(role = Role.Button, onClick = onAccount),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Icon(AppIcons.SignInOut, null, Modifier.size(22.dp), tint = c.mut)
-                    Text("Sign in", color = c.mut, style = AppTheme.type.label)
+                    Text(if (account == null) "Sign in" else "Sign out", color = c.mut, style = AppTheme.type.label)
                 }
             }
         }

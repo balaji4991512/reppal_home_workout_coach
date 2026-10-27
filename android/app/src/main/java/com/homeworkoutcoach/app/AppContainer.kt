@@ -2,7 +2,9 @@ package com.homeworkoutcoach.app
 
 import android.app.Application
 import android.content.Context
+import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.DataStoreSettingsRepository
+import com.homeworkoutcoach.app.data.FirebaseAuthRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.room.RoomTrainingRepository
@@ -21,6 +23,7 @@ class AppContainer(context: Context) {
     val training: TrainingRepository by lazy { RoomTrainingRepository(TrainingDatabase.create(context)) }
     val concerns: ConcernMapper by lazy { KeywordConcernMapper(library) }
     val actions: PlanActions by lazy { PlanActions(settings, training, concerns) }
+    val auth: AuthRepository by lazy { FirebaseAuthRepository(context) }
 }
 
 class HomeWorkoutCoachApp : Application() {

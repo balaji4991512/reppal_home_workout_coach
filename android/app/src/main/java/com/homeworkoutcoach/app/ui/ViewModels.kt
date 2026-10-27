@@ -1,12 +1,16 @@
 package com.homeworkoutcoach.app.ui
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.homeworkoutcoach.app.HomeWorkoutCoachApp
+import com.homeworkoutcoach.app.data.Account
+import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
+import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.ThemeMode
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
@@ -36,9 +40,45 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Shell state: settings drive the theme, the start screen and the menu footer. Null until loaded. */
-class AppViewModel(settings: SettingsRepository, private val actions: PlanActions) : ViewModel() {
+class AppViewModel(
+    settings: SettingsRepository,
+    private val actions: PlanActions,
+    private val auth: AuthRepository,
+) : ViewModel() {
     val settings: StateFlow<UserSettings?> =
         settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val account: StateFlow<Account?> = auth.account
+
+    private val _signIn = MutableStateFlow(SignInUi())
+    val signIn: StateFlow<SignInUi> = _signIn
+
+    /** Google sign-in from the sign-in screen. [onDone] runs after a successful sign-in. */
+    fun signInWithGoogle(activity: Activity, onDone: () -> Unit = {}) {
+        if (_signIn.value.busy) return
+        _signIn.value = SignInUi(busy = true)
+        viewModelScope.launch {
+            val error = when (val r = auth.signInWithGoogle(activity)) {
+                is SignInResult.SignedIn -> {
+                    actions.signedIn(r.account)
+                    onDone()
+                    null
+                }
+                SignInResult.Cancelled -> null
+                SignInResult.NoAccount -> "No Google account on this phone. Add one in Settings, or try without an account."
+                SignInResult.NotConfigured -> "Google sign-in isn’t set up in this build. Try without an account."
+                is SignInResult.Failed -> "Couldn’t sign in with Google. Check your connection and try again."
+            }
+            _signIn.value = SignInUi(error = error)
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            auth.signOut()
+            actions.signedOut()
+        }
+    }
 
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { actions.setTheme(mode) }
@@ -115,11 +155,14 @@ class ProgressViewModel(training: TrainingRepository, val presenter: ProgressPre
 class ProfileViewModel(
     settings: SettingsRepository,
     training: TrainingRepository,
+    auth: AuthRepository,
     presenter: ProfilePresenter,
     private val actions: PlanActions,
 ) : ViewModel() {
-    val ui: StateFlow<ProfileUi?> = combine(settings.settings, training.exerciseStates(), training.workouts()) { s, states, w ->
-        presenter.present(s, states, w)
+    val ui: StateFlow<ProfileUi?> = combine(
+        settings.settings, training.exerciseStates(), training.workouts(), auth.account,
+    ) { s, states, w, account ->
+        presenter.present(s, states, w, account)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -132,13 +175,15 @@ class ProfileViewModel(
     }
 }
 
+data class SignInUi(val busy: Boolean = false, val error: String? = null)
+
 /** Factories that pull dependencies from the [com.homeworkoutcoach.app.AppContainer]. */
 object Factories {
     private fun app(extras: androidx.lifecycle.viewmodel.CreationExtras) =
         (extras[APPLICATION_KEY] as HomeWorkoutCoachApp).container
 
     val App = viewModelFactory {
-        initializer { app(this).let { AppViewModel(it.settings, it.actions) } }
+        initializer { app(this).let { AppViewModel(it.settings, it.actions, it.auth) } }
     }
     val Week = viewModelFactory {
         initializer {
@@ -157,7 +202,7 @@ object Factories {
     }
     val Profile = viewModelFactory {
         initializer {
-            app(this).let { ProfileViewModel(it.settings, it.training, ProfilePresenter(it.library, it.planner), it.actions) }
+            app(this).let { ProfileViewModel(it.settings, it.training, it.auth, ProfilePresenter(it.library, it.planner), it.actions) }
         }
     }
     val Setup = viewModelFactory {

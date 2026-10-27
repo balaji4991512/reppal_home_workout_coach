@@ -38,6 +38,8 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun App(vm: AppViewModel = viewModel(factory = Factories.App)) {
         val settings by vm.settings.collectAsStateWithLifecycle()
+        val account by vm.account.collectAsStateWithLifecycle()
+        val signIn by vm.signIn.collectAsStateWithLifecycle()
         val mode = settings?.theme ?: ThemeMode.LIGHT
         val dark = isDark(mode)
         LaunchedEffect(dark) {
@@ -54,11 +56,21 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = signingIn) { signingIn = false }
             when {
                 s == null -> Box(Modifier.fillMaxSize().background(AppTheme.colors.bg))
-                !s.guest || signingIn -> AuthScreen(appName, onGuest = {
-                    vm.continueAsGuest()
-                    signingIn = false
-                })
-                else -> AppShell(appName, s, vm::setTheme, onSignIn = { signingIn = true })
+                (account == null && !s.guest) || signingIn -> AuthScreen(
+                    appName,
+                    busy = signIn.busy,
+                    error = signIn.error,
+                    onGoogle = { vm.signInWithGoogle(this@MainActivity) { signingIn = false } },
+                    onGuest = {
+                        vm.continueAsGuest()
+                        signingIn = false
+                    },
+                )
+                else -> AppShell(
+                    appName, s, account, vm::setTheme,
+                    onSignIn = { signingIn = true },
+                    onSignOut = vm::signOut,
+                )
             }
         }
     }

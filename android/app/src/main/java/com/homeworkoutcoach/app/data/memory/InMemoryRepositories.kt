@@ -1,6 +1,10 @@
 package com.homeworkoutcoach.app.data.memory
 
+import android.app.Activity
+import com.homeworkoutcoach.app.data.Account
+import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
+import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
@@ -56,5 +60,22 @@ class InMemoryTrainingRepository : TrainingRepository {
         states.value = emptyMap()
         swaps.value = emptyMap()
         workouts.value = emptyList()
+    }
+}
+
+/** Fake sign-in for tests and previews: [nextResult] is what the next sign-in returns. */
+class InMemoryAuthRepository(initial: Account? = null) : AuthRepository {
+    private val state = MutableStateFlow(initial)
+    override val account: StateFlow<Account?> = state
+    var nextResult: SignInResult = SignInResult.SignedIn(Account("asha@gmail.com", "Asha Rao"))
+
+    override suspend fun signInWithGoogle(activity: Activity): SignInResult {
+        val r = nextResult
+        if (r is SignInResult.SignedIn) state.value = r.account
+        return r
+    }
+
+    override suspend fun signOut() {
+        state.value = null
     }
 }

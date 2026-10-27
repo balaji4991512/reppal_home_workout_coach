@@ -21,10 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,13 +39,11 @@ import com.homeworkoutcoach.app.ui.components.Small
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 
 /**
- * Welcome and sign-in [vAuth]: the first screen until the user continues as a guest or signs in.
- * Google sign-in is not connected yet, so that button explains and points to guest mode.
+ * Welcome and sign-in [vAuth]: the first screen until the user signs in with Google or continues as a guest.
  */
 @Composable
-fun AuthScreen(appName: String, onGuest: () -> Unit) {
+fun AuthScreen(appName: String, busy: Boolean, error: String?, onGoogle: () -> Unit, onGuest: () -> Unit) {
     val c = AppTheme.colors
-    var googleNote by remember { mutableStateOf(false) }
     Box(
         Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()),
         contentAlignment = Alignment.TopCenter,
@@ -61,13 +55,9 @@ fun AuthScreen(appName: String, onGuest: () -> Unit) {
                 Body("Sign in to keep your plan and workout history.", color = c.mut)
             }
 
-            GoogleButton(onClick = { googleNote = true })
-            if (googleNote) {
-                Muted(
-                    "Google sign-in is coming soon. For now, try without an account: your plan and workouts " +
-                        "stay on this phone.",
-                    Modifier.padding(top = 4.dp),
-                )
+            GoogleButton(if (busy) "Signing in…" else "Continue with Google", onClick = { if (!busy) onGoogle() })
+            error?.let {
+                Text(it, Modifier.padding(top = 10.dp), color = c.bad, style = AppTheme.type.bodyStrong)
             }
 
             OrDivider()
@@ -78,7 +68,7 @@ fun AuthScreen(appName: String, onGuest: () -> Unit) {
 }
 
 @Composable
-private fun GoogleButton(onClick: () -> Unit) {
+private fun GoogleButton(label: String, onClick: () -> Unit) {
     val c = AppTheme.colors
     val shape = RoundedCornerShape(12.dp)
     Row(
@@ -89,7 +79,7 @@ private fun GoogleButton(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
     ) {
         Image(GoogleG, contentDescription = null, modifier = Modifier.size(20.dp))
-        Body("Continue with Google", strong = true)
+        Body(label, strong = true)
     }
 }
 
