@@ -98,6 +98,9 @@ class PlanActions(
         settings.reset()
     }
 
+    /** Use the app without an account; everything stays on this phone. */
+    suspend fun continueAsGuest() = settings.update { it.copy(guest = true) }
+
     suspend fun setTheme(mode: ThemeMode) = settings.update { it.copy(theme = mode) }
 
     suspend fun storeStates(states: Map<String, ExerciseState>) {

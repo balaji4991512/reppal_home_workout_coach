@@ -161,6 +161,14 @@ class PlanActionsTest {
     }
 
     @Test
+    fun guestChoiceIsRememberedAndSurvivesPlanBuilds() = runTest {
+        assertEquals(false, settings.settings.first().guest)
+        actions.continueAsGuest()
+        actions.buildPlan(draft())
+        assertTrue(settings.settings.first().guest)
+    }
+
+    @Test
     fun swappingBackToBaseRemovesTheSwap() = runTest {
         actions.swap("bench", "floor")
         assertEquals(mapOf("bench" to "floor"), training.swaps().first())

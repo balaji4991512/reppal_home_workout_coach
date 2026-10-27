@@ -80,7 +80,7 @@ enum class Dest(val route: String, val label: String, val icon: ImageVector, val
 }
 
 @Composable
-fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Unit) {
+fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Unit, onSignIn: () -> Unit) {
     val nav = rememberNavController()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -136,6 +136,10 @@ fun AppShell(appName: String, settings: UserSettings, onTheme: (ThemeMode) -> Un
                     onClose = { scope.launch { drawer.close() } },
                     onGo = ::go,
                     onTheme = onTheme,
+                    onSignIn = {
+                        scope.launch { drawer.close() }
+                        onSignIn()
+                    },
                 )
             }
         },
@@ -224,6 +228,7 @@ private fun MenuContent(
     onClose: () -> Unit,
     onGo: (Dest) -> Unit,
     onTheme: (ThemeMode) -> Unit,
+    onSignIn: () -> Unit,
 ) {
     val c = AppTheme.colors
     Column(
@@ -283,6 +288,15 @@ private fun MenuContent(
                     listOf(ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark", ThemeMode.SYSTEM to "Auto").forEach { (m, label) ->
                         Chip(label, settings.theme == m, { onTheme(m) }, Modifier.weight(1f), small = true)
                     }
+                }
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(RoundedCornerShape(10.dp))
+                        .clickable(role = Role.Button, onClick = onSignIn),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(AppIcons.SignInOut, null, Modifier.size(22.dp), tint = c.mut)
+                    Text("Sign in", color = c.mut, style = AppTheme.type.label)
                 }
             }
         }

@@ -38,5 +38,6 @@ object AppIcons {
     val Back = icon("back", "M19 12H5M11 6l-6 6 6 6")
     val Forward = icon("go", "M9 6l6 6-6 6")
     val Swap = icon("swap", "M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7", stroke = 1.8f)
+    val SignInOut = icon("out", "M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9M15 8l4 4-4 4M19 12H9")
     val ChevronDown = icon("chev", "M6 9l6 6 6-6", stroke = 1.5f)
 }

@@ -43,6 +43,10 @@ class AppViewModel(settings: SettingsRepository, private val actions: PlanAction
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { actions.setTheme(mode) }
     }
+
+    fun continueAsGuest() {
+        viewModelScope.launch { actions.continueAsGuest() }
+    }
 }
 
 class WeekViewModel(
