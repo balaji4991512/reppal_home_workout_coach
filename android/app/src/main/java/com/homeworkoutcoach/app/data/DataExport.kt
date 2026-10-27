@@ -1,7 +1,11 @@
 package com.homeworkoutcoach.app.data
 
+import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.Habit
+import com.homeworkoutcoach.engine.HabitKind
+import com.homeworkoutcoach.engine.HabitSchedule
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.LoggedSet
 import com.homeworkoutcoach.engine.Planner
@@ -9,7 +13,9 @@ import com.homeworkoutcoach.engine.PlannedExercise
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -19,7 +25,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    const val FORMAT = 1
+    /** 1: workouts and weigh-ins. 2: habits added (files without them still restore). */
+    const val FORMAT = 2
 
     @Serializable
     data class File(
@@ -32,6 +39,8 @@ object DataExport {
         val swaps: Map<String, String>,
         val workouts: List<WorkoutDto>,
         val weighIns: List<WeighInDto>,
+        /** Null in files from before habits existed; restoring such a file leaves the phone's habits alone. */
+        val habits: List<HabitDto>? = null,
     )
 
     @Serializable
@@ -63,6 +72,26 @@ object DataExport {
     @Serializable
     data class WeighInDto(val date: String, val weightKg: Double, val source: String)
 
+    /** [kind], [auto] and the schedule use lower-case keys; [entries] maps a calendar day (2026-10-27) to its amount. */
+    @Serializable
+    data class HabitDto(
+        val id: String,
+        val name: String,
+        val kind: String,
+        val target: Int,
+        val schedule: ScheduleDto,
+        val startDate: String,
+        val auto: String = "none",
+        val archived: Boolean = false,
+        val icon: String,
+        val color: String,
+        val entries: Map<String, Int> = emptyMap(),
+    )
+
+    /** [type] is "daily", "weekdays" (with [days], e.g. "MONDAY") or "times" (with [times] a week). */
+    @Serializable
+    data class ScheduleDto(val type: String, val days: List<String> = emptyList(), val times: Int = 0)
+
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
@@ -79,6 +108,7 @@ object DataExport {
         account: Account?,
         nowMillis: Long,
         zone: ZoneId,
+        habits: List<HabitData> = emptyList(),
     ): String {
         val planner = Planner(lib)
         fun iso(ms: Long) = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -106,6 +136,26 @@ object DataExport {
             weighIns = weights.sortedBy { it.dateMillis }.map {
                 WeighInDto(iso(it.dateMillis), it.weightKg, if (it.source == WeightSource.SCALE) "scale" else "manual")
             },
+            habits = habits.sortedWith(compareBy({ it.stored.position }, { it.stored.habit.name })).map { d ->
+                val h = d.stored.habit
+                HabitDto(
+                    id = h.id,
+                    name = h.name,
+                    kind = h.kind.name.lowercase(),
+                    target = h.target,
+                    schedule = when (val sc = h.schedule) {
+                        HabitSchedule.Daily -> ScheduleDto("daily")
+                        is HabitSchedule.Weekdays -> ScheduleDto("weekdays", days = sc.days.sorted().map { it.name })
+                        is HabitSchedule.TimesPerWeek -> ScheduleDto("times", times = sc.times)
+                    },
+                    startDate = h.startDate.toString(),
+                    auto = h.auto.name.lowercase(),
+                    archived = h.archived,
+                    icon = d.stored.icon,
+                    color = d.stored.color,
+                    entries = d.entries.toSortedMap().mapKeys { it.key.toString() },
+                )
+            },
         )
         return json.encodeToString(File.serializer(), file)
     }
@@ -122,6 +172,8 @@ data class Restore(
     val swaps: Map<String, String>,
     val workouts: List<Workout>,
     val weights: List<BodyWeight>,
+    /** Null when the file predates habits: the phone's habits stay as they are. */
+    val habits: List<HabitData>?,
     val exportedAt: Long,
 )
 
@@ -175,12 +227,37 @@ object DataImport {
                             source = if (it.source == "scale") WeightSource.SCALE else WeightSource.MANUAL,
                         )
                     },
+                    habits = file.habits?.map(::habitData),
                     exportedAt = millis(file.exportedAt),
                 ),
             )
         } catch (e: Exception) {
             ImportCheck.Bad("Part of this file couldn’t be read, so nothing was changed.")
         }
+    }
+
+    /** Throws if anything in the habit is invalid; [read] then reports that nothing was changed. */
+    private fun habitData(d: DataExport.HabitDto): HabitData {
+        val schedule = when (d.schedule.type) {
+            "daily" -> HabitSchedule.Daily
+            "weekdays" -> HabitSchedule.Weekdays(d.schedule.days.map { DayOfWeek.valueOf(it) }.toSet())
+            "times" -> HabitSchedule.TimesPerWeek(d.schedule.times)
+            else -> error("unknown schedule ${d.schedule.type}")
+        }
+        val habit = Habit(
+            id = d.id,
+            name = d.name,
+            kind = HabitKind.entries.first { it.name.lowercase() == d.kind },
+            target = d.target,
+            schedule = schedule,
+            startDate = LocalDate.parse(d.startDate),
+            auto = AutoSource.entries.firstOrNull { it.name.lowercase() == d.auto } ?: AutoSource.NONE,
+            archived = d.archived,
+        )
+        return HabitData(
+            StoredHabit(habit, d.icon, d.color),
+            d.entries.entries.associate { LocalDate.parse(it.key) to it.value.coerceAtLeast(0) },
+        )
     }
 }
 
@@ -189,6 +266,7 @@ class DataImporter(
     private val settings: SettingsRepository,
     private val training: TrainingRepository,
     private val body: BodyRepository,
+    private val habits: HabitRepository? = null,
 ) {
     suspend fun restore(r: Restore) {
         training.wipe()
@@ -197,6 +275,14 @@ class DataImporter(
         training.putExerciseStates(r.states)
         r.swaps.forEach { (base, chosen) -> training.setSwap(base, chosen) }
         r.weights.sortedBy { it.dateMillis }.forEach { body.add(it) }
+        // A file from before habits existed has none to give back, so the habits on the phone are left alone.
+        if (r.habits != null && habits != null) {
+            habits.wipe()
+            r.habits.forEachIndexed { i, d ->
+                habits.save(d.stored.copy(position = i))
+                d.entries.forEach { (day, amount) -> habits.setAmount(d.stored.habit.id, day, amount) }
+            }
+        }
         // Keep how the user is signed in on this phone; everything else comes from the file.
         settings.update { now -> r.settings.copy(guest = now.guest) }
     }
@@ -210,16 +296,21 @@ class DataExporter(
     private val body: BodyRepository,
     private val auth: AuthRepository,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    private val habits: HabitRepository? = null,
 ) {
-    data class Result(val json: String, val workouts: Int, val weighIns: Int)
+    data class Result(val json: String, val workouts: Int, val weighIns: Int, val habits: Int = 0)
 
     suspend fun export(appName: String, nowMillis: Long = System.currentTimeMillis()): Result {
         val workouts = training.workouts().first()
         val weights = body.weights().first()
+        val habitData = habits?.let { repo ->
+            val entries = repo.entries().first()
+            repo.habits().first().map { HabitData(it, entries[it.habit.id].orEmpty()) }
+        }.orEmpty()
         val text = DataExport.build(
             lib, appName, settings.settings.first(), training.exerciseStates().first(), training.swaps().first(),
-            workouts, weights, auth.account.value, nowMillis, zone,
+            workouts, weights, auth.account.value, nowMillis, zone, habitData,
         )
-        return Result(text, workouts.size, weights.size)
+        return Result(text, workouts.size, weights.size, habitData.size)
     }
 }

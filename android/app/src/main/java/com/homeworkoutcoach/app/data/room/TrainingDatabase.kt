@@ -5,6 +5,7 @@ import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -45,6 +46,39 @@ data class BodyWeightEntity(
     val dateMillis: Long,
     val weightKg: Double,
     val source: String,
+)
+
+/**
+ * A habit. Stored values (kind, scheduleType, auto) are keys; keep them stable. [scheduleValue] is the weekday bit
+ * mask (bit 0 = Monday) for "weekdays" and the count for "times", and 0 for "daily". [startEpochDay] is a local
+ * calendar day, not a timestamp.
+ */
+@Entity(tableName = "habit")
+data class HabitEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val kind: String,
+    val target: Int,
+    val scheduleType: String,
+    val scheduleValue: Int,
+    val startEpochDay: Long,
+    val auto: String,
+    val archived: Boolean,
+    val icon: String,
+    val color: String,
+    val position: Int,
+)
+
+/** What was entered for a habit on a local calendar day. Deleting the habit deletes its entries. */
+@Entity(
+    tableName = "habit_entry",
+    primaryKeys = ["habitId", "epochDay"],
+    foreignKeys = [ForeignKey(HabitEntity::class, parentColumns = ["id"], childColumns = ["habitId"], onDelete = ForeignKey.CASCADE)],
+)
+data class HabitEntryEntity(
+    val habitId: String,
+    val epochDay: Long,
+    val amount: Int,
 )
 
 @Dao
@@ -101,18 +135,49 @@ interface BodyWeightDao {
     suspend fun clear()
 }
 
+@Dao
+interface HabitDao {
+    @Query("SELECT * FROM habit ORDER BY position, name, id")
+    fun observeHabits(): Flow<List<HabitEntity>>
+
+    @Query("SELECT * FROM habit_entry")
+    fun observeEntries(): Flow<List<HabitEntryEntity>>
+
+    @Upsert
+    suspend fun upsert(habit: HabitEntity)
+
+    @Query("DELETE FROM habit WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Upsert
+    suspend fun upsertEntry(entry: HabitEntryEntity)
+
+    @Query("DELETE FROM habit_entry WHERE habitId = :habitId AND epochDay = :epochDay")
+    suspend fun deleteEntry(habitId: String, epochDay: Long)
+
+    @Query("DELETE FROM habit_entry")
+    suspend fun clearEntries()
+
+    @Query("DELETE FROM habit")
+    suspend fun clearHabits()
+}
+
 @Database(
-    entities = [ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class],
-    version = 2,
+    entities = [
+        ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class,
+        HabitEntity::class, HabitEntryEntity::class,
+    ],
+    version = 3,
     exportSchema = true,
-    // 2: body_weight table added.
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    // 2: body_weight table added. 3: habit and habit_entry tables added.
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun exerciseStates(): ExerciseStateDao
     abstract fun swaps(): SwapDao
     abstract fun workouts(): WorkoutDao
     abstract fun bodyWeights(): BodyWeightDao
+    abstract fun habits(): HabitDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =

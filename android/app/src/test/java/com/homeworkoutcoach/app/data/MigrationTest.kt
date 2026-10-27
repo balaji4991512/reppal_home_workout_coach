@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.homeworkoutcoach.app.data.room.RoomBodyRepository
+import com.homeworkoutcoach.app.data.room.RoomHabitRepository
 import com.homeworkoutcoach.app.data.room.RoomTrainingRepository
 import com.homeworkoutcoach.app.data.room.TrainingDatabase
 import kotlinx.coroutines.flow.first
@@ -20,16 +21,16 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 
-/** Phones with version 1 data (workouts, no weigh-ins) must keep it after updating. */
+/** Phones with older data (version 1: workouts only; version 2: plus weigh-ins) must keep it after updating. */
 @RunWith(RobolectricTestRunner::class)
 class MigrationTest {
     @get:Rule
     val tmp = TemporaryFolder()
 
-    /** Build a version 1 database file exactly as Room 1 created it, from the exported schema. */
-    private fun createVersion1(file: File) {
+    /** Build a database file exactly as Room created that [version], from the exported schema. */
+    private fun create(file: File, version: Int, insertRows: (SQLiteDatabase) -> Unit) {
         val schema = Json.parseToJsonElement(
-            File("schemas/com.homeworkoutcoach.app.data.room.TrainingDatabase/1.json").readText(),
+            File("schemas/com.homeworkoutcoach.app.data.room.TrainingDatabase/$version.json").readText(),
         ).jsonObject.getValue("database").jsonObject
         val db = SQLiteDatabase.openOrCreateDatabase(file, null)
         schema.getValue("entities").jsonArray.forEach { e ->
@@ -37,24 +38,30 @@ class MigrationTest {
             db.execSQL(o.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", o.getValue("tableName").jsonPrimitive.content))
         }
         schema.getValue("setupQueries").jsonArray.forEach { db.execSQL(it.jsonPrimitive.content) }
+        insertRows(db)
+        db.version = version
+        db.close()
+    }
+
+    private fun insertWorkoutAndState(db: SQLiteDatabase) {
         db.execSQL(
             "INSERT INTO workout (dateMillis, label, planJson, setsJson, painIdsJson) VALUES " +
                 "(42, 'A', '[{\"id\":\"bench\",\"sets\":3,\"target\":12,\"w\":5.0}]', " +
                 "'[{\"id\":\"bench\",\"reps\":12,\"w\":5.0,\"target\":12}]', '[]')",
         )
         db.execSQL("INSERT INTO exercise_state VALUES ('bench', 6.0, 11, 3)")
-        db.version = 1
-        db.close()
     }
+
+    private fun open(file: File) = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), TrainingDatabase::class.java, file.absolutePath)
+        .allowMainThreadQueries()
+        .build()
 
     @Test
     fun version1DataSurvivesAndWeighInsWork() = runTest {
         val file = tmp.newFile("training.db").also { it.delete() }
-        createVersion1(file)
+        create(file, 1, ::insertWorkoutAndState)
 
-        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), TrainingDatabase::class.java, file.absolutePath)
-            .allowMainThreadQueries()
-            .build()
+        val db = open(file)
         val training = RoomTrainingRepository(db)
         val body = RoomBodyRepository(db)
 
@@ -65,7 +72,31 @@ class MigrationTest {
 
         body.add(BodyWeight(dateMillis = 1, weightKg = 83.5, source = WeightSource.SCALE))
         assertEquals(83.5, body.weights().first().single().weightKg, 0.0)
-        assertEquals(2, db.openHelper.readableDatabase.version)
+        // version 1 goes all the way to the current version, so habits work too
+        RoomHabitRepository(db).save(storedHabit("water"))
+        assertEquals(1, RoomHabitRepository(db).habits().first().size)
+        assertEquals(3, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test
+    fun version2DataSurvivesAndHabitsWork() = runTest {
+        val file = tmp.newFile("training.db").also { it.delete() }
+        create(file, 2) { db ->
+            insertWorkoutAndState(db)
+            db.execSQL("INSERT INTO body_weight (dateMillis, weightKg, source) VALUES (7, 84.5, 'scale')")
+        }
+
+        val db = open(file)
+        assertEquals(84.5, RoomBodyRepository(db).weights().first().single().weightKg, 0.0)
+        assertEquals("A", RoomTrainingRepository(db).workouts().first().single().label)
+
+        val habits = RoomHabitRepository(db)
+        assertEquals(emptyList<StoredHabit>(), habits.habits().first())
+        habits.save(storedHabit("water"))
+        habits.setAmount("water", java.time.LocalDate.of(2026, 10, 27), 1)
+        assertEquals(1, habits.entries().first().getValue("water").size)
+        assertEquals(3, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

@@ -6,8 +6,10 @@ import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.BodyWeight
 import com.homeworkoutcoach.app.data.DeleteResult
+import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
+import com.homeworkoutcoach.app.data.StoredHabit
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import java.time.LocalDate
 
 /** In-memory fakes for tests and previews. They pass the same contract tests as the real stores. */
 class InMemorySettingsRepository(initial: UserSettings = UserSettings()) : SettingsRepository {
@@ -109,5 +112,37 @@ class InMemoryBodyRepository : BodyRepository {
 
     override suspend fun wipe() {
         state.value = emptyList()
+    }
+}
+
+class InMemoryHabitRepository : HabitRepository {
+    private val habits = MutableStateFlow<List<StoredHabit>>(emptyList())
+    private val entries = MutableStateFlow<Map<String, Map<LocalDate, Int>>>(emptyMap())
+
+    override fun habits(): Flow<List<StoredHabit>> = habits
+
+    override fun entries(): Flow<Map<String, Map<LocalDate, Int>>> = entries
+
+    override suspend fun save(habit: StoredHabit) = habits.update { list ->
+        (list.filterNot { it.habit.id == habit.habit.id } + habit).sortedWith(compareBy({ it.position }, { it.habit.name }, { it.habit.id }))
+    }
+
+    override suspend fun delete(id: String) {
+        habits.update { list -> list.filterNot { it.habit.id == id } }
+        entries.update { it - id }
+    }
+
+    override suspend fun setAmount(habitId: String, date: LocalDate, amount: Int) = entries.update {
+        it + (habitId to ((it[habitId] ?: emptyMap()) + (date to amount.coerceAtLeast(0))))
+    }
+
+    override suspend fun clearAmount(habitId: String, date: LocalDate) = entries.update {
+        val left = (it[habitId] ?: emptyMap()) - date
+        if (left.isEmpty()) it - habitId else it + (habitId to left)
+    }
+
+    override suspend fun wipe() {
+        habits.value = emptyList()
+        entries.value = emptyMap()
     }
 }
