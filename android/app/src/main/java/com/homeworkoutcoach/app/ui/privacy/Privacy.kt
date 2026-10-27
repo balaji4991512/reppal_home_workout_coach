@@ -25,8 +25,8 @@ object PrivacyPolicy {
         "What is stored on your phone" to
             "Your setup (name if you give one, equipment, level, days, split, anything you asked to work around, " +
             "height), your plan and progress for each exercise, your workouts with every set, any notes you " +
-            "typed or said, your weigh-ins, and your habits with what you ticked or entered for each day. It stays " +
-            "in the app's private storage on this phone.",
+            "typed or said, your weigh-ins, your habits with what you ticked or entered for each day, and your " +
+            "planner tasks. It stays in the app's private storage on this phone.",
         "Signing in with Google" to
             "Signing in is optional. If you choose it, Google confirms your account through Google Play services " +
             "and Firebase Authentication, and $app receives your name and email address. Google keeps a record " +

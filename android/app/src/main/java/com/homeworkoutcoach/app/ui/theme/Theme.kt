@@ -84,6 +84,12 @@ fun AppTheme(mode: ThemeMode, content: @Composable () -> Unit) {
     val scheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
         primary = t.acc, onPrimary = t.on, background = t.bg, onBackground = t.fg,
         surface = t.bg, onSurface = t.fg, onSurfaceVariant = t.mut, outline = t.bd, error = t.bad,
+        // The date and time pickers take their tints from these; keep them in the app's black and white.
+        primaryContainer = t.acc, onPrimaryContainer = t.on,
+        secondaryContainer = t.accs, onSecondaryContainer = t.fg,
+        tertiaryContainer = t.acc, onTertiaryContainer = t.on,
+        surfaceVariant = t.accs,
+        surfaceContainer = t.bg, surfaceContainerHigh = t.bg, surfaceContainerHighest = t.accs,
     )
     CompositionLocalProvider(LocalTokens provides t, LocalType provides Type()) {
         MaterialTheme(colorScheme = scheme, content = content)

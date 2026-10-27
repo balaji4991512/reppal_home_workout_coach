@@ -74,6 +74,8 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.habits.HabitDetailScreen
 import com.homeworkoutcoach.app.ui.habits.HabitEditScreen
 import com.homeworkoutcoach.app.ui.habits.HabitsScreen
+import com.homeworkoutcoach.app.ui.planner.PlannerScreen
+import com.homeworkoutcoach.app.ui.planner.TaskEditScreen
 import com.homeworkoutcoach.app.ui.week.ArrangeScreen
 import com.homeworkoutcoach.app.ui.week.WeekScreen
 import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
@@ -90,9 +92,13 @@ private const val HABIT = "habit/{id}"
 private const val HABIT_EDIT = "habit/{id}/edit"
 private const val HABIT_NEW = "habit-new"
 
+/** Route of a task's edit form, opened from the Planner. */
+private const val TASK = "task/{id}"
+
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
     Habits("habits", "Habits", AppIcons.List, beforeSetup = true),
+    Planner("planner", "Planner", AppIcons.Planner, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
     Today("today", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
@@ -204,6 +210,10 @@ private fun AppNavHost(
         composable(ARRANGE) { ArrangeScreen(onDone = { nav.popBackStack() }) }
         composable(Dest.Habits.route) {
             HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
+        }
+        composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }) }
+        composable(TASK) { entry ->
+            TaskEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() })
         }
         composable(HABIT_NEW) {
             HabitEditScreen(id = null, onDone = { nav.popBackStack() }, onGone = { nav.popBackStack() })

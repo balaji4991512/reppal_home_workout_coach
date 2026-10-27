@@ -30,6 +30,9 @@ import com.homeworkoutcoach.app.ui.body.BodyViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitDetailViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitEditViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitsViewModel
+import com.homeworkoutcoach.app.ui.planner.PlannerActions
+import com.homeworkoutcoach.app.ui.planner.PlannerViewModel
+import com.homeworkoutcoach.app.ui.planner.TaskEditViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfilePresenter
 import com.homeworkoutcoach.app.ui.profile.ProfileUi
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
@@ -330,6 +333,12 @@ object Factories {
     }
     fun habitEdit(id: String?) = viewModelFactory {
         initializer { app(this).let { HabitEditViewModel(id, it.habits) } }
+    }
+    val Planner = viewModelFactory {
+        initializer { app(this).let { PlannerViewModel(it.tasks, PlannerActions(it.tasks)) } }
+    }
+    fun taskEdit(id: String) = viewModelFactory {
+        initializer { app(this).let { TaskEditViewModel(id, it.tasks, PlannerActions(it.tasks)) } }
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }

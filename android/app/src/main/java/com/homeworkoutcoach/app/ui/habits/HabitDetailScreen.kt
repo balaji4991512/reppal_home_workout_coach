@@ -153,7 +153,7 @@ fun HabitDetailScreen(
 private fun days(n: Int) = if (n == 1) "1 day" else "$n days"
 
 @Composable
-private fun MonthButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun MonthButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(44.dp).clip(CircleShape).then(if (enabled) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .semantics { contentDescription = label },
