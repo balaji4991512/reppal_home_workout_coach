@@ -58,7 +58,7 @@ evening).
 - Starting suggestions: Morning, Evening (the user edits them).
 
 ## 4. Today screen
-The new home screen, one scroll:
+The new home screen, the first screen when the app opens (replacing the Week page; the Week page stays in the menu), one scroll:
 1. Greeting and date.
 2. **Workout**: today's planned workout (or "Rest day"), with Start. Tapping goes to the existing workout screens.
 3. **Routines** for the current part of the day.
@@ -99,5 +99,5 @@ AI, Indian-language text, festival and fasting days. Each gets its own short spe
 
 ## Questions for you
 1. ~~Colour~~ Decided: one accent colour per habit (the project's "monochrome" rule is relaxed for habits only).
-2. **Home screen:** should Today replace the Week page as the first screen when the app opens?
+2. ~~Home screen~~ Decided: Today is the first screen.
 3. **Habit suggestions:** is the starting list (water, sleep, reading, yoga, meditation, walking) right, or what else?
