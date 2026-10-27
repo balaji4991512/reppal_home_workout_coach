@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -37,6 +38,8 @@ fun LineChart(
     fromZero: Boolean = true,
     /** Axis label format. */
     label: (Double) -> String = { "${it.roundToLong()}" },
+    /** Soft fill under the line, and the latest point drawn larger. */
+    emphasis: Boolean = false,
 ) {
     val c = AppTheme.colors
     val measurer = rememberTextMeasurer()
@@ -84,7 +87,22 @@ fun LineChart(
                 if (i == 0) moveTo(xs(p.dateMillis), ys(p.value)) else lineTo(xs(p.dateMillis), ys(p.value))
             }
         }
+        if (emphasis && points.size > 1) {
+            val area = Path().apply {
+                addPath(path)
+                lineTo(xs(points.last().dateMillis), ys(bottom))
+                lineTo(xs(points.first().dateMillis), ys(bottom))
+                close()
+            }
+            drawPath(area, Brush.verticalGradient(listOf(c.fg.copy(alpha = 0.12f), c.fg.copy(alpha = 0f)), startY = T * u, endY = (H - B) * u))
+        }
         drawPath(path, c.fg, style = Stroke(width = 2.2f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        if (emphasis) {
+            val last = points.last()
+            val p = Offset(xs(last.dateMillis), ys(last.value))
+            drawCircle(c.fg.copy(alpha = 0.15f), radius = 9f * u, center = p)
+            drawCircle(c.fg, radius = 5f * u, center = p)
+        }
         points.forEach { drawCircle(c.fg, radius = 3.6f * u, center = Offset(xs(it.dateMillis), ys(it.value))) }
 
         val baseline = (H - 8) * u

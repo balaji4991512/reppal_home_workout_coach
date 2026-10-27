@@ -112,6 +112,7 @@ class BodyViewModel(
         }
     }
 
+    /** Close the weigh-in screen: stops listening; a saved reading stays saved. */
     fun cancelWeighIn() {
         stopListening()
         _weighIn.value = WeighInUi.Idle
@@ -130,10 +131,8 @@ class BodyViewModel(
     fun addManual(text: String): String? {
         val kg = text.trim().replace(',', '.').toDoubleOrNull()
         if (kg == null || kg < 20 || kg > 300) return "Enter a weight between 20 and 300 kg."
-        viewModelScope.launch {
-            val id = body.add(BodyWeight(dateMillis = now(), weightKg = kg, source = WeightSource.MANUAL))
-            _weighIn.value = WeighInUi.Saved(kg, id)
-        }
+        // Saved quietly: the weigh-in screen is only for the scale.
+        viewModelScope.launch { body.add(BodyWeight(dateMillis = now(), weightKg = kg, source = WeightSource.MANUAL)) }
         return null
     }
 

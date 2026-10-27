@@ -2,6 +2,7 @@ package com.homeworkoutcoach.app.ui.body
 
 import com.homeworkoutcoach.app.data.BodyWeight
 import com.homeworkoutcoach.app.data.WeightSource
+import com.homeworkoutcoach.app.ui.Copy
 import com.homeworkoutcoach.app.ui.progress.ChartPoint
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter.Companion.DAY_MS
 import com.homeworkoutcoach.app.ui.progress.Range
@@ -23,7 +24,12 @@ data class BodyUi(
     val history: List<HistoryRowUi>,
 )
 
-data class LatestUi(val weight: String, val whenText: String)
+data class LatestUi(
+    val weight: String,
+    val whenText: String,
+    /** "−0.4 kg since last weigh-in", or null for the first one. */
+    val sinceLast: String?,
+)
 
 data class StatUi(val label: String, val value: String, val note: String? = null)
 
@@ -40,7 +46,13 @@ class BodyPresenter(private val zone: ZoneId = ZoneId.systemDefault()) {
         val inRange = all.filter { it.dateMillis >= cut }
 
         return BodyUi(
-            latest = last?.let { LatestUi("${weight(it.weightKg)} kg", time.format(Instant.ofEpochMilli(it.dateMillis).atZone(zone))) },
+            latest = last?.let {
+                LatestUi(
+                    weight = "${weight(it.weightKg)} kg",
+                    whenText = time.format(Instant.ofEpochMilli(it.dateMillis).atZone(zone)),
+                    sinceLast = all.getOrNull(all.size - 2)?.let { prev -> "${signed(it.weightKg - prev.weightKg)} kg since last weigh-in" },
+                )
+            },
             stats = if (last == null) emptyList() else stats(all, last, heightCm, nowMillis),
             range = range,
             points = inRange.map { ChartPoint(it.dateMillis, it.weightKg) },
@@ -66,24 +78,34 @@ class BodyPresenter(private val zone: ZoneId = ZoneId.systemDefault()) {
     private fun stats(all: List<BodyWeight>, last: BodyWeight, heightCm: Int?, now: Long): List<StatUi> {
         fun mean(from: Long, to: Long) = all.filter { it.dateMillis in (from + 1)..to }.map { it.weightKg }
             .takeIf { it.isNotEmpty() }?.average()
+        val weekValues = all.filter { it.dateMillis in (now - 7 * DAY_MS + 1)..now }
         val week = mean(now - 7 * DAY_MS, now)
         val prevWeek = mean(now - 14 * DAY_MS, now - 7 * DAY_MS)
-        val out = mutableListOf<StatUi>()
-        out += StatUi("7-day average", week?.let { "${weight(it)} kg" } ?: "No weigh-in this week")
-        out += StatUi(
-            "Change vs last week",
-            if (week != null && prevWeek != null) "${signed(week - prevWeek)} kg" else "Not enough data",
-            "Compares 7-day averages, which smooth out day-to-day swings.",
+        val trend = trendPerWeek(all, now)
+        // Four short tiles. A missing figure shows a dash and says what it needs.
+        return listOf(
+            StatUi(
+                "7-day average",
+                week?.let { "${weight(round(it, 1).toDouble())} kg" } ?: DASH,
+                if (week != null) Copy.count(weekValues.size, "weigh-in") else "None this week",
+            ),
+            StatUi(
+                "vs last week",
+                if (week != null && prevWeek != null) "${signed(week - prevWeek)} kg" else DASH,
+                if (week != null && prevWeek != null) "7-day averages" else "Needs 2 weeks",
+            ),
+            StatUi(
+                "Trend",
+                trend?.let { "${signed(it)} kg/wk" } ?: DASH,
+                if (trend != null) "Last 4 weeks" else "Needs 3 weigh-ins",
+            ),
+            if (heightCm != null && heightCm > 0) {
+                val bmi = last.weightKg / ((heightCm / 100.0) * (heightCm / 100.0))
+                StatUi("BMI", round(bmi, 1).toPlainString(), bmiBand(bmi))
+            } else {
+                StatUi("BMI", DASH, "Add your height")
+            },
         )
-        out += StatUi("4-week trend", trendPerWeek(all, now)?.let { "${signed(it)} kg a week" } ?: "Needs 3 weigh-ins over a week")
-        out += if (heightCm != null && heightCm > 0) {
-            val bmi = last.weightKg / ((heightCm / 100.0) * (heightCm / 100.0))
-            StatUi("BMI", round(bmi, 1).toPlainString(), "${bmiBand(bmi)}. BMI is a rough guide; it can't tell muscle from fat.")
-        } else {
-            StatUi("BMI", "Add your height", null)
-        }
-        out += StatUi("Since first weigh-in", "${signed(last.weightKg - all.first().weightKg)} kg", null)
-        return out
     }
 
     /** Least-squares slope over the last 28 days, in kg per week. Needs 3 points spanning at least a week. */
@@ -100,12 +122,14 @@ class BodyPresenter(private val zone: ZoneId = ZoneId.systemDefault()) {
     }
 
     companion object {
-        /** WHO adult bands. */
+        const val DASH = "—"
+
+        /** WHO adult bands. BMI is a rough guide: it can't tell muscle from fat. */
         fun bmiBand(bmi: Double) = when {
-            bmi < 18.5 -> "Below the healthy range"
-            bmi < 25 -> "In the healthy range"
-            bmi < 30 -> "Above the healthy range"
-            else -> "Well above the healthy range"
+            bmi < 18.5 -> "Below healthy range"
+            bmi < 25 -> "Healthy range"
+            bmi < 30 -> "Above healthy range"
+            else -> "Well above healthy range"
         }
 
         // valueOf goes through the decimal string, so 83.55 stays 83.55 rather than 83.5499...

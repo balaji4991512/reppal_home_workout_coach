@@ -54,13 +54,17 @@ class BodyPresenterTest {
         val ui = presenter.present(weights, heightCm = 175, range = Range.MONTH, nowMillis = now)
         assertEquals("83.5 kg", ui.latest!!.weight)
         assertEquals("Tue, 27 Oct · 08:47", ui.latest!!.whenText)
+        assertEquals("−0.4 kg since last weigh-in", ui.latest!!.sinceLast)
         val stats = ui.stats.associate { it.label to it.value }
+        val notes = ui.stats.associate { it.label to it.note }
+        assertEquals(listOf("7-day average", "vs last week", "Trend", "BMI"), ui.stats.map { it.label })
         // this week: 84.2, 83.9, 83.5 -> 83.87; last week: 84.6, 84.4 -> 84.5
-        assertEquals("83.87 kg", stats["7-day average"])
-        assertEquals("−0.6 kg", stats["Change vs last week"])
+        assertEquals("83.9 kg", stats["7-day average"])
+        assertEquals("3 weigh-ins", notes["7-day average"])
+        assertEquals("−0.6 kg", stats["vs last week"])
         assertEquals("27.3", stats["BMI"])
-        assertEquals("−1.5 kg", stats["Since first weigh-in"])
-        assertTrue(stats.getValue("4-week trend").startsWith("−0."))
+        assertEquals("Above healthy range", notes["BMI"])
+        assertTrue(stats.getValue("Trend").startsWith("−0.") && stats.getValue("Trend").endsWith("kg/wk"))
 
         assertEquals(listOf(6L, 5L, 4L, 3L, 2L, 1L), ui.history.map { it.id })
         assertEquals("Scale · −0.4 kg", ui.history[0].detail)
@@ -79,11 +83,14 @@ class BodyPresenterTest {
         assertTrue(empty.stats.isEmpty() && empty.history.isEmpty())
 
         val one = presenter.present(listOf(w(1, "2026-10-27T07:00:00", 84.05)), null, Range.QUARTER, now)
-        val stats = one.stats.associate { it.label to it.value }
-        assertEquals("Add your height", stats["BMI"])
-        assertEquals("Not enough data", stats["Change vs last week"])
-        assertEquals("Needs 3 weigh-ins over a week", stats["4-week trend"])
+        // missing figures show a dash and say what they need
+        assertEquals(
+            listOf("1 weigh-in", "Needs 2 weeks", "Needs 3 weigh-ins", "Add your height"),
+            one.stats.map { it.note },
+        )
+        assertEquals(listOf("84.1 kg", "—", "—", "—"), one.stats.map { it.value })
         assertEquals("84.05 kg", one.latest!!.weight)
+        assertNull(one.latest!!.sinceLast)
     }
 
     @Test
@@ -99,7 +106,7 @@ class BodyPresenterTest {
         assertEquals("80", BodyPresenter.weight(80.0))
         assertEquals("+0.6", BodyPresenter.signed(0.55))
         assertEquals("0", BodyPresenter.signed(0.04))
-        assertEquals("In the healthy range", BodyPresenter.bmiBand(22.0))
+        assertEquals("Healthy range", BodyPresenter.bmiBand(22.0))
     }
 }
 
@@ -161,6 +168,8 @@ class BodyViewModelTest {
         assertNull(vm.addManual("84,3"))
         assertEquals(84.3, body.weights().first().single().weightKg, 0.0)
         assertEquals(WeightSource.MANUAL, body.weights().first().single().source)
+        // typed weights don't open the weigh-in screen
+        assertTrue(vm.weighIn.value is WeighInUi.Problem)
 
         assertEquals("Enter your height in cm, between 100 and 250.", vm.setHeight("5.9"))
         assertNull(vm.setHeight("175"))
