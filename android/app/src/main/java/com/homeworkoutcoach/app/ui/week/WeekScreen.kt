@@ -48,19 +48,25 @@ import com.homeworkoutcoach.app.ui.components.Pill
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Segments
 import com.homeworkoutcoach.app.ui.components.Small
+import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.SetCountStatus
 
 @Composable
-fun WeekScreen(onStart: () -> Unit, vm: WeekViewModel = viewModel(factory = Factories.Week)) {
+fun WeekScreen(onStart: () -> Unit, onArrange: () -> Unit = {}, vm: WeekViewModel = viewModel(factory = Factories.Week)) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    ui?.let { WeekContent(it, onStart, vm::swap) }
+    ui?.let { WeekContent(it, onStart, vm::swap, onArrange) }
 }
 
 /** This week [vWeek]: hero, Monday to Sunday, left-out note, planned volume. */
 @Composable
-fun WeekContent(ui: WeekUi, onStart: () -> Unit, onSwap: (baseId: String, chosenId: String) -> Unit) {
+fun WeekContent(
+    ui: WeekUi,
+    onStart: () -> Unit,
+    onSwap: (baseId: String, chosenId: String) -> Unit,
+    onArrange: () -> Unit = {},
+) {
     // Days the user opened; the next workout starts open.
     var open by rememberSaveable { mutableStateOf<List<Int>?>(null) }
     val nextIndex = ui.hero.done
@@ -86,6 +92,7 @@ fun WeekContent(ui: WeekUi, onStart: () -> Unit, onSwap: (baseId: String, chosen
             }
         }
         Hairline()
+        TextLink("Rearrange days", onArrange)
         if (ui.leftOut.isNotEmpty()) Muted("Left out because of what you told me: ${ui.leftOut.joinToString(", ")}.")
         PlannedVolume(ui.volume)
     }

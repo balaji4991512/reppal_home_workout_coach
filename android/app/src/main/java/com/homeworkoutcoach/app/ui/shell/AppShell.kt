@@ -71,12 +71,16 @@ import com.homeworkoutcoach.app.ui.progress.ProgressScreen
 import com.homeworkoutcoach.app.ui.setup.SetupScreen
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
+import com.homeworkoutcoach.app.ui.week.ArrangeScreen
 import com.homeworkoutcoach.app.ui.week.WeekScreen
 import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
 import kotlinx.coroutines.launch
 
 /** Route of the privacy policy, linked from the menu footer, How it works and Profile. */
 private const val PRIVACY = "privacy"
+
+/** Route of Rearrange days, opened from the Week page. */
+private const val ARRANGE = "arrange"
 
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
@@ -187,7 +191,8 @@ private fun AppNavHost(
     onLeaveRequest: () -> Unit,
 ) {
     NavHost(nav, startDestination = if (started) Dest.Week.route else Dest.Setup.route) {
-        composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Today) }) }
+        composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Today) }, onArrange = { nav.navigate(ARRANGE) }) }
+        composable(ARRANGE) { ArrangeScreen(onDone = { nav.popBackStack() }) }
         composable(Dest.Setup.route) {
             SetupScreen(appName, onBuilt = {
                 nav.navigate(Dest.Week.route) {

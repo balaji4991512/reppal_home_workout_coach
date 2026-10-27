@@ -98,7 +98,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
         val ps = settings.planSettings(swaps)
         val seq = planner.weekSequence(ps)
         val week: List<Day> = seq.map { planner.buildDay(it, ps) }
-        val weekdays = planner.workoutWeekdays(settings.daysPerWeek)
+        val weekdays = planner.weekdays(ps)
         val k = settings.sessionIndex % seq.size
         val weekNumber = settings.sessionIndex / seq.size + 1
 

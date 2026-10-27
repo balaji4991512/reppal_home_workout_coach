@@ -30,6 +30,8 @@ import com.homeworkoutcoach.app.ui.body.BodyViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfilePresenter
 import com.homeworkoutcoach.app.ui.profile.ProfileUi
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
+import com.homeworkoutcoach.app.ui.week.ArrangePresenter
+import com.homeworkoutcoach.app.ui.week.ArrangeViewModel
 import com.homeworkoutcoach.app.ui.week.WeekPresenter
 import com.homeworkoutcoach.app.ui.week.WeekUi
 import com.homeworkoutcoach.app.ui.workout.WorkoutViewModel
@@ -310,6 +312,11 @@ object Factories {
             app(this).let {
                 WorkoutViewModel(it.library, it.planner, it.settings, it.training, it.actions, KeywordSetParser)
             }
+        }
+    }
+    val Arrange = viewModelFactory {
+        initializer {
+            app(this).let { ArrangeViewModel(it.settings, it.training, it.actions, ArrangePresenter(it.library, it.planner)) }
         }
     }
     val Body = viewModelFactory {

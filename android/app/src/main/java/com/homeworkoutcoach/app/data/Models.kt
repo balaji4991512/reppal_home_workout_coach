@@ -43,6 +43,8 @@ data class UserSettings(
     val heightCm: Int? = null,
     /** The user's Bluetooth scale, remembered after the first weigh-in so neighbours' scales are ignored. */
     val scaleId: String? = null,
+    /** Rearranged week: weekday (0 = Monday) for each session of the plan's default order. Null = default days. */
+    val sessionWeekdays: List<Int>? = null,
 ) {
     fun equipment(): Equipment = Equipment(bench, dumbbellsKg.toSet())
 
@@ -54,6 +56,7 @@ data class UserSettings(
         customDays = customDays,
         excluded = excluded.toSet(),
         swaps = swaps,
+        sessionWeekdays = sessionWeekdays,
     )
 }
 

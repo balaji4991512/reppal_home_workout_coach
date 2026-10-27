@@ -11,6 +11,11 @@ data class PlanSettings(
     val excluded: Set<String> = emptySet(),
     /** baseId -> chosen exercise id. */
     val swaps: Map<String, String> = emptyMap(),
+    /**
+     * The user's own arrangement: the weekday (0 = Monday) for each session of the default sequence, in default order.
+     * Null, or not a valid layout for this sequence, means the default weekdays.
+     */
+    val sessionWeekdays: List<Int>? = null,
 ) {
     init {
         require(daysPerWeek in 1..7) { "daysPerWeek must be 1..7" }
@@ -29,7 +34,23 @@ class Planner(private val lib: Library = Library.default) {
 
     // ---- Weekly schedule [wkSeq, occ] ----
 
+    /** The week's sessions in the order they fall, following the user's arrangement when there is one. */
     fun weekSequence(s: PlanSettings): List<String> {
+        val base = defaultSequence(s)
+        val layout = layout(s, base.size) ?: return base
+        return base.indices.sortedBy { layout[it] }.map { base[it] }
+    }
+
+    /** Weekday (0 = Monday) of each session in [weekSequence], in the same order. */
+    fun weekdays(s: PlanSettings): List<Int> =
+        layout(s, defaultSequence(s).size)?.sorted() ?: workoutWeekdays(s.daysPerWeek)
+
+    /** The arrangement if it is a valid one for [sessions] sessions: distinct weekdays in 0..6. */
+    private fun layout(s: PlanSettings, sessions: Int): List<Int>? =
+        s.sessionWeekdays?.takeIf { w -> w.size == sessions && w.distinct().size == sessions && w.all { it in 0..6 } }
+
+    /** The plan's own order [wkSeq], before any arrangement by the user. */
+    fun defaultSequence(s: PlanSettings): List<String> {
         val d = s.daysPerWeek
         fun cycle(a: List<String>) = withOccurrences(List(d) { a[it % a.size] })
         return when (s.split) {

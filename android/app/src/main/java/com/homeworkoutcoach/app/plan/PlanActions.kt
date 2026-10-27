@@ -70,6 +70,11 @@ class PlanActions(
                 split = draft.split,
                 customDays = draft.customDays,
                 excluded = (concerns.excludedIds(draft.concern) + s.painExcluded).distinct(),
+                // A rearranged week only fits the plan it was made for.
+                sessionWeekdays = s.sessionWeekdays.takeIf {
+                    draft.daysPerWeek == s.daysPerWeek && draft.split == s.split &&
+                        (draft.split != Split.CUSTOM || draft.customDays.take(draft.daysPerWeek) == s.customDays.take(s.daysPerWeek))
+                },
                 sessionIndex = 0,
                 weekBase = saved,
             )
@@ -100,6 +105,15 @@ class PlanActions(
         training.wipe()
         body?.wipe()
         settings.reset()
+    }
+
+    /**
+     * Save a rearranged week ([weekdays]: the weekday for each session in the plan's default order; null restores the
+     * default) and start a fresh week from its first day.
+     */
+    suspend fun arrangeWeek(weekdays: List<Int>?) {
+        val saved = training.workouts().first().size
+        settings.update { it.copy(sessionWeekdays = weekdays, sessionIndex = 0, weekBase = saved) }
     }
 
     /** Use the app without an account; everything stays on this phone. */
