@@ -10,10 +10,12 @@ import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.StoredHabit
+import com.homeworkoutcoach.app.data.TaskRepository
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.Task
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -144,5 +146,21 @@ class InMemoryHabitRepository : HabitRepository {
     override suspend fun wipe() {
         habits.value = emptyList()
         entries.value = emptyMap()
+    }
+}
+
+class InMemoryTaskRepository : TaskRepository {
+    private val state = MutableStateFlow<List<Task>>(emptyList())
+
+    override fun tasks(): Flow<List<Task>> = state
+
+    override suspend fun save(task: Task) = state.update { list ->
+        (list.filterNot { it.id == task.id } + task).sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id }))
+    }
+
+    override suspend fun delete(id: String) = state.update { list -> list.filterNot { it.id == id } }
+
+    override suspend fun wipe() {
+        state.value = emptyList()
     }
 }

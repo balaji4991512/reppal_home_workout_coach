@@ -49,7 +49,7 @@ class DataExportTest {
 
         val o = Json.parseToJsonElement(r.json).jsonObject
         assertEquals("RepPal", o.getValue("app").jsonPrimitive.content)
-        assertEquals(2, o.getValue("format").jsonPrimitive.int)
+        assertEquals(3, o.getValue("format").jsonPrimitive.int)
         assertEquals("2026-10-27T14:57:36+05:30", o.getValue("exportedAt").jsonPrimitive.content)
         assertEquals("me@gmail.com", o.getValue("account").jsonPrimitive.content)
         assertEquals("Balaji", o.getValue("settings").jsonObject.getValue("name").jsonPrimitive.content)

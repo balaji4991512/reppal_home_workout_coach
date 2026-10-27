@@ -81,6 +81,18 @@ data class HabitEntryEntity(
     val amount: Int,
 )
 
+/** A planner task. [epochDay] is a local calendar day and [minuteOfDay] the time (null for none), never timestamps. */
+@Entity(tableName = "task")
+data class TaskEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val epochDay: Long,
+    val minuteOfDay: Int?,
+    val note: String,
+    val done: Boolean,
+    val createdAt: Long,
+)
+
 @Dao
 interface ExerciseStateDao {
     @Query("SELECT * FROM exercise_state")
@@ -162,15 +174,30 @@ interface HabitDao {
     suspend fun clearHabits()
 }
 
+@Dao
+interface TaskDao {
+    @Query("SELECT * FROM task ORDER BY epochDay, createdAt, id")
+    fun observeAll(): Flow<List<TaskEntity>>
+
+    @Upsert
+    suspend fun upsert(task: TaskEntity)
+
+    @Query("DELETE FROM task WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("DELETE FROM task")
+    suspend fun clear()
+}
+
 @Database(
     entities = [
         ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class,
-        HabitEntity::class, HabitEntryEntity::class,
+        HabitEntity::class, HabitEntryEntity::class, TaskEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
-    // 2: body_weight table added. 3: habit and habit_entry tables added.
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun exerciseStates(): ExerciseStateDao
@@ -178,6 +205,7 @@ abstract class TrainingDatabase : RoomDatabase() {
     abstract fun workouts(): WorkoutDao
     abstract fun bodyWeights(): BodyWeightDao
     abstract fun habits(): HabitDao
+    abstract fun tasks(): TaskDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =

@@ -10,12 +10,14 @@ import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.LoggedSet
 import com.homeworkoutcoach.engine.Planner
 import com.homeworkoutcoach.engine.PlannedExercise
+import com.homeworkoutcoach.engine.Task
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -25,8 +27,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits added (files without them still restore). */
-    const val FORMAT = 2
+    /** 1: workouts and weigh-ins. 2: habits added. 3: planner tasks added (older files still restore). */
+    const val FORMAT = 3
 
     @Serializable
     data class File(
@@ -41,6 +43,8 @@ object DataExport {
         val weighIns: List<WeighInDto>,
         /** Null in files from before habits existed; restoring such a file leaves the phone's habits alone. */
         val habits: List<HabitDto>? = null,
+        /** Null in files from before the planner existed; restoring such a file leaves the phone's tasks alone. */
+        val tasks: List<TaskDto>? = null,
     )
 
     @Serializable
@@ -92,6 +96,18 @@ object DataExport {
     @Serializable
     data class ScheduleDto(val type: String, val days: List<String> = emptyList(), val times: Int = 0)
 
+    /** [date] is a calendar day (2026-10-27); [time] is 24-hour "18:30" or null. */
+    @Serializable
+    data class TaskDto(
+        val id: String,
+        val title: String,
+        val date: String,
+        val time: String? = null,
+        val note: String = "",
+        val done: Boolean = false,
+        val createdAt: Long = 0,
+    )
+
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
@@ -109,6 +125,7 @@ object DataExport {
         nowMillis: Long,
         zone: ZoneId,
         habits: List<HabitData> = emptyList(),
+        tasks: List<Task> = emptyList(),
     ): String {
         val planner = Planner(lib)
         fun iso(ms: Long) = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -156,6 +173,9 @@ object DataExport {
                     entries = d.entries.toSortedMap().mapKeys { it.key.toString() },
                 )
             },
+            tasks = tasks.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id })).map {
+                TaskDto(it.id, it.title, it.date.toString(), it.time?.toString(), it.note, it.done, it.createdAt)
+            },
         )
         return json.encodeToString(File.serializer(), file)
     }
@@ -174,6 +194,8 @@ data class Restore(
     val weights: List<BodyWeight>,
     /** Null when the file predates habits: the phone's habits stay as they are. */
     val habits: List<HabitData>?,
+    /** Null when the file predates the planner: the phone's tasks stay as they are. */
+    val tasks: List<Task>?,
     val exportedAt: Long,
 )
 
@@ -228,6 +250,7 @@ object DataImport {
                         )
                     },
                     habits = file.habits?.map(::habitData),
+                    tasks = file.tasks?.map(::task),
                     exportedAt = millis(file.exportedAt),
                 ),
             )
@@ -235,6 +258,17 @@ object DataImport {
             ImportCheck.Bad("Part of this file couldn’t be read, so nothing was changed.")
         }
     }
+
+    /** Throws if anything in the task is invalid; [read] then reports that nothing was changed. */
+    private fun task(d: DataExport.TaskDto) = Task(
+        id = d.id,
+        title = d.title,
+        date = LocalDate.parse(d.date),
+        time = d.time?.let(LocalTime::parse),
+        note = d.note,
+        done = d.done,
+        createdAt = d.createdAt,
+    )
 
     /** Throws if anything in the habit is invalid; [read] then reports that nothing was changed. */
     private fun habitData(d: DataExport.HabitDto): HabitData {
@@ -267,6 +301,7 @@ class DataImporter(
     private val training: TrainingRepository,
     private val body: BodyRepository,
     private val habits: HabitRepository? = null,
+    private val tasks: TaskRepository? = null,
 ) {
     suspend fun restore(r: Restore) {
         training.wipe()
@@ -283,6 +318,11 @@ class DataImporter(
                 d.entries.forEach { (day, amount) -> habits.setAmount(d.stored.habit.id, day, amount) }
             }
         }
+        // Likewise for a file from before the planner.
+        if (r.tasks != null && tasks != null) {
+            tasks.wipe()
+            r.tasks.forEach { tasks.save(it) }
+        }
         // Keep how the user is signed in on this phone; everything else comes from the file.
         settings.update { now -> r.settings.copy(guest = now.guest) }
     }
@@ -297,8 +337,9 @@ class DataExporter(
     private val auth: AuthRepository,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val habits: HabitRepository? = null,
+    private val tasks: TaskRepository? = null,
 ) {
-    data class Result(val json: String, val workouts: Int, val weighIns: Int, val habits: Int = 0)
+    data class Result(val json: String, val workouts: Int, val weighIns: Int, val habits: Int = 0, val tasks: Int = 0)
 
     suspend fun export(appName: String, nowMillis: Long = System.currentTimeMillis()): Result {
         val workouts = training.workouts().first()
@@ -307,10 +348,11 @@ class DataExporter(
             val entries = repo.entries().first()
             repo.habits().first().map { HabitData(it, entries[it.habit.id].orEmpty()) }
         }.orEmpty()
+        val taskList = tasks?.tasks()?.first().orEmpty()
         val text = DataExport.build(
             lib, appName, settings.settings.first(), training.exerciseStates().first(), training.swaps().first(),
-            workouts, weights, auth.account.value, nowMillis, zone, habitData,
+            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList,
         )
-        return Result(text, workouts.size, weights.size, habitData.size)
+        return Result(text, workouts.size, weights.size, habitData.size, taskList.size)
     }
 }
