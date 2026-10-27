@@ -106,7 +106,7 @@ data class WorkoutSession(
             equipment = equipment,
             day = day,
             plan = day.items.map { item ->
-                val s = stateOf(item.exerciseId)
+                val s = stateOf(item.exerciseId).atLeast(item.sets)
                 PlannedExercise(item.exerciseId, s.sets, s.targetReps, s.weightKg)
             },
         )

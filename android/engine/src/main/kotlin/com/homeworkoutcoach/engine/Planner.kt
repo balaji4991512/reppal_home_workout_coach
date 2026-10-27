@@ -22,8 +22,11 @@ data class PlanSettings(
     }
 }
 
-/** One exercise in a day. [slot] is the preset slot name or the muscle label. [baseId] is the id before swaps. */
-data class DayItem(val slot: String, val exerciseId: String, val baseId: String = exerciseId) {
+/**
+ * One exercise in a day. [slot] is the preset slot name or the muscle label. [baseId] is the id before swaps.
+ * [sets] is the fewest sets it is planned with on this day (progression may have added more).
+ */
+data class DayItem(val slot: String, val exerciseId: String, val baseId: String = exerciseId, val sets: Int = DEFAULT_SETS) {
     val swapped: Boolean get() = exerciseId != baseId
 }
 
@@ -32,8 +35,8 @@ data class Day(val label: String, val items: List<DayItem>, val missing: List<St
 
 class Planner(
     private val lib: Library = Library.default,
-    /** Weekly sets per muscle; [WeeklyTargets.prototype] reproduces the web prototype. */
-    val targets: WeeklyTargets = WeeklyTargets.PER_MUSCLE,
+    /** Weekly sets per muscle, day sizes and preset slots; [PlanRules.prototype] reproduces the web prototype. */
+    val rules: PlanRules = PlanRules.CURRENT,
 ) {
 
     // ---- Weekly schedule [wkSeq, occ] ----
@@ -85,9 +88,10 @@ class Planner(
         if (label.startsWith("M:")) return buildMuscleDay(label, s)
         val items = mutableListOf<DayItem>()
         val missing = mutableListOf<String>()
-        for ((slot, ids) in lib.presetPlans.getValue(label)) {
+        for ((slot, ids) in rules.presetSlots(lib, label)) {
             val id = ids.filter { i -> items.none { it.exerciseId == i } }.firstOrNull { available(it, s) }
-            if (id != null) items += DayItem(slot, id) else missing += slot
+            if (id != null) items += DayItem(slot, id, sets = rules.setsPerExercise(label, lib.exercise(id).primary.first()))
+            else missing += slot
         }
         return Day(label, items, missing)
     }
@@ -97,11 +101,11 @@ class Planner(
         val parts = label.substring(2).split('#')
         val occurrence = parts.getOrNull(1)?.toIntOrNull() ?: 0
         val muscles = parseMuscles(parts[0]).sortedBy { if (it in lib.bigMuscles) 0 else 1 }
-        val cap = targets.dayCap(s.level)
+        val cap = rules.dayCap(s.level)
         val sequence = weekSequence(s)
 
         val count = muscles.associateWith { m ->
-            maxOf(1, jsRound(targets.sets(m, s.level).toDouble() / frequency(m, sequence) / 3))
+            maxOf(1, jsRound(rules.sets(m, s.level).toDouble() / frequency(m, sequence) / rules.setsPerExercise(label, m)))
         }.toMutableMap()
         while (count.values.sum() > cap) {
             val most = muscles.maxOf { count.getValue(it) }
@@ -120,7 +124,7 @@ class Planner(
                 if (got >= count.getValue(m)) break
                 val id = group.firstOrNull { id -> available(id, s) && items.none { it.exerciseId == id } }
                 if (id != null) {
-                    items += DayItem(lib.muscleLabels.getValue(m), id)
+                    items += DayItem(lib.muscleLabels.getValue(m), id, sets = rules.setsPerExercise(label, m))
                     got++
                 }
             }
@@ -139,9 +143,9 @@ class Planner(
             val to = s.swaps[item.exerciseId]
             if (to != null && to in lib.exercises && available(to, s) && to !in used) {
                 used += to
-                DayItem(item.slot, to, baseId = item.exerciseId)
+                item.copy(exerciseId = to, baseId = item.exerciseId)
             } else {
-                DayItem(item.slot, item.exerciseId)
+                item.copy(baseId = item.exerciseId)
             }
         })
     }

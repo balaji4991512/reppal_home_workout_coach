@@ -132,7 +132,7 @@ class AcceptanceTest {
                 val ids = day.items.map { it.exerciseId }
                 assertEquals("$s ${day.label}", ids.size, ids.toSet().size)
                 assertTrue(ids.all { s.equipment.canDo(lib.exercise(it)) })
-                if (day.label.startsWith("M:")) assertTrue(ids.size <= planner.targets.dayCap(level))
+                if (day.label.startsWith("M:")) assertTrue(ids.size <= planner.rules.dayCap(level))
             }
         }
     }
@@ -274,7 +274,7 @@ class AcceptanceTest {
         assertEquals(50.0, Volume.niceStep(45.0), 1e-9)
         assertEquals(200.0, Volume.niceStep(120.0), 1e-9)
         assertEquals(1.0, Volume.niceStep(0.0), 1e-9)
-        val day = planner.buildDay("A", PlanSettings(fullKit))
+        val day = Planner(lib, PlanRules.prototype(lib)).buildDay("A", PlanSettings(fullKit))
         assertEquals(45, planner.estimateMinutes(day) { ExerciseState(5.0) }) // 5 exercises x 3 sets: (15 * 2.5 + 8) / 5 = 9.1 -> 9 x 5
     }
 }

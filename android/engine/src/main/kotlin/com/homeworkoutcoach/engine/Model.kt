@@ -85,7 +85,10 @@ data class ExerciseState(
     val weightKg: Double,
     val targetReps: Int = DEFAULT_TARGET_REPS,
     val sets: Int = DEFAULT_SETS,
-)
+) {
+    /** This state with at least [min] sets, for a day that plans the exercise with more. */
+    fun atLeast(min: Int): ExerciseState = if (sets >= min) this else copy(sets = min)
+}
 
 /** What voice, text or chips produce for one set (PRODUCT_SPEC "Set record"). */
 data class SetRecord(

@@ -105,7 +105,11 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
         val states = week.flatMap { d -> d.items.map { it.exerciseId } }.distinct().associateWith { id ->
             Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)
         }
-        val state = { id: String -> states[id] ?: Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level) }
+        // An exercise planned with more sets on one of its days shows that many all week (not stored: it is the day's plan).
+        val minSets = week.flatMap { it.items }.groupBy { it.exerciseId }.mapValues { (_, items) -> items.maxOf { it.sets } }
+        val state = { id: String ->
+            (states[id] ?: Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)).atLeast(minSets[id] ?: 0)
+        }
 
         val next = week[k]
         val hero = HeroUi(
@@ -163,7 +167,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
     }
 
     private fun volume(settings: UserSettings, week: List<Day>, state: (String) -> ExerciseState): VolumeUi {
-        val v = Volume.plannedWeek(lib, settings.level, week, state, planner.targets)
+        val v = Volume.plannedWeek(lib, settings.level, week, state, planner.rules)
         val low = v.filterValues { it.status == SetCountStatus.LOW }.keys.map { lib.muscleLabels.getValue(it).lowercase() }
         return VolumeUi(
             headline = if (low.isNotEmpty()) "Lighter this week: ${low.joinToString(", ")}." else "This week covers all major muscles.",
@@ -175,7 +179,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
                 VolumeRowUi(
                     muscle = lib.muscleLabels.getValue(m),
                     load = parts.joinToString(", ").ifEmpty { "none" },
-                    sets = "${Copy.kg(w.sets)} of ${planner.targets.sets(m, settings.level)} sets, " + when (w.status) {
+                    sets = "${Copy.kg(w.sets)} of ${planner.rules.sets(m, settings.level)} sets, " + when (w.status) {
                         SetCountStatus.LOW -> "Low"
                         SetCountStatus.HIGH -> "High"
                         SetCountStatus.ON_TARGET -> "On target"

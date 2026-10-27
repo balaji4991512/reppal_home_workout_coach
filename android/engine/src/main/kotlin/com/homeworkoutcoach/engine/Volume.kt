@@ -109,7 +109,7 @@ object Volume {
         level: Level,
         week: List<Day>,
         stateOf: (String) -> ExerciseState,
-        targets: WeeklyTargets = WeeklyTargets.PER_MUSCLE,
+        rules: PlanRules = PlanRules.CURRENT,
     ): Map<Muscle, MuscleWeek> {
         val sets = mutableMapOf<Muscle, Double>()
         val kg = mutableMapOf<Muscle, Double>()
@@ -123,7 +123,7 @@ object Volume {
             else e.primary.forEach { kg.merge(it, s.sets * s.targetReps * s.weightKg, Double::plus) }
         }
         return Muscle.entries.associateWith { m ->
-            val range = targets.range(m, level)
+            val range = rules.range(m, level)
             val v = jsRound((sets[m] ?: 0.0) * 2) / 2.0
             MuscleWeek(
                 kg = kg[m] ?: 0.0,
