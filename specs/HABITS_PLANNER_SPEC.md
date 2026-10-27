@@ -16,7 +16,9 @@ on the data this records. They are NOT part of this spec.
 - Rules in the pure Kotlin engine with unit tests first, then the screens (as for the workout planner).
 
 ## 1. Habits
-**A habit** has: name, icon (picked from a small set), how it is tracked, a schedule, and a start date.
+**A habit** has: name, icon (picked from a small set), one accent colour (picked from a small set of soft colours),
+how it is tracked, a schedule, and a start date. The accent colour is used only on that habit's icon, its calendar
+fill and its progress; the rest of the app stays black and white. Colours are chosen to read well in light and dark.
 
 | How it is tracked | Example | Counts as done when |
 |---|---|---|
@@ -30,7 +32,7 @@ on the data this records. They are NOT part of this spec.
 - *Habits list*: today's habits first, one-tap tick; a number or time habit opens a small box to add to today's amount.
 - *Habit page*: month calendar (days fill in when done), this week "4 of 5", this month and all-time counts. Past days
   can be edited.
-- *Add / edit habit*: name, icon, tracking type, target, schedule. Starting suggestions (water, sleep, reading, yoga,
+- *Add / edit habit*: name, icon, colour, tracking type, target, schedule. Starting suggestions (water, sleep, reading, yoga,
   meditation, walking) that the user can ignore.
 - *Archive* a habit to hide it and keep its history; *Delete* removes its history too (asks first).
 
@@ -96,6 +98,6 @@ AI, Indian-language text, festival and fasting days. Each gets its own short spe
 - Old exports (before this change) still restore.
 
 ## Questions for you
-1. **Colour:** the app is black and white. Allow one accent colour per habit, or keep everything monochrome?
+1. ~~Colour~~ Decided: one accent colour per habit (the project's "monochrome" rule is relaxed for habits only).
 2. **Home screen:** should Today replace the Week page as the first screen when the app opens?
 3. **Habit suggestions:** is the starting list (water, sleep, reading, yoga, meditation, walking) right, or what else?
