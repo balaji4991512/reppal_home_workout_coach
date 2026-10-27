@@ -1,6 +1,7 @@
 package com.homeworkoutcoach.app.data
 
 import com.homeworkoutcoach.engine.AutoSource
+import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Habit
@@ -10,6 +11,8 @@ import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.LoggedSet
 import com.homeworkoutcoach.engine.Planner
 import com.homeworkoutcoach.engine.PlannedExercise
+import com.homeworkoutcoach.engine.Routine
+import com.homeworkoutcoach.engine.RoutineItem
 import com.homeworkoutcoach.engine.Task
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
@@ -27,8 +30,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits added. 3: planner tasks added (older files still restore). */
-    const val FORMAT = 3
+    /** 1: workouts and weigh-ins. 2: habits added. 3: planner tasks added. 4: routines added (older files still restore). */
+    const val FORMAT = 4
 
     @Serializable
     data class File(
@@ -45,6 +48,8 @@ object DataExport {
         val habits: List<HabitDto>? = null,
         /** Null in files from before the planner existed; restoring such a file leaves the phone's tasks alone. */
         val tasks: List<TaskDto>? = null,
+        /** Null in files from before routines existed; restoring such a file leaves the phone's routines alone. */
+        val routines: List<RoutineDto>? = null,
     )
 
     @Serializable
@@ -108,6 +113,20 @@ object DataExport {
         val createdAt: Long = 0,
     )
 
+    /** [part] is "morning", "afternoon" or "evening"; [done] are the days it was finished (2026-10-27). */
+    @Serializable
+    data class RoutineDto(
+        val id: String,
+        val name: String,
+        val part: String,
+        val steps: List<StepDto> = emptyList(),
+        val done: List<String> = emptyList(),
+    )
+
+    /** A step; [habit] is the id of the habit it ticks, if any. */
+    @Serializable
+    data class StepDto(val id: String, val title: String, val habit: String? = null)
+
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
@@ -126,6 +145,7 @@ object DataExport {
         zone: ZoneId,
         habits: List<HabitData> = emptyList(),
         tasks: List<Task> = emptyList(),
+        routines: List<RoutineBundle> = emptyList(),
     ): String {
         val planner = Planner(lib)
         fun iso(ms: Long) = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -176,6 +196,15 @@ object DataExport {
             tasks = tasks.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id })).map {
                 TaskDto(it.id, it.title, it.date.toString(), it.time?.toString(), it.note, it.done, it.createdAt)
             },
+            routines = routines.sortedWith(compareBy({ it.routine.position }, { it.routine.name })).map { b ->
+                RoutineDto(
+                    id = b.routine.id,
+                    name = b.routine.name,
+                    part = b.routine.part.name.lowercase(),
+                    steps = b.routine.items.map { StepDto(it.id, it.title, it.habitId) },
+                    done = b.done.sorted().map { it.toString() },
+                )
+            },
         )
         return json.encodeToString(File.serializer(), file)
     }
@@ -196,6 +225,8 @@ data class Restore(
     val habits: List<HabitData>?,
     /** Null when the file predates the planner: the phone's tasks stay as they are. */
     val tasks: List<Task>?,
+    /** Null when the file predates routines: the phone's routines stay as they are. */
+    val routines: List<RoutineBundle>?,
     val exportedAt: Long,
 )
 
@@ -251,6 +282,7 @@ object DataImport {
                     },
                     habits = file.habits?.map(::habitData),
                     tasks = file.tasks?.map(::task),
+                    routines = file.routines?.map(::routine),
                     exportedAt = millis(file.exportedAt),
                 ),
             )
@@ -258,6 +290,17 @@ object DataImport {
             ImportCheck.Bad("Part of this file couldn’t be read, so nothing was changed.")
         }
     }
+
+    /** Throws if anything in the routine is invalid; [read] then reports that nothing was changed. */
+    private fun routine(d: DataExport.RoutineDto) = RoutineBundle(
+        Routine(
+            id = d.id,
+            name = d.name,
+            part = DayPart.entries.first { it.name.lowercase() == d.part },
+            items = d.steps.map { RoutineItem(it.id, it.title, it.habit) },
+        ),
+        d.done.map(LocalDate::parse).toSet(),
+    )
 
     /** Throws if anything in the task is invalid; [read] then reports that nothing was changed. */
     private fun task(d: DataExport.TaskDto) = Task(
@@ -302,6 +345,7 @@ class DataImporter(
     private val body: BodyRepository,
     private val habits: HabitRepository? = null,
     private val tasks: TaskRepository? = null,
+    private val routines: RoutineRepository? = null,
 ) {
     suspend fun restore(r: Restore) {
         training.wipe()
@@ -323,6 +367,16 @@ class DataImporter(
             tasks.wipe()
             r.tasks.forEach { tasks.save(it) }
         }
+        // And for a file from before routines. Steps keep their habit link only if that habit is on the phone now.
+        if (r.routines != null && routines != null) {
+            routines.wipe()
+            val known = habits?.habits()?.first()?.map { it.habit.id }?.toSet().orEmpty()
+            r.routines.forEachIndexed { i, b ->
+                val steps = b.routine.items.map { if (it.habitId != null && it.habitId !in known) it.copy(habitId = null) else it }
+                routines.save(b.routine.copy(items = steps, position = i))
+                b.done.forEach { routines.setDone(b.routine.id, it, true) }
+            }
+        }
         // Keep how the user is signed in on this phone; everything else comes from the file.
         settings.update { now -> r.settings.copy(guest = now.guest) }
     }
@@ -338,8 +392,9 @@ class DataExporter(
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val habits: HabitRepository? = null,
     private val tasks: TaskRepository? = null,
+    private val routines: RoutineRepository? = null,
 ) {
-    data class Result(val json: String, val workouts: Int, val weighIns: Int, val habits: Int = 0, val tasks: Int = 0)
+    data class Result(val json: String, val workouts: Int, val weighIns: Int, val habits: Int = 0, val tasks: Int = 0, val routines: Int = 0)
 
     suspend fun export(appName: String, nowMillis: Long = System.currentTimeMillis()): Result {
         val workouts = training.workouts().first()
@@ -349,10 +404,14 @@ class DataExporter(
             repo.habits().first().map { HabitData(it, entries[it.habit.id].orEmpty()) }
         }.orEmpty()
         val taskList = tasks?.tasks()?.first().orEmpty()
+        val routineData = routines?.let { repo ->
+            val done = repo.done().first()
+            repo.routines().first().map { r -> RoutineBundle(r, done.filter { it.routineId == r.id }.map { it.date }.toSet()) }
+        }.orEmpty()
         val text = DataExport.build(
             lib, appName, settings.settings.first(), training.exerciseStates().first(), training.swaps().first(),
-            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList,
+            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData,
         )
-        return Result(text, workouts.size, weights.size, habitData.size, taskList.size)
+        return Result(text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size)
     }
 }

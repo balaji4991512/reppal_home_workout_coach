@@ -5,6 +5,7 @@ import android.content.Context
 import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.HabitRepository
+import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.TaskRepository
 import com.homeworkoutcoach.app.data.DataExporter
 import com.homeworkoutcoach.app.data.DataImporter
@@ -14,6 +15,7 @@ import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.room.RoomBodyRepository
 import com.homeworkoutcoach.app.data.room.RoomHabitRepository
+import com.homeworkoutcoach.app.data.room.RoomRoutineRepository
 import com.homeworkoutcoach.app.data.room.RoomTaskRepository
 import com.homeworkoutcoach.app.data.room.RoomTrainingRepository
 import com.homeworkoutcoach.app.data.room.TrainingDatabase
@@ -33,11 +35,12 @@ class AppContainer(context: Context) {
     val body: BodyRepository by lazy { RoomBodyRepository(database) }
     val habits: HabitRepository by lazy { RoomHabitRepository(database) }
     val tasks: TaskRepository by lazy { RoomTaskRepository(database) }
+    val routines: RoutineRepository by lazy { RoomRoutineRepository(database) }
     val concerns: ConcernMapper by lazy { KeywordConcernMapper(library) }
-    val actions: PlanActions by lazy { PlanActions(settings, training, concerns, body, habits, tasks) }
+    val actions: PlanActions by lazy { PlanActions(settings, training, concerns, body, habits, tasks, routines) }
     val auth: AuthRepository by lazy { FirebaseAuthRepository(context) }
-    val exporter: DataExporter by lazy { DataExporter(library, settings, training, body, auth, habits = habits, tasks = tasks) }
-    val importer: DataImporter by lazy { DataImporter(settings, training, body, habits, tasks) }
+    val exporter: DataExporter by lazy { DataExporter(library, settings, training, body, auth, habits = habits, tasks = tasks, routines = routines) }
+    val importer: DataImporter by lazy { DataImporter(settings, training, body, habits, tasks, routines) }
 }
 
 class HomeWorkoutCoachApp : Application() {

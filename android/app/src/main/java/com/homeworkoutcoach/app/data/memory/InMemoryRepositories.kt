@@ -7,6 +7,7 @@ import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.BodyWeight
 import com.homeworkoutcoach.app.data.DeleteResult
 import com.homeworkoutcoach.app.data.HabitRepository
+import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.StoredHabit
@@ -15,6 +16,9 @@ import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.Routine
+import com.homeworkoutcoach.engine.RoutineDone
+import com.homeworkoutcoach.engine.Routines
 import com.homeworkoutcoach.engine.Task
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -162,5 +166,32 @@ class InMemoryTaskRepository : TaskRepository {
 
     override suspend fun wipe() {
         state.value = emptyList()
+    }
+}
+
+class InMemoryRoutineRepository : RoutineRepository {
+    private val routines = MutableStateFlow<List<Routine>>(emptyList())
+    private val done = MutableStateFlow<Set<RoutineDone>>(emptySet())
+
+    override fun routines(): Flow<List<Routine>> = routines
+
+    override fun done(): Flow<Set<RoutineDone>> = done
+
+    override suspend fun save(routine: Routine) = routines.update { list ->
+        (list.filterNot { it.id == routine.id } + routine).sortedWith(Routines.order)
+    }
+
+    override suspend fun delete(id: String) {
+        routines.update { list -> list.filterNot { it.id == id } }
+        done.update { set -> set.filterNot { it.routineId == id }.toSet() }
+    }
+
+    override suspend fun setDone(routineId: String, date: LocalDate, done: Boolean) = this.done.update {
+        if (done) it + RoutineDone(routineId, date) else it - RoutineDone(routineId, date)
+    }
+
+    override suspend fun wipe() {
+        routines.value = emptyList()
+        done.value = emptySet()
     }
 }

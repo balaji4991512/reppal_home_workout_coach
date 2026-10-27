@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.homeworkoutcoach.app.data.room.RoomBodyRepository
 import com.homeworkoutcoach.app.data.room.RoomHabitRepository
+import com.homeworkoutcoach.app.data.room.RoomRoutineRepository
 import com.homeworkoutcoach.app.data.room.RoomTaskRepository
 import com.homeworkoutcoach.app.data.room.RoomTrainingRepository
 import com.homeworkoutcoach.app.data.room.TrainingDatabase
@@ -78,7 +79,34 @@ class MigrationTest {
         assertEquals(1, RoomHabitRepository(db).habits().first().size)
         RoomTaskRepository(db).save(task("t"))
         assertEquals(1, RoomTaskRepository(db).tasks().first().size)
-        assertEquals(4, db.openHelper.readableDatabase.version)
+        RoomRoutineRepository(db).save(routine("r"))
+        assertEquals(1, RoomRoutineRepository(db).routines().first().size)
+        assertEquals(5, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test
+    fun version4DataSurvivesAndRoutinesWork() = runTest {
+        val file = tmp.newFile("training.db").also { it.delete() }
+        create(file, 4) { db ->
+            insertWorkoutAndState(db)
+            db.execSQL(
+                "INSERT INTO habit (id, name, kind, target, scheduleType, scheduleValue, startEpochDay, auto, archived, icon, color, position) " +
+                    "VALUES ('h', 'Water', 'count', 8, 'daily', 0, 20000, 'none', 0, 'drop', 'blue', 0)",
+            )
+            db.execSQL("INSERT INTO task (id, title, epochDay, minuteOfDay, note, done, createdAt) VALUES ('t', 'Milk', 20001, 540, '', 0, 5)")
+        }
+
+        val db = open(file)
+        assertEquals("Water", RoomHabitRepository(db).habits().first().single().habit.name)
+        assertEquals(java.time.LocalTime.of(9, 0), RoomTaskRepository(db).tasks().first().single().time)
+        assertEquals("A", RoomTrainingRepository(db).workouts().first().single().label)
+
+        val routines = RoomRoutineRepository(db)
+        assertEquals(emptyList<com.homeworkoutcoach.engine.Routine>(), routines.routines().first())
+        routines.save(routine("r", linkedTo = "h"))
+        assertEquals("h", routines.routines().first().single().items.first().habitId)
+        assertEquals(5, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -105,7 +133,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Task>(), tasks.tasks().first())
         tasks.save(task("t"))
         assertEquals(listOf("t"), tasks.tasks().first().map { it.id })
-        assertEquals(4, db.openHelper.readableDatabase.version)
+        assertEquals(5, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -126,7 +154,7 @@ class MigrationTest {
         habits.save(storedHabit("water"))
         habits.setAmount("water", java.time.LocalDate.of(2026, 10, 27), 1)
         assertEquals(1, habits.entries().first().getValue("water").size)
-        assertEquals(4, db.openHelper.readableDatabase.version)
+        assertEquals(5, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

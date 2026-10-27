@@ -5,10 +5,12 @@ import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.ForeignKey
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
@@ -91,6 +93,44 @@ data class TaskEntity(
     val note: String,
     val done: Boolean,
     val createdAt: Long,
+)
+
+/** A routine. [part] is a stored key ("morning", "afternoon", "evening"); keep them stable. */
+@Entity(tableName = "routine")
+data class RoutineEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val part: String,
+    val position: Int,
+)
+
+/** A step of a routine. Deleting the routine deletes its steps; deleting the linked habit clears the link. */
+@Entity(
+    tableName = "routine_item",
+    primaryKeys = ["routineId", "id"],
+    foreignKeys = [
+        ForeignKey(RoutineEntity::class, parentColumns = ["id"], childColumns = ["routineId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(HabitEntity::class, parentColumns = ["id"], childColumns = ["habitId"], onDelete = ForeignKey.SET_NULL),
+    ],
+    indices = [Index("habitId")],
+)
+data class RoutineItemEntity(
+    val routineId: String,
+    val id: String,
+    val title: String,
+    val habitId: String?,
+    val position: Int,
+)
+
+/** A routine finished on a local calendar day. */
+@Entity(
+    tableName = "routine_done",
+    primaryKeys = ["routineId", "epochDay"],
+    foreignKeys = [ForeignKey(RoutineEntity::class, parentColumns = ["id"], childColumns = ["routineId"], onDelete = ForeignKey.CASCADE)],
+)
+data class RoutineDoneEntity(
+    val routineId: String,
+    val epochDay: Long,
 )
 
 @Dao
@@ -189,15 +229,67 @@ interface TaskDao {
     suspend fun clear()
 }
 
+@Dao
+abstract class RoutineDao {
+    @Query("SELECT * FROM routine ORDER BY position, name, id")
+    abstract fun observeRoutines(): Flow<List<RoutineEntity>>
+
+    @Query("SELECT * FROM routine_item ORDER BY routineId, position")
+    abstract fun observeItems(): Flow<List<RoutineItemEntity>>
+
+    @Query("SELECT * FROM routine_done")
+    abstract fun observeDone(): Flow<List<RoutineDoneEntity>>
+
+    @Upsert
+    abstract suspend fun upsertRoutine(routine: RoutineEntity)
+
+    @Query("DELETE FROM routine_item WHERE routineId = :routineId")
+    abstract suspend fun deleteItems(routineId: String)
+
+    @Insert
+    abstract suspend fun insertItems(items: List<RoutineItemEntity>)
+
+    /** Replaces a routine and all its steps together. The routine row is updated in place, so finished days stay. */
+    @Transaction
+    open suspend fun replace(routine: RoutineEntity, items: List<RoutineItemEntity>) {
+        upsertRoutine(routine)
+        deleteItems(routine.id)
+        insertItems(items)
+    }
+
+    @Query("DELETE FROM routine WHERE id = :id")
+    abstract suspend fun delete(id: String)
+
+    @Upsert
+    abstract suspend fun upsertDone(done: RoutineDoneEntity)
+
+    @Query("DELETE FROM routine_done WHERE routineId = :routineId AND epochDay = :epochDay")
+    abstract suspend fun deleteDone(routineId: String, epochDay: Long)
+
+    @Query("DELETE FROM routine_done")
+    abstract suspend fun clearDone()
+
+    @Query("DELETE FROM routine_item")
+    abstract suspend fun clearItems()
+
+    @Query("DELETE FROM routine")
+    abstract suspend fun clearRoutines()
+}
+
 @Database(
     entities = [
         ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class,
         HabitEntity::class, HabitEntryEntity::class, TaskEntity::class,
+        RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
+    // 5: routine, routine_item and routine_done tables added.
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
+    ],
 )
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun exerciseStates(): ExerciseStateDao
@@ -206,6 +298,7 @@ abstract class TrainingDatabase : RoomDatabase() {
     abstract fun bodyWeights(): BodyWeightDao
     abstract fun habits(): HabitDao
     abstract fun tasks(): TaskDao
+    abstract fun routines(): RoutineDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =
