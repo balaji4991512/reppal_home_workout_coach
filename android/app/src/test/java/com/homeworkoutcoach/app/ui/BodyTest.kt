@@ -60,7 +60,7 @@ class BodyPresenterTest {
         assertEquals(listOf("7-day average", "vs last week", "Trend", "BMI"), ui.stats.map { it.label })
         // this week: 84.2, 83.9, 83.5 -> 83.87; last week: 84.6, 84.4 -> 84.5
         assertEquals("83.9 kg", stats["7-day average"])
-        assertEquals("3 weigh-ins", notes["7-day average"])
+        assertEquals("3 days", notes["7-day average"])
         assertEquals("−0.6 kg", stats["vs last week"])
         assertEquals("27.3", stats["BMI"])
         assertEquals("Above healthy range", notes["BMI"])
@@ -85,12 +85,35 @@ class BodyPresenterTest {
         val one = presenter.present(listOf(w(1, "2026-10-27T07:00:00", 84.05)), null, Range.QUARTER, now)
         // missing figures show a dash and say what they need
         assertEquals(
-            listOf("1 weigh-in", "Needs 2 weeks", "Needs 3 weigh-ins", "Add your height"),
+            listOf("1 day", "Needs 2 weeks", "Needs 3 days", "Add your height"),
             one.stats.map { it.note },
         )
         assertEquals(listOf("84.1 kg", "—", "—", "—"), one.stats.map { it.value })
         assertEquals("84.05 kg", one.latest!!.weight)
         assertNull(one.latest!!.sinceLast)
+    }
+
+    @Test
+    fun severalWeighInsADayCountOnceUsingTheFirst() {
+        val many = weights + listOf(
+            w(7, "2026-10-27T12:30:00", 84.6), // after lunch
+            w(8, "2026-10-27T19:10:00", 85.1), // evening
+            w(9, "2026-10-27T19:12:00", 85.0),
+        )
+        val ui = presenter.present(many, heightCm = 175, range = Range.MONTH, nowMillis = at("2026-10-27T20:00:00"))
+        // all kept in history and the card shows the latest, but says which one counts
+        assertEquals(9, ui.history.size)
+        assertEquals("85 kg", ui.latest!!.weight)
+        assertEquals("4 weigh-ins today. Trends use the first: 83.5 kg at 08:47.", ui.latest!!.dayNote)
+        assertEquals("Scale · −0.4 kg · Used for trends", ui.history.first { it.id == 6L }.detail)
+        assertEquals("Scale · +1.1 kg", ui.history.first { it.id == 7L }.detail)
+        // chart and trends: one point a day, so the same as without the extra weigh-ins
+        assertEquals(6, ui.points.size)
+        assertEquals(83.5, ui.points.last().value, 0.0)
+        val stats = ui.stats.associate { it.label to it.value }
+        assertEquals("83.9 kg", stats["7-day average"])
+        assertEquals("3 days", ui.stats.first().note)
+        assertEquals("27.3", stats["BMI"])
     }
 
     @Test

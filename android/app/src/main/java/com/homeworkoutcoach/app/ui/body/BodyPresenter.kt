@@ -29,6 +29,8 @@ data class LatestUi(
     val whenText: String,
     /** "−0.4 kg since last weigh-in", or null for the first one. */
     val sinceLast: String?,
+    /** When the latest day has several weigh-ins: which one the trends use. */
+    val dayNote: String? = null,
 )
 
 data class StatUi(val label: String, val value: String, val note: String? = null)
@@ -38,22 +40,35 @@ data class HistoryRowUi(val id: Long, val date: String, val weight: String, val 
 /** Weight history and trends for the Body screen. Pure, so it is unit-tested directly. */
 class BodyPresenter(private val zone: ZoneId = ZoneId.systemDefault()) {
     private val time = DateTimeFormatter.ofPattern("EEE, d MMM · HH:mm", Locale.forLanguageTag("en-IN"))
+    private val clock = DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("en-IN"))
 
     fun present(weights: List<BodyWeight>, heightCm: Int?, range: Range, nowMillis: Long): BodyUi {
         val all = weights.sortedWith(compareBy({ it.dateMillis }, { it.id }))
         val last = all.lastOrNull()
+        // Every weigh-in is kept, but the chart and trends use one per day: the first, as weight drifts
+        // 1-2 kg over a day with food, water and exercise, and the same time of day compares best.
+        val byDay = all.groupBy { localDate(it.dateMillis) }
+        val daily = byDay.values.map { it.first() }
+        val counted = byDay.filterValues { it.size > 1 }.values.map { it.first().id }.toSet()
         val cut = if (range.days > 0) nowMillis - range.days * DAY_MS else Long.MIN_VALUE
-        val inRange = all.filter { it.dateMillis >= cut }
+        val inRange = daily.filter { it.dateMillis >= cut }
 
         return BodyUi(
             latest = last?.let {
+                val sameDay = byDay.getValue(localDate(it.dateMillis))
+                val first = sameDay.first()
+                val dayWord = if (localDate(it.dateMillis) == localDate(nowMillis)) "today" else "that day"
                 LatestUi(
                     weight = "${weight(it.weightKg)} kg",
                     whenText = time.format(Instant.ofEpochMilli(it.dateMillis).atZone(zone)),
                     sinceLast = all.getOrNull(all.size - 2)?.let { prev -> "${signed(it.weightKg - prev.weightKg)} kg since last weigh-in" },
+                    dayNote = if (sameDay.size > 1) {
+                        "${Copy.count(sameDay.size, "weigh-in")} $dayWord. Trends use the first: " +
+                            "${weight(first.weightKg)} kg at ${clock.format(Instant.ofEpochMilli(first.dateMillis).atZone(zone))}."
+                    } else null,
                 )
             },
-            stats = if (last == null) emptyList() else stats(all, last, heightCm, nowMillis),
+            stats = if (daily.isEmpty()) emptyList() else stats(daily, heightCm, nowMillis),
             range = range,
             points = inRange.map { ChartPoint(it.dateMillis, it.weightKg) },
             rangeNote = if (inRange.size >= 2) {
@@ -69,25 +84,30 @@ class BodyPresenter(private val zone: ZoneId = ZoneId.systemDefault()) {
                     detail = listOfNotNull(
                         if (w.source == WeightSource.SCALE) "Scale" else "Entered",
                         prev?.let { signed(w.weightKg - it.weightKg) + " kg" },
+                        if (w.id in counted) "Used for trends" else null,
                     ).joinToString(" · "),
                 )
             },
         )
     }
 
-    private fun stats(all: List<BodyWeight>, last: BodyWeight, heightCm: Int?, now: Long): List<StatUi> {
-        fun mean(from: Long, to: Long) = all.filter { it.dateMillis in (from + 1)..to }.map { it.weightKg }
+    private fun localDate(millis: Long) = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+
+    /** [daily] holds one weigh-in per day, oldest first. */
+    private fun stats(daily: List<BodyWeight>, heightCm: Int?, now: Long): List<StatUi> {
+        val last = daily.last()
+        fun mean(from: Long, to: Long) = daily.filter { it.dateMillis in (from + 1)..to }.map { it.weightKg }
             .takeIf { it.isNotEmpty() }?.average()
-        val weekValues = all.filter { it.dateMillis in (now - 7 * DAY_MS + 1)..now }
+        val weekDays = daily.count { it.dateMillis in (now - 7 * DAY_MS + 1)..now }
         val week = mean(now - 7 * DAY_MS, now)
         val prevWeek = mean(now - 14 * DAY_MS, now - 7 * DAY_MS)
-        val trend = trendPerWeek(all, now)
+        val trend = trendPerWeek(daily, now)
         // Four short tiles. A missing figure shows a dash and says what it needs.
         return listOf(
             StatUi(
                 "7-day average",
                 week?.let { "${weight(round(it, 1).toDouble())} kg" } ?: DASH,
-                if (week != null) Copy.count(weekValues.size, "weigh-in") else "None this week",
+                if (week != null) Copy.count(weekDays, "day") else "None this week",
             ),
             StatUi(
                 "vs last week",
@@ -97,7 +117,7 @@ class BodyPresenter(private val zone: ZoneId = ZoneId.systemDefault()) {
             StatUi(
                 "Trend",
                 trend?.let { "${signed(it)} kg/wk" } ?: DASH,
-                if (trend != null) "Last 4 weeks" else "Needs 3 weigh-ins",
+                if (trend != null) "Last 4 weeks" else "Needs 3 days",
             ),
             if (heightCm != null && heightCm > 0) {
                 val bmi = last.weightKg / ((heightCm / 100.0) * (heightCm / 100.0))

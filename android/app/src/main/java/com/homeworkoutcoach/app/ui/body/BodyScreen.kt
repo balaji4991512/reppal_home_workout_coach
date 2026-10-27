@@ -183,6 +183,7 @@ private fun Hero(latest: LatestUi?, onWeighIn: () -> Unit, onManual: (String) ->
             }
             Small(latest.whenText)
             latest.sinceLast?.let { Pill(it, c.bg, c.fg, Modifier.padding(top = 10.dp)) }
+            latest.dayNote?.let { Small(it, Modifier.padding(top = 8.dp)) }
         } else {
             Body("No weigh-ins yet", strong = true)
             Small("Tap Weigh in, then step on your scale.")
