@@ -10,7 +10,12 @@ import com.homeworkoutcoach.app.HomeWorkoutCoachApp
 import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.DataExport
+import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.DataExporter
+import com.homeworkoutcoach.app.data.DataImport
+import com.homeworkoutcoach.app.data.DataImporter
+import com.homeworkoutcoach.app.data.ImportCheck
+import com.homeworkoutcoach.app.data.Restore
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.ThemeMode
@@ -43,7 +48,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** Shell state: settings drive the theme, the start screen and the menu footer. Null until loaded. */
 class AppViewModel(
@@ -160,12 +168,60 @@ class ProgressViewModel(training: TrainingRepository, val presenter: ProgressPre
 
 class ProfileViewModel(
     settings: SettingsRepository,
-    training: TrainingRepository,
+    private val training: TrainingRepository,
     auth: AuthRepository,
     presenter: ProfilePresenter,
     private val actions: PlanActions,
     private val exporter: DataExporter,
+    private val importer: DataImporter,
+    private val library: Library,
+    private val body: BodyRepository,
 ) : ViewModel() {
+    private val _restore = MutableStateFlow<RestoreUi?>(null)
+
+    /** Restore from a file: the confirm step, then the outcome. */
+    val restore: StateFlow<RestoreUi?> = _restore
+
+    /** Check a chosen file and ask before replacing anything. */
+    fun checkFile(text: String?) {
+        if (text == null) {
+            _restore.value = RestoreUi.Message("Couldn’t open that file.", bad = true)
+            return
+        }
+        viewModelScope.launch {
+            _restore.value = when (val c = withContext(Dispatchers.Default) { DataImport.read(library, text) }) {
+                is ImportCheck.Bad -> RestoreUi.Message(c.message, bad = true)
+                is ImportCheck.Ok -> {
+                    val r = c.restore
+                    val nowWorkouts = training.workouts().first().size
+                    val nowWeights = body.weights().first().size
+                    val exported = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm", Locale.forLanguageTag("en-IN"))
+                        .format(Instant.ofEpochMilli(r.exportedAt).atZone(ZoneId.systemDefault()))
+                    RestoreUi.Confirm(
+                        r,
+                        "The file has ${Copy.count(r.workouts.size, "workout")} and ${Copy.count(r.weights.size, "weigh-in")}, " +
+                            "saved $exported. Restoring replaces everything on this phone " +
+                            "(now ${Copy.count(nowWorkouts, "workout")} and ${Copy.count(nowWeights, "weigh-in")}).",
+                    )
+                }
+            }
+        }
+    }
+
+    fun confirmRestore() {
+        val c = _restore.value as? RestoreUi.Confirm ?: return
+        viewModelScope.launch {
+            _restore.value = runCatching { importer.restore(c.restore) }.fold(
+                { RestoreUi.Message("Restored ${Copy.count(c.restore.workouts.size, "workout")} and ${Copy.count(c.restore.weights.size, "weigh-in")}.") },
+                { RestoreUi.Message("Restoring stopped part-way. Try the same file again.", bad = true) },
+            )
+        }
+    }
+
+    fun cancelRestore() {
+        _restore.value = null
+    }
+
     private val _exportNote = MutableStateFlow<String?>(null)
 
     /** Result of the last export, shown under the button. */
@@ -203,6 +259,11 @@ class ProfileViewModel(
 
 data class SignInUi(val busy: Boolean = false, val error: String? = null)
 
+sealed interface RestoreUi {
+    data class Confirm(val restore: Restore, val summary: String) : RestoreUi
+    data class Message(val text: String, val bad: Boolean = false) : RestoreUi
+}
+
 /** Factories that pull dependencies from the [com.homeworkoutcoach.app.AppContainer]. */
 object Factories {
     private fun app(extras: androidx.lifecycle.viewmodel.CreationExtras) =
@@ -232,7 +293,10 @@ object Factories {
     val Profile = viewModelFactory {
         initializer {
             app(this).let {
-                ProfileViewModel(it.settings, it.training, it.auth, ProfilePresenter(it.library, it.planner), it.actions, it.exporter)
+                ProfileViewModel(
+                    it.settings, it.training, it.auth, ProfilePresenter(it.library, it.planner), it.actions,
+                    it.exporter, it.importer, it.library, it.body,
+                )
             }
         }
     }

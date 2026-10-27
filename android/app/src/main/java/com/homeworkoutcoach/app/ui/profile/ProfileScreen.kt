@@ -14,12 +14,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.homeworkoutcoach.app.R
 import com.homeworkoutcoach.app.ui.Factories
+import com.homeworkoutcoach.app.ui.RestoreUi
 import com.homeworkoutcoach.app.ui.ProfileViewModel
 import com.homeworkoutcoach.app.ui.components.Body
 import com.homeworkoutcoach.app.ui.components.H1
@@ -53,6 +56,9 @@ import com.homeworkoutcoach.app.ui.components.Small
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.week.SessionCard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ProfileScreen(
@@ -73,12 +79,29 @@ fun ProfileScreen(
             }
         }
     }
+    val restore by vm.restore.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    // Drive and some file apps label JSON as plain text or binary, so accept those too.
+    val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } }.getOrNull()
+                }
+                vm.checkFile(text)
+            }
+        }
+    }
     ui?.let {
         ProfileContent(
             it, onWeek, onSetup,
             onWipe = { vm.wipe(onWiped) },
             onExport = { saveAs.launch(vm.exportFileName(appName)) },
             exportNote = exportNote,
+            onImport = { open.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+            restore = restore,
+            onConfirmRestore = vm::confirmRestore,
+            onCancelRestore = vm::cancelRestore,
         )
     }
 }
@@ -92,6 +115,10 @@ fun ProfileContent(
     onWipe: () -> Unit,
     onExport: () -> Unit = {},
     exportNote: String? = null,
+    onImport: () -> Unit = {},
+    restore: RestoreUi? = null,
+    onConfirmRestore: () -> Unit = {},
+    onCancelRestore: () -> Unit = {},
 ) {
     val c = AppTheme.colors
     var confirmWipe by remember { mutableStateOf(false) }
@@ -156,6 +183,26 @@ fun ProfileContent(
         Muted("Everything is stored on this phone. Save a copy of your plan, workouts and weigh-ins as a file you keep.")
         PrimaryButton("Export my data", onExport, alt = true)
         exportNote?.let { Text(it, Modifier.padding(top = 8.dp), color = c.fg, style = AppTheme.type.bodyStrong) }
+        PrimaryButton("Restore from a file", onImport, alt = true)
+        when (restore) {
+            is RestoreUi.Confirm -> Column(
+                Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(14.dp),
+            ) {
+                Body("Restore from this file?", strong = true)
+                Body(restore.summary, Modifier.padding(top = 4.dp))
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { PrimaryButton("Cancel", onCancelRestore, alt = true, compact = true) }
+                    Box(Modifier.weight(1f)) { PrimaryButton("Restore", onConfirmRestore, compact = true) }
+                }
+            }
+            is RestoreUi.Message -> Text(
+                restore.text,
+                Modifier.padding(top = 8.dp),
+                color = if (restore.bad) c.bad else c.fg,
+                style = AppTheme.type.bodyStrong,
+            )
+            null -> Unit
+        }
         PrimaryButton(
             if (confirmWipe) "Tap again to erase everything" else "Erase saved data",
             { if (confirmWipe) onWipe() else confirmWipe = true },

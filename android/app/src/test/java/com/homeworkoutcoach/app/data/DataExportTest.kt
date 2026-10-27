@@ -9,6 +9,7 @@ import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.LoggedSet
 import com.homeworkoutcoach.engine.PlannedExercise
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -69,6 +70,65 @@ class DataExportTest {
         val weigh = o.getValue("weighIns").jsonArray.single().jsonObject
         assertEquals("scale", weigh.getValue("source").jsonPrimitive.content)
         assertEquals("84.5", weigh.getValue("weightKg").jsonPrimitive.content)
+    }
+
+    @Test
+    fun exportThenRestoreGivesTheSameData() = runTest {
+        // a phone with data
+        val settings = InMemorySettingsRepository(UserSettings(started = true, name = "Balaji", heightCm = 171, sessionIndex = 1))
+        val training = InMemoryTrainingRepository()
+        val body = InMemoryBodyRepository()
+        training.setSwap("bench", "floor")
+        val workout = Workout(
+            dateMillis = now - 3_600_000, label = "M:chest,triceps#1",
+            plan = listOf(PlannedExercise("floor", 3, 12, 5.0), PlannedExercise("pushup", 3, 12, 0.0)),
+            sets = linkedMapOf(
+                "floor" to listOf(LoggedSet(12, 5.0, 12, Effort.EASY), LoggedSet(11, 6.0, 11, Effort.HARD, "wrist")),
+                "pushup" to listOf(LoggedSet(9, 0.0, 12)),
+            ),
+            painIds = setOf("pushup"),
+        )
+        training.saveWorkout(workout, mapOf("floor" to ExerciseState(6.0, 11, 3)))
+        body.add(BodyWeight(dateMillis = now, weightKg = 84.05, source = WeightSource.SCALE))
+        body.add(BodyWeight(dateMillis = now + 60_000, weightKg = 84.3, source = WeightSource.MANUAL))
+        val file = DataExporter(lib, settings, training, body, InMemoryAuthRepository(), ist).export("RepPal", now).json
+
+        // a fresh phone, signed in as a guest, with some other data that must go
+        val s2 = InMemorySettingsRepository(UserSettings(guest = true, name = "Other"))
+        val t2 = InMemoryTrainingRepository()
+        val b2 = InMemoryBodyRepository()
+        t2.putExerciseStates(mapOf("rdl" to ExerciseState(20.0)))
+        b2.add(BodyWeight(dateMillis = 1, weightKg = 99.0, source = WeightSource.MANUAL))
+
+        val check = DataImport.read(lib, file) as ImportCheck.Ok
+        DataImporter(s2, t2, b2).restore(check.restore)
+
+        assertEquals(settings.settings.first().copy(guest = true), s2.settings.first())
+        assertEquals(training.exerciseStates().first(), t2.exerciseStates().first())
+        assertEquals(training.swaps().first(), t2.swaps().first())
+        val restored = t2.workouts().first().single()
+        assertEquals(workout.copy(id = restored.id), restored)
+        assertEquals(body.weights().first().map { it.copy(id = 0) }, b2.weights().first().map { it.copy(id = 0) })
+        assertEquals(now, check.restore.exportedAt)
+    }
+
+    @Test
+    fun badFilesChangeNothing() {
+        assertEquals(ImportCheck.Bad("This isn’t an export file from this app."), DataImport.read(lib, "{\"hello\": 1}"))
+        assertEquals(ImportCheck.Bad("This isn’t an export file from this app."), DataImport.read(lib, "not json"))
+        val newer = """{"app":"RepPal","format":99,"exportedAt":"2026-10-27T14:57:36+05:30","account":null,
+            "settings":{},"exerciseStates":{},"swaps":{},"workouts":[],"weighIns":[]}"""
+        assertEquals(
+            ImportCheck.Bad("This file comes from a newer version of the app. Update the app, then try again."),
+            DataImport.read(lib, newer),
+        )
+        val unknown = newer.replace("\"format\":99", "\"format\":1").replace("\"swaps\":{}", "\"swaps\":{\"bench\":\"teleport\"}")
+        assertEquals(
+            ImportCheck.Bad("This file has exercises this version doesn’t know: teleport."),
+            DataImport.read(lib, unknown),
+        )
+        val badDate = newer.replace("\"format\":99", "\"format\":1").replace("2026-10-27T14:57:36+05:30", "yesterday")
+        assertEquals(ImportCheck.Bad("Part of this file couldn’t be read, so nothing was changed."), DataImport.read(lib, badDate))
     }
 
     @Test

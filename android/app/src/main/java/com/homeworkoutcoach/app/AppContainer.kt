@@ -5,6 +5,7 @@ import android.content.Context
 import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.DataExporter
+import com.homeworkoutcoach.app.data.DataImporter
 import com.homeworkoutcoach.app.data.DataStoreSettingsRepository
 import com.homeworkoutcoach.app.data.FirebaseAuthRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
@@ -30,6 +31,7 @@ class AppContainer(context: Context) {
     val actions: PlanActions by lazy { PlanActions(settings, training, concerns, body) }
     val auth: AuthRepository by lazy { FirebaseAuthRepository(context) }
     val exporter: DataExporter by lazy { DataExporter(library, settings, training, body, auth) }
+    val importer: DataImporter by lazy { DataImporter(settings, training, body) }
 }
 
 class HomeWorkoutCoachApp : Application() {
