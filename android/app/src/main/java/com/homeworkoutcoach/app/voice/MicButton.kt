@@ -42,8 +42,13 @@ fun MicButton(
             override fun onError(error: VoiceError) = errorCb(error)
         }
     }
+    // Show "Listening…" and Stop straight away; the recognizer can take a moment to open the mic.
+    fun begin() {
+        listeningCb()
+        speech.start(callbacks)
+    }
     val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) speech.start(callbacks) else errorCb(VoiceError.NO_PERMISSION)
+        if (granted) begin() else errorCb(VoiceError.NO_PERMISSION)
     }
 
     Chip(
@@ -54,7 +59,7 @@ fun MicButton(
                 listening -> speech.stop()
                 !speech.available -> errorCb(VoiceError.NOT_AVAILABLE)
                 ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                    PackageManager.PERMISSION_GRANTED -> speech.start(callbacks)
+                    PackageManager.PERMISSION_GRANTED -> begin()
                 else -> askPermission.launch(Manifest.permission.RECORD_AUDIO)
             }
         },

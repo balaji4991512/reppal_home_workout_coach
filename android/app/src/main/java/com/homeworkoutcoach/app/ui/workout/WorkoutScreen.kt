@@ -171,15 +171,15 @@ fun LoggingContent(
         Muted("Reps you did", Modifier.padding(top = 8.dp))
         Chips {
             (0 until 5).map { target.targetReps - it }.filter { it >= 1 }.forEach { n ->
-                Chip("$n", input.reps == n, { onReps(n) }, Modifier.widthIn(min = 52.dp))
+                Chip("$n", input.shownReps == n, { onReps(n) }, Modifier.widthIn(min = 52.dp))
             }
         }
         Muted("How it felt")
         Chips {
             listOf(Effort.EASY to "Easy", Effort.JUST_RIGHT to "Just right", Effort.HARD to "Hard").forEach { (k, label) ->
-                Chip(label, (input.effort ?: Effort.JUST_RIGHT) == k, { onEffort(k) })
+                Chip(label, input.shownEffort == k, { onEffort(k) })
             }
-            Chip("Felt pain", input.pain, onPain)
+            Chip("Felt pain", input.shownPain, onPain)
         }
 
         if (input.reps == null && input.preview == null) PrimaryButton("Check my note", onCheck, alt = true)

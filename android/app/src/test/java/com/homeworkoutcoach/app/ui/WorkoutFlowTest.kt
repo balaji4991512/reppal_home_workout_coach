@@ -177,7 +177,15 @@ class WorkoutViewModelTest {
         vm.onCheck()
         assertEquals(SetRecord(10, 6.0, Effort.HARD, comment = "left wrist tight"), vm.logging().input.preview)
 
-        // chips win over typed text and build the record at once; tapping again clears
+        // after a note, chips adjust it (keeping its weight and comment)
+        vm.onReps(12)
+        vm.onEffort(Effort.EASY)
+        assertEquals(SetRecord(12, 6.0, Effort.EASY, comment = "left wrist tight"), vm.logging().input.preview)
+    }
+
+    @Test
+    fun chipsAloneBuildTheRecordAndTappingAgainClears() {
+        val vm = vm()
         vm.onReps(12)
         vm.onEffort(Effort.EASY)
         assertEquals(SetRecord(12, 6.0, Effort.EASY), vm.logging().input.preview)
@@ -203,6 +211,27 @@ class WorkoutViewModelTest {
         assertEquals("ten reps, hard, left wrist tight", input.text)
         // one-line readback before Save set: weight defaults to the current target
         assertEquals(SetRecord(10, 6.0, Effort.HARD, comment = "left wrist tight"), input.preview)
+    }
+
+    @Test
+    fun chipsFollowAndAdjustASpokenNote() {
+        val vm = vm()
+        vm.onVoiceResult("10 reps at 5 kg, easy, wrist tight")
+        var input = vm.logging().input
+        assertEquals(10, input.shownReps)
+        assertEquals(Effort.EASY, input.shownEffort)
+        assertEquals(false, input.shownPain)
+
+        // tapping chips edits the spoken note, keeping its weight and comment
+        vm.onEffort(Effort.HARD)
+        vm.onReps(9)
+        vm.onPain()
+        input = vm.logging().input
+        assertEquals(SetRecord(9, 5.0, Effort.HARD, setOf(com.homeworkoutcoach.engine.SetFlag.PAIN), "wrist tight"), input.preview)
+        assertEquals(Effort.HARD, input.shownEffort)
+        assertTrue(input.shownPain)
+        vm.onPain()
+        assertEquals(false, vm.logging().input.preview!!.pain)
     }
 
     @Test

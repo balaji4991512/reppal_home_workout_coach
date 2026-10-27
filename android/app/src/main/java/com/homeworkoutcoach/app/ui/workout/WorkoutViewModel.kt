@@ -13,6 +13,7 @@ import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 import com.homeworkoutcoach.engine.Progression
 import com.homeworkoutcoach.engine.SetCheck
+import com.homeworkoutcoach.engine.SetFlag
 import com.homeworkoutcoach.engine.SetParser
 import com.homeworkoutcoach.engine.SetRecord
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,15 @@ data class SetInput(
     val error: String? = null,
     /** The microphone is open; [text] shows what has been heard so far. */
     val listening: Boolean = false,
-)
+) {
+    /** The record read from a spoken or typed note (not built from chips), if any. */
+    fun notePreview(): SetRecord? = preview.takeIf { reps == null }
+
+    // What the chips show: the chips themselves, or what the note said.
+    val shownReps: Int? get() = reps ?: notePreview()?.reps
+    val shownEffort: Effort get() = notePreview()?.effort ?: effort ?: Effort.JUST_RIGHT
+    val shownPain: Boolean get() = notePreview()?.pain ?: pain
+}
 
 sealed interface WorkoutState {
     data object Loading : WorkoutState
@@ -83,18 +92,27 @@ class WorkoutViewModel(
 
     fun onText(text: String) = editLogging { it.copy(input = it.input.copy(text = text)) }
 
-    /** Tapping the selected chip again clears it [qs]. A rep count builds the record straight away. */
+    /**
+     * Tapping the selected chip again clears it [qs]. A rep count builds the record straight away.
+     * After a spoken or typed note, chips adjust that note instead, keeping its weight and comment.
+     */
     fun onReps(n: Int) = editLogging { l ->
+        l.input.notePreview()?.let { return@editLogging l.copy(input = l.input.copy(preview = it.copy(reps = n))) }
         val input = l.input.copy(reps = if (l.input.reps == n) null else n)
         l.copy(input = if (input.reps != null) read(l.session, input) else input.copy(preview = null, error = null))
     }
 
     fun onEffort(e: Effort) = editLogging { l ->
+        l.input.notePreview()?.let { return@editLogging l.copy(input = l.input.copy(preview = it.copy(effort = e))) }
         val input = l.input.copy(effort = if (l.input.effort == e) null else e)
         l.copy(input = if (input.reps != null) read(l.session, input) else input.copy(preview = null))
     }
 
     fun onPain() = editLogging { l ->
+        l.input.notePreview()?.let { p ->
+            val flags = if (p.pain) p.flags - SetFlag.PAIN else p.flags + SetFlag.PAIN
+            return@editLogging l.copy(input = l.input.copy(preview = p.copy(flags = flags)))
+        }
         val input = l.input.copy(pain = !l.input.pain)
         l.copy(input = if (input.reps != null) read(l.session, input) else input)
     }
