@@ -1,6 +1,7 @@
 package com.homeworkoutcoach.app.data.room
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -35,6 +36,15 @@ data class WorkoutEntity(
     val planJson: String,
     val setsJson: String,
     val painIdsJson: String,
+)
+
+/** One weigh-in. [source] is "scale" or "manual". */
+@Entity(tableName = "body_weight")
+data class BodyWeightEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dateMillis: Long,
+    val weightKg: Double,
+    val source: String,
 )
 
 @Dao
@@ -76,15 +86,33 @@ interface WorkoutDao {
     suspend fun clear()
 }
 
+@Dao
+interface BodyWeightDao {
+    @Query("SELECT * FROM body_weight ORDER BY dateMillis, id")
+    fun observeAll(): Flow<List<BodyWeightEntity>>
+
+    @Insert
+    suspend fun insert(entry: BodyWeightEntity): Long
+
+    @Query("DELETE FROM body_weight WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM body_weight")
+    suspend fun clear()
+}
+
 @Database(
-    entities = [ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class],
-    version = 1,
+    entities = [ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class],
+    version = 2,
     exportSchema = true,
+    // 2: body_weight table added.
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun exerciseStates(): ExerciseStateDao
     abstract fun swaps(): SwapDao
     abstract fun workouts(): WorkoutDao
+    abstract fun bodyWeights(): BodyWeightDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =

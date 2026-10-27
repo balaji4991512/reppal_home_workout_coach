@@ -39,6 +39,10 @@ data class UserSettings(
     val sessionIndex: Int = 0,
     /** Number of saved workouts when the plan was last built, to find this week's sessions in history. */
     val weekBase: Int = 0,
+    /** For BMI on the Body screen. */
+    val heightCm: Int? = null,
+    /** The user's Bluetooth scale, remembered after the first weigh-in so neighbours' scales are ignored. */
+    val scaleId: String? = null,
 ) {
     fun equipment(): Equipment = Equipment(bench, dumbbellsKg.toSet())
 

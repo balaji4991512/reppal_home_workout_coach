@@ -110,25 +110,7 @@ fun ExerciseProgressContent(ui: ExerciseDetailUi, onRange: (Range) -> Unit, onBa
             Spacer(Modifier.width(44.dp))
         }
 
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp).selectableGroup()) {
-            Range.entries.forEach { r ->
-                val on = r == ui.range
-                Column(
-                    Modifier.weight(1f).heightIn(min = 46.dp)
-                        .selectable(selected = on, role = Role.Tab) { onRange(r) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    Text(
-                        r.tab,
-                        Modifier.padding(vertical = 12.dp),
-                        color = if (on) c.fg else c.mut,
-                        style = AppTheme.type.label.copy(fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium),
-                    )
-                    Box(Modifier.fillMaxWidth().height(2.dp).background(if (on) c.fg else c.bd))
-                }
-            }
-        }
+        RangeTabs(ui.range, onRange)
 
         H2(if (ui.bodyweight) "Reps per session" else "Volume per session", top = 26.dp)
         Small(ui.range.label + if (ui.bodyweight) "" else ", sets × reps × weight")
@@ -173,3 +155,28 @@ private fun EmptyNote(text: String) = Text(
     style = AppTheme.type.small,
     textAlign = TextAlign.Center,
 )
+
+/** 1W to All tabs over a chart. */
+@Composable
+fun RangeTabs(selected: Range, onRange: (Range) -> Unit) {
+    val c = AppTheme.colors
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp).selectableGroup()) {
+        Range.entries.forEach { r ->
+            val on = r == selected
+            Column(
+                Modifier.weight(1f).heightIn(min = 46.dp)
+                    .selectable(selected = on, role = Role.Tab) { onRange(r) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Text(
+                    r.tab,
+                    Modifier.padding(vertical = 12.dp),
+                    color = if (on) c.fg else c.mut,
+                    style = AppTheme.type.label.copy(fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium),
+                )
+                Box(Modifier.fillMaxWidth().height(2.dp).background(if (on) c.fg else c.bd))
+            }
+        }
+    }
+}

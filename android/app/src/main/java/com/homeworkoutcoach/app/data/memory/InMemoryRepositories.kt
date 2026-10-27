@@ -3,6 +3,8 @@ package com.homeworkoutcoach.app.data.memory
 import android.app.Activity
 import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.AuthRepository
+import com.homeworkoutcoach.app.data.BodyRepository
+import com.homeworkoutcoach.app.data.BodyWeight
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
 import com.homeworkoutcoach.app.data.TrainingRepository
@@ -77,5 +79,24 @@ class InMemoryAuthRepository(initial: Account? = null) : AuthRepository {
 
     override suspend fun signOut() {
         state.value = null
+    }
+}
+
+class InMemoryBodyRepository : BodyRepository {
+    private val state = MutableStateFlow<List<BodyWeight>>(emptyList())
+    private var nextId = 1L
+
+    override fun weights(): Flow<List<BodyWeight>> = state
+
+    override suspend fun add(entry: BodyWeight): Long {
+        val saved = entry.copy(id = nextId++)
+        state.update { list -> (list + saved).sortedWith(compareBy({ it.dateMillis }, { it.id })) }
+        return saved.id
+    }
+
+    override suspend fun delete(id: Long) = state.update { list -> list.filterNot { it.id == id } }
+
+    override suspend fun wipe() {
+        state.value = emptyList()
     }
 }

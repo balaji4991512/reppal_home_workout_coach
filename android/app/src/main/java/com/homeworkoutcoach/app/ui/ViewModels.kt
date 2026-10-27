@@ -17,6 +17,8 @@ import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.app.plan.PlanActions
 import com.homeworkoutcoach.app.plan.SetupDraft
+import com.homeworkoutcoach.app.ui.body.BodyPresenter
+import com.homeworkoutcoach.app.ui.body.BodyViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfilePresenter
 import com.homeworkoutcoach.app.ui.profile.ProfileUi
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
@@ -196,6 +198,9 @@ object Factories {
                 WorkoutViewModel(it.library, it.planner, it.settings, it.training, it.actions, KeywordSetParser)
             }
         }
+    }
+    val Body = viewModelFactory {
+        initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }
     }
     val Progress = viewModelFactory {
         initializer { app(this).let { ProgressViewModel(it.training, ProgressPresenter(it.library)) } }

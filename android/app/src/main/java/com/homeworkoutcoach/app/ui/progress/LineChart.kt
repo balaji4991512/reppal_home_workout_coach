@@ -23,14 +23,24 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.Volume
 import java.time.ZoneId
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToLong
 
 /** Volume per session line chart on a 360 x 210 grid with nice-step axis [chart]. */
 @Composable
-fun LineChart(points: List<ChartPoint>, unit: String, zone: ZoneId = ZoneId.systemDefault(), modifier: Modifier = Modifier) {
+fun LineChart(
+    points: List<ChartPoint>,
+    unit: String,
+    zone: ZoneId = ZoneId.systemDefault(),
+    modifier: Modifier = Modifier,
+    /** False: the axis starts near the lowest value (body weight), not at zero (volume). */
+    fromZero: Boolean = true,
+    /** Axis label format. */
+    label: (Double) -> String = { "${it.roundToLong()}" },
+) {
     val c = AppTheme.colors
     val measurer = rememberTextMeasurer()
-    val label = TextStyle(color = c.mut, fontSize = 12.sp)
+    val labelStyle = TextStyle(color = c.mut, fontSize = 12.sp)
     val description = if (points.isEmpty()) "" else
         "$unit per session, from ${points.first().value.roundToLong()} on ${Copy.dayMonth(points.first().dateMillis, zone)} " +
             "to ${points.last().value.roundToLong()} on ${Copy.dayMonth(points.last().dateMillis, zone)}"
@@ -40,16 +50,18 @@ fun LineChart(points: List<ChartPoint>, unit: String, zone: ZoneId = ZoneId.syst
     ) {
         val u = size.width / W
         val max = points.maxOf { it.value }
-        val step = Volume.niceStep(max / 4)
-        val top = maxOf(step, ceil(max / step) * step)
+        val min = points.minOf { it.value }
+        val step = if (fromZero) Volume.niceStep(max / 4) else Volume.niceStep(maxOf(max - min, 1.0) / 4)
+        val bottom = if (fromZero) 0.0 else floor(min / step) * step
+        val top = maxOf(bottom + step, ceil(max / step) * step)
         val x0 = points.first().dateMillis.toDouble()
         val x1 = points.last().dateMillis.toDouble()
         val cw = W - L - R
         fun xs(d: Long) = (if (x1 == x0) L + cw / 2 else L + ((d - x0) / (x1 - x0)).toFloat() * cw) * u
-        fun ys(v: Double) = (T + (1 - (v / top).toFloat()) * (H - T - B)) * u
+        fun ys(v: Double) = (T + (1 - ((v - bottom) / (top - bottom)).toFloat()) * (H - T - B)) * u
 
         fun text(s: String, x: Float, y: Float, align: Align) {
-            val m = measurer.measure(s, label)
+            val m = measurer.measure(s, labelStyle)
             val left = when (align) {
                 Align.START -> x
                 Align.MIDDLE -> x - m.size.width / 2f
@@ -59,11 +71,11 @@ fun LineChart(points: List<ChartPoint>, unit: String, zone: ZoneId = ZoneId.syst
             drawText(m, topLeft = Offset(left, y - m.firstBaseline))
         }
 
-        var v = 0.0
+        var v = bottom
         while (v <= top + 0.001) {
             val y = ys(v)
             drawLine(c.bd, Offset(L * u, y), Offset((W - R) * u, y), strokeWidth = 1f * u)
-            text("${v.roundToLong()}", (L - 8) * u, y + 4 * u, Align.END)
+            text(label(v), (L - 8) * u, y + 4 * u, Align.END)
             v += step
         }
 

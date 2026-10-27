@@ -60,6 +60,7 @@ import com.homeworkoutcoach.app.ui.components.Muted
 import com.homeworkoutcoach.app.ui.components.Page
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
+import com.homeworkoutcoach.app.ui.body.BodyScreen
 import com.homeworkoutcoach.app.ui.profile.ProfileScreen
 import com.homeworkoutcoach.app.ui.progress.ExerciseProgressScreen
 import com.homeworkoutcoach.app.ui.progress.ProgressScreen
@@ -75,6 +76,7 @@ enum class Dest(val route: String, val label: String, val icon: ImageVector, val
     Week("week", "This week", AppIcons.Calendar),
     Today("today", "Today’s workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
+    Body("body", "Body", AppIcons.Scale),
     Profile("profile", "History and profile", AppIcons.User),
     Setup("setup", "Equipment and plan", AppIcons.Sliders, beforeSetup = true),
     How("how", "How it works", AppIcons.Info, beforeSetup = true),
@@ -190,6 +192,7 @@ private fun AppNavHost(
         composable("exercise/{id}") { entry ->
             ExerciseProgressScreen(entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
         }
+        composable(Dest.Body.route) { BodyScreen() }
         composable(Dest.Profile.route) {
             ProfileScreen(
                 onWeek = { go(Dest.Week) },
