@@ -8,6 +8,9 @@
     <!-- Rings the focus timer on time, even while the phone dozes (an alarm and timer app permission). -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- Habit reminders are set again after the phone restarts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Voice input for set notes. Asked for only when the Mic button is first tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
@@ -47,5 +50,11 @@
         </activity>
 
         <receiver android:name=".focus.FocusAlarmReceiver" android:exported="false" />
+        <receiver android:name=".reminders.HabitReminderReceiver" android:exported="false" />
+        <receiver android:name=".reminders.HabitRemindersBootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

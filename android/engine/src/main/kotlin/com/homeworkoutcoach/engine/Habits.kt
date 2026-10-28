@@ -2,6 +2,8 @@ package com.homeworkoutcoach.engine
 
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
 
 /** How a habit is tracked (specs/HABITS_PLANNER_SPEC.md, section 1). */
@@ -40,6 +42,8 @@ data class Habit(
     val startDate: LocalDate,
     val auto: AutoSource = AutoSource.NONE,
     val archived: Boolean = false,
+    /** The time of day to be reminded, on the days the habit is due; null for no reminder. */
+    val reminder: LocalTime? = null,
 ) {
     init {
         require(target >= 1) { "target must be at least 1" }
@@ -229,6 +233,22 @@ object Habits {
             }
         }
         return Streaks(run, best, weekly)
+    }
+
+    /**
+     * Whether to send the reminder on [today]: the habit has one, is not archived, is due and is not already done. A
+     * habit done earlier in the day, or not due (a rest day, or a times-a-week habit already met), stays quiet.
+     */
+    fun shouldRemind(habit: Habit, log: HabitLog, today: LocalDate): Boolean =
+        habit.reminder != null && !habit.archived && isDue(habit, log, today) && !isDone(habit, log, today)
+
+    /**
+     * The next moment to ring a reminder at [time] that is after [after]: today at [time] if that is still ahead,
+     * otherwise tomorrow. Whether to actually ring is decided then, by [shouldRemind].
+     */
+    fun nextReminder(time: LocalTime, after: LocalDateTime): LocalDateTime {
+        val today = after.toLocalDate().atTime(time)
+        return if (today.isAfter(after)) today else today.plusDays(1)
     }
 
     /** Fixed-schedule due check that ignores what was logged (used for counting past days). */

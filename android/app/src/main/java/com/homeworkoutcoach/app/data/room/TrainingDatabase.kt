@@ -70,6 +70,8 @@ data class HabitEntity(
     val icon: String,
     val color: String,
     val position: Int,
+    /** Reminder time as minutes since midnight, or null for none. */
+    val reminderMinuteOfDay: Int? = null,
 )
 
 /** What was entered for a habit on a local calendar day. Deleting the habit deletes its entries. */
@@ -394,15 +396,15 @@ interface JournalDao {
         RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class, GoalEntity::class, FocusSessionEntity::class,
         WeeklyReflectionEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added. 10: task.endMinuteOfDay added. 11: workout.madeUpForEpochDay added.
+    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added. 10: task.endMinuteOfDay added. 11: workout.madeUpForEpochDay added. 12: habit.reminderMinuteOfDay added.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8),
-        AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11),
+        AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11), AutoMigration(from = 11, to = 12),
     ],
 )
 abstract class TrainingDatabase : RoomDatabase() {

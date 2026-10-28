@@ -36,7 +36,7 @@ import java.time.format.DateTimeFormatter
  */
 object DataExport {
     /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections (older files still restore). */
-    const val FORMAT = 10
+    const val FORMAT = 11
 
     @Serializable
     data class File(
@@ -110,6 +110,8 @@ object DataExport {
         val icon: String,
         val color: String,
         val entries: Map<String, Int> = emptyMap(),
+        /** The reminder time, 24-hour "10:00", or absent for none (format 11 on). */
+        val reminder: String? = null,
     )
 
     /** [type] is "daily", "weekdays" (with [days], e.g. "MONDAY") or "times" (with [times] a week). */
@@ -244,6 +246,7 @@ object DataExport {
                     icon = d.stored.icon,
                     color = d.stored.color,
                     entries = d.entries.toSortedMap().mapKeys { it.key.toString() },
+                    reminder = h.reminder?.toString(),
                 )
             },
             tasks = tasks.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id })).map {
@@ -416,6 +419,7 @@ object DataImport {
             startDate = LocalDate.parse(d.startDate),
             auto = AutoSource.entries.firstOrNull { it.name.lowercase() == d.auto } ?: AutoSource.NONE,
             archived = d.archived,
+            reminder = d.reminder?.let(java.time.LocalTime::parse),
         )
         return HabitData(
             StoredHabit(habit, d.icon, d.color),

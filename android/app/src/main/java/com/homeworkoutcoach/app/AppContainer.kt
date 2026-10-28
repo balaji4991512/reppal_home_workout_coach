@@ -34,6 +34,12 @@ import com.homeworkoutcoach.engine.ConcernMapper
 import com.homeworkoutcoach.engine.KeywordConcernMapper
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
+import com.homeworkoutcoach.app.reminders.HabitReminders
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /** App-wide singletons, built once. Plain constructor wiring; no DI framework needed at this size. */
 class AppContainer(private val context: Context) {
@@ -60,4 +66,13 @@ class AppContainer(private val context: Context) {
 
 class HomeWorkoutCoachApp : Application() {
     val container: AppContainer by lazy { AppContainer(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Keep the habit reminder alarms matching the habits: at start, and whenever a habit is saved, removed or restored.
+        val reminders = HabitReminders(this)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            container.habits.habits().collect { reminders.sync(it) }
+        }
+    }
 }

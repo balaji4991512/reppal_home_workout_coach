@@ -78,6 +78,20 @@ class HabitExportTest {
     }
 
     @Test
+    fun aReminderTimeSurvivesAnExportFile() = runTest {
+        val p = Phone().also { it.addHabits() }
+        val h = p.habits.habits().first().first()
+        p.habits.save(h.copy(habit = h.habit.copy(reminder = java.time.LocalTime.of(10, 0))))
+        val file = exporter(p).export("RepPal", now).json
+        assertTrue(file.contains("\"reminder\": \"10:00\"") || file.contains("\"reminder\":\"10:00\""))
+
+        val fresh = Phone()
+        DataImporter(fresh.settings, fresh.training, fresh.body, fresh.habits).restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
+        assertEquals(p.habits.habits().first().map { it.habit.reminder }, fresh.habits.habits().first().map { it.habit.reminder })
+        assertEquals(java.time.LocalTime.of(10, 0), fresh.habits.habits().first().first { it.habit.id == h.habit.id }.habit.reminder)
+    }
+
+    @Test
     fun habitsRoundTripThroughAnExportFile() = runTest {
         val p = Phone().also { it.addHabits() }
         val file = exporter(p).export("RepPal", now).json

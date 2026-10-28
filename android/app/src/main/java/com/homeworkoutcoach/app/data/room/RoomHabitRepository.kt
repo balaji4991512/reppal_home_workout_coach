@@ -55,6 +55,7 @@ class RoomHabitRepository(private val db: TrainingDatabase) : HabitRepository {
             icon = s.icon,
             color = s.color,
             position = s.position,
+            reminderMinuteOfDay = h.reminder?.let { it.hour * 60 + it.minute },
         )
     }
 
@@ -74,6 +75,7 @@ class RoomHabitRepository(private val db: TrainingDatabase) : HabitRepository {
                 startDate = LocalDate.ofEpochDay(e.startEpochDay),
                 auto = AutoSource.entries.firstOrNull { it.name.lowercase() == e.auto } ?: AutoSource.NONE,
                 archived = e.archived,
+                reminder = e.reminderMinuteOfDay?.let { java.time.LocalTime.of(it / 60, it % 60) },
             ),
             icon = e.icon,
             color = e.color,

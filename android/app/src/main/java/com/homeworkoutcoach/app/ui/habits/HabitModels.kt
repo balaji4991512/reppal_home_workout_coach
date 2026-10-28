@@ -62,6 +62,10 @@ data class HabitsUi(
 )
 
 object HabitFormat {
+    /** A time of day as 10:00 AM. */
+    fun clock(t: java.time.LocalTime): String =
+        "%d:%02d %s".format(if (t.hour % 12 == 0) 12 else t.hour % 12, t.minute, if (t.hour < 12) "AM" else "PM")
+
     fun minutes(n: Int): String = when {
         n < 60 -> "$n min"
         n % 60 == 0 -> "${n / 60} h"
@@ -335,6 +339,8 @@ data class HabitDraft(
     /** Kept when editing; a new habit starts today. */
     val startDate: LocalDate? = null,
     val position: Int? = null,
+    /** When to be reminded, or null for no reminder. */
+    val reminder: java.time.LocalTime? = null,
 ) {
     /** The target as a number, or null if what was typed is not valid for [kind]. */
     val target: Int?
@@ -372,7 +378,7 @@ data class HabitDraft(
             ScheduleType.TIMES -> HabitSchedule.TimesPerWeek(times)
         }
         return StoredHabit(
-            Habit(id ?: newId, name.trim(), kind, checkNotNull(target), schedule, startDate ?: today, auto, archived),
+            Habit(id ?: newId, name.trim(), kind, checkNotNull(target), schedule, startDate ?: today, auto, archived, reminder),
             icon = icon,
             color = color,
             position = position ?: nextPosition,
@@ -407,6 +413,7 @@ data class HabitDraft(
                 archived = h.archived,
                 startDate = h.startDate,
                 position = s.position,
+                reminder = h.reminder,
             )
         }
 

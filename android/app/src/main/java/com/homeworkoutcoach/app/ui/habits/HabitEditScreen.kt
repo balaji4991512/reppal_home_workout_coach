@@ -52,11 +52,23 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.HabitKind
 import java.time.DayOfWeek
+import java.time.LocalTime
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Add or edit a habit. [id] is null for a new one. [onDone] closes the form; [onGone] runs after the habit is archived
  * or deleted, so the caller can leave the habit's own page too.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun HabitEditScreen(
     id: String?,
@@ -68,6 +80,29 @@ fun HabitEditScreen(
     val s = st ?: return
     val d = s.draft
     val c = AppTheme.colors
+    val context = LocalContext.current
+    var pickTime by rememberSaveable { mutableStateOf(false) }
+    // Android 13 and up ask before notifications show; the reminder is kept either way.
+    val askForNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    if (pickTime) {
+        val start = d.reminder ?: LocalTime.of(9, 0)
+        val state = rememberTimePickerState(initialHour = start.hour, initialMinute = start.minute, is24Hour = false)
+        AlertDialog(
+            onDismissRequest = { pickTime = false },
+            confirmButton = {
+                TextButton({
+                    vm.edit { it.copy(reminder = LocalTime.of(state.hour, state.minute)) }
+                    pickTime = false
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton({ pickTime = false }) { Text("Cancel") } },
+            text = { TimePicker(state) },
+        )
+    }
 
     Page {
         H1(if (id == null) "New habit" else "Edit habit")
@@ -125,6 +160,16 @@ fun HabitEditScreen(
             }
             ScheduleType.DAILY -> Unit
         }
+
+        Label("Reminder")
+        Chips {
+            Chip("None", d.reminder == null, { vm.edit { it.copy(reminder = null) } }, small = true)
+            Chip(
+                d.reminder?.let { HabitFormat.clock(it) } ?: "At a time",
+                d.reminder != null, { pickTime = true }, small = true,
+            )
+        }
+        if (d.reminder != null) Small("A reminder at this time on days it is due and not done yet.")
 
         if (d.auto == AutoSource.WORKOUT) Muted("This one ticks itself on days you finish a workout. You can still change it by hand.")
 

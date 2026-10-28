@@ -238,6 +238,62 @@ class HabitsTest {
         assertEquals(1, Habits.streaks(workout, log.copy(entries = mapOf(day(0) to 0)), day(2)).current)
     }
 
+    // ---- Reminders ----
+
+    private fun remind(schedule: HabitSchedule = HabitSchedule.Daily, at: java.time.LocalTime? = java.time.LocalTime.of(10, 0), archived: Boolean = false) =
+        Habit("h", "Habit", HabitKind.DONE, 1, schedule, mon.minusDays(60), AutoSource.NONE, archived, at)
+
+    @Test
+    fun aDueHabitThatIsNotDoneIsRemindedAbout() {
+        assertTrue(Habits.shouldRemind(remind(), HabitLog(), day(2)))
+    }
+
+    @Test
+    fun noReminderOrAnArchivedHabitStaysQuiet() {
+        assertFalse(Habits.shouldRemind(remind(at = null), HabitLog(), day(2)))
+        assertFalse(Habits.shouldRemind(remind(archived = true), HabitLog(), day(2)))
+    }
+
+    @Test
+    fun aHabitAlreadyDoneTodayIsNotRemindedAbout() {
+        assertFalse(Habits.shouldRemind(remind(), ticks(2), day(2)))
+        // done yesterday does not matter
+        assertTrue(Habits.shouldRemind(remind(), ticks(1), day(2)))
+    }
+
+    @Test
+    fun aHabitNotDueTodayStaysQuiet() {
+        val gym = remind(HabitSchedule.Weekdays(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)))
+        assertTrue(Habits.shouldRemind(gym, HabitLog(), day(0))) // Monday
+        assertFalse(Habits.shouldRemind(gym, HabitLog(), day(2))) // Wednesday
+    }
+
+    @Test
+    fun aTimesAWeekHabitReminsUntilTheWeekIsMet() {
+        val run = remind(HabitSchedule.TimesPerWeek(2))
+        assertTrue(Habits.shouldRemind(run, ticks(0), day(2))) // one of two so far
+        assertFalse(Habits.shouldRemind(run, ticks(0, 1), day(2))) // met: no more this week
+        assertTrue(Habits.shouldRemind(run, ticks(0, 1), day(7))) // a new week
+    }
+
+    @Test
+    fun aSelfTickingHabitDoneByItsSourceIsNotRemindedAbout() {
+        val workout = remind().copy(auto = AutoSource.WORKOUT)
+        assertFalse(Habits.shouldRemind(workout, HabitLog(autoDays = setOf(day(2))), day(2)))
+        assertTrue(Habits.shouldRemind(workout, HabitLog(), day(2)))
+    }
+
+    @Test
+    fun theNextReminderIsTodayIfItIsStillAheadOtherwiseTomorrow() {
+        val ten = java.time.LocalTime.of(10, 0)
+        fun at(h: Int, m: Int = 0) = day(2).atTime(h, m)
+        assertEquals(at(10), Habits.nextReminder(ten, at(8, 30)))
+        assertEquals(at(10).plusDays(1), Habits.nextReminder(ten, at(10))) // it has just rung
+        assertEquals(at(10).plusDays(1), Habits.nextReminder(ten, at(10, 1)))
+        assertEquals(at(10).plusDays(1), Habits.nextReminder(ten, at(23, 59)))
+        assertEquals(day(3).atTime(0, 5), Habits.nextReminder(java.time.LocalTime.of(0, 5), at(23, 59))) // just after midnight
+    }
+
     // ---- Ticking itself ----
 
     @Test
