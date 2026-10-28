@@ -2,6 +2,18 @@ package com.homeworkoutcoach.app.ui.week
 
 import com.homeworkoutcoach.app.ui.components.OutlineButton
 import androidx.compose.animation.AnimatedVisibility
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import com.homeworkoutcoach.app.ui.components.ProgressRing
+import com.homeworkoutcoach.app.ui.components.AccentButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,7 +72,7 @@ fun WeekScreen(onStart: () -> Unit, onArrange: () -> Unit = {}, vm: WeekViewMode
     ui?.let { WeekContent(it, onStart, vm::swap, onArrange) }
 }
 
-/** This week [vWeek]: hero, Monday to Sunday, left-out note, planned volume. */
+/** This week [vWeek]: hero, the seven days at a glance, a card per training day, left-out note, planned volume. */
 @Composable
 fun WeekContent(
     ui: WeekUi,
@@ -77,13 +89,14 @@ fun WeekContent(
 
     Page {
         Hero(ui.hero, onStart)
+        WeekStrip(ui.days, Modifier.padding(top = 16.dp))
         H2("Your week")
-        ui.days.forEach { day ->
-            Hairline()
+        ui.days.forEachIndexed { i, day ->
             when (day) {
-                is WeekdayUi.Rest -> RestRow(day.abbr)
+                is WeekdayUi.Rest -> RestRow(day.abbr, i)
                 is WeekdayUi.Training -> TrainingDay(
                     day = day,
+                    index = i,
                     expanded = day.index in opened,
                     onToggle = { open = if (day.index in opened) opened - day.index else opened + day.index },
                     swapKey = swapKey,
@@ -92,38 +105,96 @@ fun WeekContent(
                 )
             }
         }
-        Hairline()
         OutlineButton("Rearrange days", onArrange, tint = AppTheme.colors.accent)
         if (ui.leftOut.isNotEmpty()) Muted("Left out because of what you told me: ${ui.leftOut.joinToString(", ")}.")
         PlannedVolume(ui.volume)
     }
 }
 
+/** The week in one card: a ring of workouts done, what is next, and the Start button. */
 @Composable
 private fun Hero(h: HeroUi, onStart: () -> Unit) {
-    Column(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
-        Small(h.when_)
-        H1(h.title, Modifier.padding(top = 6.dp))
-        Body(h.summary, Modifier.padding(top = 6.dp))
-        Segments(
-            h.total, h.done,
-            Modifier.padding(top = 16.dp).semantics { contentDescription = "${h.done} of ${h.total} workouts done this week" },
-        )
-        Small("${h.done} of ${h.total} workouts done this week", Modifier.padding(top = 6.dp))
-        if (h.canStart) PrimaryButton("Start workout", onStart)
-        else Muted("Nothing to train on this day yet. Add muscles or equipment under Plan settings.")
+    val c = AppTheme.colors
+    val fraction by animateFloatAsState(if (h.total == 0) 0f else h.done.toFloat() / h.total, tween(700), label = "weekRing")
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
+            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 700f))),
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            drawCircle(c.accent.copy(alpha = 0.07f), radius = size.height * 0.6f, center = Offset(size.width * 0.95f, -size.height * 0.1f))
+            drawCircle(c.coral.copy(alpha = 0.10f), radius = size.height * 0.35f, center = Offset(size.width * 0.8f, size.height * 1.0f))
+        }
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ProgressRing(fraction, size = 92.dp, stroke = 10.dp, track = c.bg.copy(alpha = 0.7f)) {
+                    Text(
+                        "${h.done}/${h.total}", color = c.fg,
+                        style = AppTheme.type.tabular(AppTheme.type.h2.copy(fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)),
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Small(h.when_, color = c.mut)
+                    Text(h.title, Modifier.padding(top = 2.dp), color = c.fg, style = AppTheme.type.h2.copy(fontSize = 22.sp, lineHeight = 27.sp))
+                    Small(h.summary, Modifier.padding(top = 2.dp), color = c.fg)
+                }
+            }
+            Small(
+                "${h.done} of ${h.total} workouts done this week", Modifier.padding(top = 12.dp),
+                color = c.mut,
+            )
+            if (h.canStart) AccentButton("Start workout", onStart, Modifier.padding(top = 14.dp), icon = AppIcons.Dumbbell)
+            else Muted("Nothing to train on this day yet. Add muscles or equipment under Plan settings.")
+        }
+    }
+}
+
+/** Seven days as circles: done is green, the next one is indigo, others to come are ringed, rest days are faint. */
+@Composable
+private fun WeekStrip(days: List<WeekdayUi>, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        days.forEach { d ->
+            val status = (d as? WeekdayUi.Training)?.status
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape)
+                        .background(
+                            when (status) {
+                                DayStatus.DONE -> c.ok
+                                DayStatus.NEXT -> c.accent
+                                else -> Color.Transparent
+                            },
+                        )
+                        .then(if (status == DayStatus.UPCOMING) Modifier.border(1.5.dp, c.accent.copy(alpha = 0.6f), CircleShape) else Modifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when (status) {
+                        DayStatus.DONE -> Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.bg)
+                        DayStatus.NEXT -> Icon(AppIcons.Dumbbell, null, Modifier.size(20.dp), tint = c.onAccent)
+                        DayStatus.UPCOMING -> Icon(AppIcons.Dumbbell, null, Modifier.size(18.dp), tint = c.accent)
+                        null -> Text("–", color = c.mut.copy(alpha = 0.6f), style = AppTheme.type.small)
+                    }
+                }
+                Text(
+                    d.abbr.take(3), Modifier.padding(top = 6.dp),
+                    color = if (status == null) c.mut.copy(alpha = 0.6f) else c.fg, style = AppTheme.type.small.copy(fontSize = 12.sp),
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun DayAbbr(text: String) =
-    Text(text, Modifier.width(44.dp), color = AppTheme.colors.mut, style = AppTheme.type.label.copy(fontWeight = FontWeight.SemiBold))
-
-@Composable
-private fun RestRow(abbr: String) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 46.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        DayAbbr(abbr)
-        Body("Rest", color = AppTheme.colors.mut)
+private fun RestRow(abbr: String, index: Int) {
+    val c = AppTheme.colors
+    Row(
+        Modifier.fadeLiftIn(index * 50).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.accs.copy(alpha = 0.6f))
+            .heightIn(min = 46.dp).padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(abbr, Modifier.width(36.dp), color = c.mut, style = AppTheme.type.label.copy(fontWeight = FontWeight.SemiBold))
+        Text("Rest day", color = c.mut, style = AppTheme.type.body)
     }
 }
 
@@ -134,6 +205,7 @@ private fun Chevron(expanded: Boolean) =
 @Composable
 private fun TrainingDay(
     day: WeekdayUi.Training,
+    index: Int,
     expanded: Boolean,
     onToggle: () -> Unit,
     swapKey: String?,
@@ -141,43 +213,52 @@ private fun TrainingDay(
     onSwap: (String, String) -> Unit,
 ) {
     val c = AppTheme.colors
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 58.dp)
-            .clickable(role = Role.Button, onClick = onToggle)
-            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        DayAbbr(day.abbr)
-        Column(Modifier.weight(1f)) {
-            Body(day.name, strong = true)
-            Small("${day.exerciseCount} exercises")
-        }
-        when (day.status) {
-            DayStatus.DONE -> Pill("Done", c.oks, c.ok)
-            DayStatus.NEXT -> Pill("Next up", c.fg, c.bg)
-            DayStatus.UPCOMING -> Unit
-        }
-        Chevron(expanded)
+    val disc = when (day.status) {
+        DayStatus.DONE -> c.tintMint
+        DayStatus.NEXT -> c.accentSoft
+        DayStatus.UPCOMING -> c.tintPeach
     }
-    AnimatedVisibility(expanded) {
-        Column(Modifier.padding(bottom = 10.dp)) {
-            if (day.status == DayStatus.DONE) {
-                day.session?.let { SessionCard(it) }
-            } else {
-                day.exercises.forEachIndexed { i, ex ->
-                    val key = "${day.index}:$i"
-                    ExerciseRow(
-                        ex,
-                        last = i == day.exercises.lastIndex,
-                        swapOpen = swapKey == key,
-                        onSwapClick = { onSwapKey(key) },
-                        onSwap = onSwap,
-                    )
-                }
-                if (day.missing.isNotEmpty()) {
-                    Muted("Nothing available for ${day.missing.joinToString(", ").lowercase()} with your equipment.")
+    Column(Modifier.fadeLiftIn(index * 50).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.soft)) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 72.dp)
+                .clickable(role = Role.Button, onClick = onToggle)
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.size(48.dp).clip(CircleShape).background(disc), contentAlignment = Alignment.Center) {
+                Text(day.abbr.take(3), color = c.fg, style = AppTheme.type.label.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold))
+            }
+            Column(Modifier.weight(1f)) {
+                Body(day.name, strong = true)
+                Small("${day.exerciseCount} exercises")
+            }
+            when (day.status) {
+                DayStatus.DONE -> Pill("Done", c.oks, c.ok)
+                DayStatus.NEXT -> Pill("Next up", c.accent, c.onAccent)
+                DayStatus.UPCOMING -> Unit
+            }
+            Chevron(expanded)
+        }
+        AnimatedVisibility(expanded) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                if (day.status == DayStatus.DONE) {
+                    day.session?.let { SessionCard(it) }
+                } else {
+                    day.exercises.forEachIndexed { i, ex ->
+                        val key = "${day.index}:$i"
+                        ExerciseRow(
+                            ex,
+                            last = i == day.exercises.lastIndex,
+                            swapOpen = swapKey == key,
+                            onSwapClick = { onSwapKey(key) },
+                            onSwap = onSwap,
+                        )
+                    }
+                    if (day.missing.isNotEmpty()) {
+                        Muted("Nothing available for ${day.missing.joinToString(", ").lowercase()} with your equipment.")
+                    }
                 }
             }
         }
@@ -188,7 +269,7 @@ private fun TrainingDay(
 private fun ExerciseRow(ex: ExerciseRowUi, last: Boolean, swapOpen: Boolean, onSwapClick: () -> Unit, onSwap: (String, String) -> Unit) {
     val c = AppTheme.colors
     LineRow(
-        // The day's own hairline closes the list, so the last row has none.
+        // The card closes the list, so the last row has no line.
         divider = !swapOpen && !last,
         left = {
             Body(ex.name)
@@ -199,11 +280,11 @@ private fun ExerciseRow(ex: ExerciseRowUi, last: Boolean, swapOpen: Boolean, onS
             Icon(
                 AppIcons.Swap,
                 contentDescription = "Swap ${ex.name}",
-                tint = if (swapOpen) c.fg else c.mut,
-                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
-                    .background(if (swapOpen) c.bd else c.bg)
+                tint = if (swapOpen) c.accent else c.mut,
+                modifier = Modifier.size(34.dp).clip(CircleShape)
+                    .background(if (swapOpen) c.accentSoft else c.accs)
                     .clickable(role = Role.Button, onClick = onSwapClick)
-                    .padding(7.dp),
+                    .padding(8.dp),
             )
         },
     )
@@ -222,16 +303,15 @@ private fun ExerciseRow(ex: ExerciseRowUi, last: Boolean, swapOpen: Boolean, onS
     }
 }
 
-/** Collapsed "Planned volume this week" section [volCard]. */
+/** Collapsed "Planned volume this week" card [volCard]. */
 @Composable
 private fun PlannedVolume(v: VolumeUi) {
     val c = AppTheme.colors
     var expanded by remember { mutableStateOf(false) }
     var showSets by remember { mutableStateOf(false) }
-    Column(Modifier.padding(top = 24.dp)) {
-        Hairline()
+    Column(Modifier.padding(top = 20.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.soft).padding(horizontal = 16.dp)) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { expanded = !expanded }
+            Modifier.fillMaxWidth().heightIn(min = 60.dp).clickable(role = Role.Button) { expanded = !expanded }
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -239,7 +319,7 @@ private fun PlannedVolume(v: VolumeUi) {
             Chevron(expanded)
         }
         AnimatedVisibility(expanded) {
-            Column {
+            Column(Modifier.padding(bottom = 12.dp)) {
                 Body(v.headline, Modifier.padding(vertical = 6.dp))
                 v.rows.forEachIndexed { i, r ->
                     LineRow(divider = i < v.rows.lastIndex, left = { Body(r.muscle) }) {
@@ -250,14 +330,14 @@ private fun PlannedVolume(v: VolumeUi) {
                     "Weighted exercises show kg (sets × reps × weight). Bodyweight exercises show total reps, because their " +
                         "load can’t be measured honestly in kg. Only the main muscle of each exercise gets the kg.",
                 )
-                PrimaryButton(if (showSets) "Hide sets per muscle" else "Show sets per muscle", { showSets = !showSets }, alt = true)
+                OutlineButton(if (showSets) "Hide sets per muscle" else "Show sets per muscle", { showSets = !showSets })
                 if (showSets) {
                     v.rows.forEachIndexed { i, r ->
                         LineRow(divider = i < v.rows.lastIndex, left = { Body(r.muscle) }) {
                             Text(
                                 r.sets,
                                 color = when (r.status) {
-                                    SetCountStatus.LOW -> c.bad
+                                    SetCountStatus.LOW -> c.coral
                                     SetCountStatus.HIGH -> c.mut
                                     SetCountStatus.ON_TARGET -> c.ok
                                 },

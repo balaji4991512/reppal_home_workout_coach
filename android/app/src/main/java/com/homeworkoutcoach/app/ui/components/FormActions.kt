@@ -4,7 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,5 +74,47 @@ fun DeleteAction(
         }
     } else {
         OutlineButton(label, { asking = true }, modifier.padding(top = gap), tint = c.bad, compact = true)
+    }
+}
+
+/** The page's main action in indigo, with an icon: "Start workout", "Weigh in", "Start". */
+@Composable
+fun AccentButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+) {
+    val c = AppTheme.colors
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp)).background(c.accent)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).padding(horizontal = 16.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (icon != null) {
+            androidx.compose.material3.Icon(icon, null, Modifier.size(20.dp), tint = c.onAccent)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 10.dp))
+        }
+        Text(text, color = c.onAccent, style = AppTheme.type.bodyStrong)
+    }
+}
+
+/** A pill choice: filled indigo when selected, soft and white otherwise. For the choices in a coloured page. */
+@Composable
+fun AccentChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, small: Boolean = false) {
+    val c = AppTheme.colors
+    Box(
+        modifier.heightIn(min = if (small) 38.dp else 44.dp).clip(RoundedCornerShape(99.dp))
+            .background(if (selected) c.accent else c.soft)
+            .border(androidx.compose.foundation.BorderStroke(1.dp, if (selected) c.accent else c.bd), RoundedCornerShape(99.dp))
+            .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = if (small) 14.dp else 18.dp, vertical = 6.dp),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        Text(
+            text, color = if (selected) c.onAccent else c.fg,
+            style = AppTheme.type.label.copy(fontSize = if (small) 14.sp else 15.sp, fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium),
+        )
     }
 }

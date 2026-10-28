@@ -39,7 +39,7 @@ fun SessionCard(card: SessionCardUi, modifier: Modifier = Modifier) {
             )
             Text(
                 if (card.reached) "Target reached" else "Below target",
-                color = if (card.reached) c.ok else c.bad,
+                color = if (card.reached) c.ok else c.mut,
                 style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.alignByBaseline(),
             )
@@ -47,7 +47,7 @@ fun SessionCard(card: SessionCardUi, modifier: Modifier = Modifier) {
         Box(Modifier.padding(top = 8.dp, bottom = 6.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(c.bd)) {
             Box(
                 Modifier.fillMaxWidth(card.percent.coerceIn(0, 100) / 100f).fillMaxHeight()
-                    .clip(RoundedCornerShape(2.dp)).background(c.fg),
+                    .clip(RoundedCornerShape(2.dp)).background(if (card.reached) c.ok else c.accent),
             )
         }
         Small(card.totals, Modifier.padding(bottom = 6.dp))

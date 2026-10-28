@@ -5,6 +5,18 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import com.homeworkoutcoach.app.ui.theme.AppIcons
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import com.homeworkoutcoach.app.ui.components.PillTabs
+import com.homeworkoutcoach.app.ui.components.OutlineButton
+import com.homeworkoutcoach.app.ui.components.AccentChip
+import com.homeworkoutcoach.app.ui.components.AccentButton
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -111,9 +123,11 @@ fun BodyContent(
 
         if (ui.stats.isNotEmpty()) {
             H2("Trends")
+            val tints = listOf(c.tintMint, c.tintPeach, c.accentSoft, c.tintRose)
+            var n = 0
             ui.stats.chunked(2).forEach { row ->
-                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { s -> StatTile(s, Modifier.weight(1f)) }
+                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { s -> StatTile(s, tints[n++ % tints.size], Modifier.weight(1f)) }
                 }
             }
         }
@@ -121,41 +135,50 @@ fun BodyContent(
 
         if (ui.history.isNotEmpty()) {
             H2("Weight")
-            RangeTabs(ui.range, onRange)
-            if (ui.points.isEmpty()) Muted("No weigh-ins in this range.", Modifier.padding(vertical = 16.dp))
-            else LineChart(
-                ui.points,
-                unit = "Weight in kilograms",
-                fromZero = false,
-                label = { BodyPresenter.weight(it) },
-                emphasis = true,
-            )
-            ui.rangeNote?.let { Small(it, Modifier.padding(top = 4.dp)) }
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.soft).padding(16.dp)) {
+                PillTabs(Range.entries.map { it.tab }, Range.entries.indexOf(ui.range)) { onRange(Range.entries[it]) }
+                if (ui.points.isEmpty()) Muted("No weigh-ins in this range.", Modifier.padding(vertical = 16.dp))
+                else LineChart(
+                    ui.points,
+                    unit = "Weight in kilograms",
+                    fromZero = false,
+                    label = { BodyPresenter.weight(it) },
+                    emphasis = true,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                ui.rangeNote?.let { Small(it, Modifier.padding(top = 4.dp)) }
+            }
 
             H2("History")
             var open by rememberSaveable { mutableStateOf<Long?>(null) }
-            ui.history.forEach { h ->
-                Hairline()
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 60.dp)
-                        .clickable(role = Role.Button) { open = if (open == h.id) null else h.id }
-                        .padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            ui.history.forEachIndexed { i, h ->
+                Column(
+                    Modifier.fadeLiftIn(minOf(i, 6) * 40).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft),
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Body(h.date)
-                        Small(h.detail)
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                            .clickable(role = Role.Button) { open = if (open == h.id) null else h.id }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Body(h.date)
+                            Small(h.detail)
+                        }
+                        Text(
+                            h.weight, Modifier.clip(RoundedCornerShape(99.dp)).background(c.accentSoft).padding(horizontal = 12.dp, vertical = 4.dp),
+                            color = c.accent, style = AppTheme.type.tabular(AppTheme.type.bodyStrong.copy(fontSize = 16.sp)),
+                        )
                     }
-                    Text(h.weight, color = c.fg, style = AppTheme.type.tabular(AppTheme.type.bodyStrong.copy(fontSize = 17.sp)))
-                }
-                if (open == h.id) {
-                    Row(Modifier.padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Chip("Delete this weigh-in", false, { onDelete(h.id); open = null }, small = true)
-                        Chip("Keep", false, { open = null }, small = true)
+                    if (open == h.id) {
+                        Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.weight(1f)) { OutlineButton("Keep", { open = null }, compact = true) }
+                            Box(Modifier.weight(1f)) { OutlineButton("Delete weigh-in", { onDelete(h.id); open = null }, tint = c.bad, compact = true) }
+                        }
                     }
                 }
             }
-            Hairline()
         }
     }
 }
@@ -167,72 +190,84 @@ private fun Hero(latest: LatestUi?, onWeighIn: () -> Unit, onManual: (String) ->
     var manual by rememberSaveable { mutableStateOf(false) }
     var text by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    Column(
-        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(20.dp),
+    Box(
+        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(30.dp))
+            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 700f))),
     ) {
-        if (latest != null) {
-            Small("Latest")
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    latest.weight.removeSuffix(" kg"),
-                    Modifier.alignByBaseline(),
-                    color = c.fg,
-                    style = AppTheme.type.tabular(TextStyle(fontSize = 56.sp, lineHeight = 60.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.03).em)),
-                )
-                Text("kg", Modifier.alignByBaseline(), color = c.mut, style = AppTheme.type.body.copy(fontSize = 18.sp))
-            }
-            Small(latest.whenText)
-            latest.sinceLast?.let { Pill(it, c.bg, c.fg, Modifier.padding(top = 10.dp)) }
-            latest.dayNote?.let { Small(it, Modifier.padding(top = 8.dp)) }
-        } else {
-            Body("No weigh-ins yet", strong = true)
-            Small("Tap Weigh in, then step on your scale.")
+        Canvas(Modifier.matchParentSize()) {
+            drawCircle(c.accent.copy(alpha = 0.07f), radius = size.height * 0.6f, center = Offset(size.width * 0.95f, -size.height * 0.1f))
+            drawCircle(c.coral.copy(alpha = 0.10f), radius = size.height * 0.35f, center = Offset(size.width * 0.82f, size.height * 1.0f))
         }
-
-        PrimaryButton("Weigh in", onWeighIn, Modifier.padding(top = 6.dp))
-
-        if (!manual) {
-            Text(
-                "or enter weight by hand",
-                Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 44.dp).clickable(role = Role.Button) { manual = true }
-                    .padding(top = 12.dp),
-                color = c.mut,
-                style = AppTheme.type.small,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Field(
-                    text, { text = it; error = null },
-                    placeholder = "Weight in kg",
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                Chip("Save", false, {
-                    error = onManual(text)
-                    if (error == null) {
-                        text = ""
-                        manual = false
-                    }
-                })
+        Column(Modifier.padding(20.dp)) {
+            if (latest != null) {
+                Small("Latest", color = c.mut)
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        latest.weight.removeSuffix(" kg"),
+                        Modifier.alignByBaseline(),
+                        color = c.fg,
+                        style = AppTheme.type.tabular(TextStyle(fontSize = 60.sp, lineHeight = 64.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.03).em)),
+                    )
+                    Text("kg", Modifier.alignByBaseline(), color = c.mut, style = AppTheme.type.body.copy(fontSize = 20.sp))
+                }
+                Small(latest.whenText, color = c.fg)
+                latest.sinceLast?.let {
+                    Text(
+                        it, Modifier.padding(top = 10.dp).clip(RoundedCornerShape(99.dp)).background(c.bg.copy(alpha = 0.75f)).padding(horizontal = 12.dp, vertical = 5.dp),
+                        color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+                latest.dayNote?.let { Small(it, Modifier.padding(top = 8.dp)) }
+            } else {
+                Body("No weigh-ins yet", strong = true)
+                Small("Tap Weigh in, then step on your scale.")
             }
-            error?.let { Text(it, Modifier.padding(top = 6.dp), color = c.bad, style = AppTheme.type.small) }
+
+            AccentButton("Weigh in", onWeighIn, Modifier.padding(top = 16.dp), icon = AppIcons.Scale)
+
+            if (!manual) {
+                Text(
+                    "or enter weight by hand",
+                    Modifier.fillMaxWidth().padding(top = 4.dp).heightIn(min = 44.dp).clickable(role = Role.Button) { manual = true }
+                        .padding(top = 12.dp),
+                    color = c.mut,
+                    style = AppTheme.type.small.copy(textDecoration = TextDecoration.Underline),
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Field(
+                        text, { text = it; error = null },
+                        placeholder = "Weight in kg",
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    )
+                    AccentChip("Save", false, {
+                        error = onManual(text)
+                        if (error == null) {
+                            text = ""
+                            manual = false
+                        }
+                    })
+                }
+                error?.let { Text(it, Modifier.padding(top = 6.dp), color = c.bad, style = AppTheme.type.small) }
+            }
         }
     }
 }
 
 @Composable
-private fun StatTile(s: StatUi, modifier: Modifier = Modifier) {
+private fun StatTile(s: StatUi, tint: Color, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.soft).padding(14.dp)) {
-        Small(s.label)
+    Column(modifier.clip(RoundedCornerShape(24.dp)).background(tint).padding(16.dp)) {
+        Text(s.label.uppercase(), color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold))
         Text(
             s.value,
             Modifier.padding(top = 4.dp),
             color = if (s.value == BodyPresenter.DASH) c.mut else c.fg,
-            style = AppTheme.type.tabular(TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)),
+            style = AppTheme.type.tabular(TextStyle(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)),
         )
-        s.note?.let { Small(it) }
+        s.note?.let { Small(it, color = c.fg) }
     }
 }
 
@@ -243,24 +278,33 @@ private fun HeightRow(heightCm: Int?, onHeight: (String) -> String?) {
     var text by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     if (heightCm != null && !editing) {
-        Small(
-            "Height $heightCm cm · Change",
-            Modifier.heightIn(min = 44.dp).clickable(role = Role.Button) { text = heightCm.toString(); editing = true }.padding(top = 12.dp),
-        )
+        Row(
+            Modifier.padding(top = 2.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft)
+                .clickable(role = Role.Button) { text = heightCm.toString(); editing = true }.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Small("Height")
+                Body("$heightCm cm", strong = true)
+            }
+            Small("Change")
+        }
         return
     }
-    Small("Your height, for BMI", Modifier.padding(top = 12.dp, bottom = 6.dp))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Field(
-            text, { text = it; error = null },
-            placeholder = "Height in cm",
-            modifier = Modifier.weight(1f),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-        Chip("Save", false, {
-            error = onHeight(text)
-            if (error == null) editing = false
-        })
+    Column(Modifier.padding(top = 2.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(16.dp)) {
+        Small("Your height, for BMI", Modifier.padding(bottom = 6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Field(
+                text, { text = it; error = null },
+                placeholder = "Height in cm",
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            AccentChip("Save", false, {
+                error = onHeight(text)
+                if (error == null) editing = false
+            })
+        }
+        error?.let { Text(it, Modifier.padding(top = 6.dp), color = c.bad, style = AppTheme.type.small) }
     }
-    error?.let { Text(it, Modifier.padding(top = 6.dp), color = c.bad, style = AppTheme.type.small) }
 }

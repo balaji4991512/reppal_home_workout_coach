@@ -2,6 +2,19 @@ package com.homeworkoutcoach.app.ui.workout
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import com.homeworkoutcoach.app.ui.theme.AppIcons
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import com.homeworkoutcoach.app.ui.components.OutlineButton
+import com.homeworkoutcoach.app.ui.components.AccentChip
+import com.homeworkoutcoach.app.ui.components.AccentButton
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
+import com.homeworkoutcoach.app.ui.components.H2
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -133,27 +146,35 @@ fun LoggingContent(
         Muted("${session.slot}, exercise ${session.index + 1} of ${session.day.items.size}")
         H1(e.name)
 
-        Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                "${target.targetReps}",
-                Modifier.alignByBaseline(),
-                color = c.fg,
-                style = AppTheme.type.tabular(AppTheme.type.big),
-            )
-            Text(
-                "reps" + if (e.bodyweight) "" else " at ${Copy.kg(target.weightKg)} kg",
-                Modifier.alignByBaseline(),
-                color = c.mut,
-                style = AppTheme.type.body.copy(fontSize = 17.sp),
-            )
+        // The target in a card, with the sets under it.
+        Column(
+            Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp))
+                .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 600f)))
+                .padding(20.dp),
+        ) {
+            Text("YOUR TARGET", color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, letterSpacing = 0.08.em, fontWeight = FontWeight.SemiBold))
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "${target.targetReps}",
+                    Modifier.alignByBaseline(),
+                    color = c.fg,
+                    style = AppTheme.type.tabular(AppTheme.type.big),
+                )
+                Text(
+                    "reps" + if (e.bodyweight) "" else " at ${Copy.kg(target.weightKg)} kg",
+                    Modifier.alignByBaseline(),
+                    color = c.fg,
+                    style = AppTheme.type.body.copy(fontSize = 18.sp),
+                )
+            }
+            SetPills(session)
         }
-        SetPills(session)
 
         if (state.note != null && session.setIndex > 0) {
-            Text(state.note, Modifier.padding(vertical = 6.dp), color = c.ok, style = AppTheme.type.bodyStrong)
+            Text(state.note, Modifier.padding(top = 10.dp), color = c.ok, style = AppTheme.type.bodyStrong)
         }
 
-        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(
                 input.text,
                 onText,
@@ -168,21 +189,21 @@ fun LoggingContent(
             }
         }
 
-        Muted("Reps you did", Modifier.padding(top = 8.dp))
+        Muted("Reps you did", Modifier.padding(top = 10.dp))
         Chips {
             (0 until 5).map { target.targetReps - it }.filter { it >= 1 }.forEach { n ->
-                Chip("$n", input.shownReps == n, { onReps(n) }, Modifier.widthIn(min = 52.dp))
+                AccentChip("$n", input.shownReps == n, { onReps(n) }, Modifier.widthIn(min = 52.dp))
             }
         }
         Muted("How it felt")
         Chips {
             listOf(Effort.EASY to "Easy", Effort.JUST_RIGHT to "Just right", Effort.HARD to "Hard").forEach { (k, label) ->
-                Chip(label, input.shownEffort == k, { onEffort(k) })
+                AccentChip(label, input.shownEffort == k, { onEffort(k) })
             }
-            Chip("Felt pain", input.shownPain, onPain)
+            AccentChip("Felt pain", input.shownPain, onPain)
         }
 
-        if (input.reps == null && input.preview == null) PrimaryButton("Check my note", onCheck, alt = true)
+        if (input.reps == null && input.preview == null) OutlineButton("Check my note", onCheck, tint = c.accent)
         input.error?.let { Text(it, Modifier.padding(vertical = 6.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
         input.preview?.let { SetPreview(it, onSave) }
     }
@@ -198,10 +219,10 @@ private fun ProgressDots(session: WorkoutSession) {
     ) {
         session.day.items.indices.forEach { i ->
             Box(
-                Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(
+                Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp)).background(
                     when {
-                        i < session.index -> c.fg
-                        i == session.index -> c.mut
+                        i < session.index -> c.accent
+                        i == session.index -> c.accent.copy(alpha = 0.45f)
                         else -> c.bd
                     },
                 ),
@@ -216,24 +237,22 @@ private fun SetPills(session: WorkoutSession) {
     val c = AppTheme.colors
     val done = session.repsDone
     FlowRow(
-        Modifier.padding(top = 14.dp, bottom = 2.dp).semantics { contentDescription = "Sets" },
+        Modifier.padding(top = 16.dp).semantics { contentDescription = "Sets" },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         repeat(session.planned.sets) { i ->
             val isDone = i < done.size
             val current = !isDone && i == session.setIndex
-            val shape = RoundedCornerShape(10.dp)
             Box(
-                Modifier.widthIn(min = 56.dp).height(44.dp).clip(shape)
-                    .background(if (isDone) c.accs else c.bg)
-                    .border(1.dp, if (isDone) c.accs else if (current) c.fg else c.bd, shape)
-                    .padding(horizontal = 10.dp),
+                Modifier.widthIn(min = 60.dp).height(44.dp).clip(RoundedCornerShape(99.dp))
+                    .background(if (isDone) c.ok else if (current) c.accent else c.bg.copy(alpha = 0.7f))
+                    .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    if (isDone) "${done[i]}" else "Set ${i + 1}",
-                    color = if (isDone || current) c.fg else c.mut,
+                    if (isDone) "✓ ${done[i]}" else "Set ${i + 1}",
+                    color = if (isDone) c.bg else if (current) c.onAccent else c.mut,
                     style = AppTheme.type.tabular(AppTheme.type.label.copy(fontWeight = FontWeight.SemiBold)),
                 )
             }
@@ -260,7 +279,7 @@ private fun SetPreview(r: SetRecord, onSave: () -> Unit) {
                 style = AppTheme.type.bodyStrong,
             )
         }
-        PrimaryButton("Save set", onSave)
+        AccentButton("Save set", onSave, Modifier.padding(top = 14.dp))
         Row(
             Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button) { showData = !showData }
                 .semantics { stateDescription = if (showData) "Expanded" else "Collapsed" },
@@ -293,54 +312,77 @@ fun recordJson(r: SetRecord): String = prettyJson.encodeToString(
     },
 )
 
-/** Workout done [vDone, sumCard]. */
+/** Workout done [vDone, sumCard]: a celebration card, the muscles, the session, and what changes next time. */
 @Composable
 fun DoneContent(ui: DoneUi, onWeek: () -> Unit) {
     val c = AppTheme.colors
     Page {
         H1("Workout done")
-        Column(Modifier.padding(top = 8.dp)) {
-            ui.totalKg?.let { kg ->
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("$kg", Modifier.alignByBaseline(), color = c.fg, style = AppTheme.type.tabular(AppTheme.type.big))
-                    Text(
-                        "kg volume load, weighted exercises",
-                        Modifier.alignByBaseline().weight(1f),
-                        color = c.mut,
-                        style = AppTheme.type.body.copy(fontSize = 17.sp),
-                    )
+        Box(
+            Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(30.dp))
+                .background(Brush.linearGradient(listOf(c.tintMint, c.accentSoft), start = Offset.Zero, end = Offset(900f, 700f))),
+        ) {
+            Canvas(Modifier.matchParentSize()) {
+                drawCircle(c.ok.copy(alpha = 0.10f), radius = size.height * 0.6f, center = Offset(size.width * 0.95f, -size.height * 0.1f))
+                drawCircle(c.accent.copy(alpha = 0.08f), radius = size.height * 0.4f, center = Offset(size.width * 0.8f, size.height * 1.0f))
+            }
+            Column(Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(c.ok), contentAlignment = Alignment.Center) {
+                        Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.bg)
+                    }
+                    Text("Well done", color = c.fg, style = AppTheme.type.h2)
                 }
-                ui.kgComparison?.let { Muted(it) }
-            }
-            ui.repsLine?.let { line ->
-                val n = line.substringBefore(' ')
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(n) }
-                        append(line.removePrefix(n))
-                    },
-                    Modifier.padding(vertical = 6.dp),
-                    color = c.fg,
-                    style = AppTheme.type.body,
-                )
-            }
-            ui.muscles.forEachIndexed { i, m ->
-                LineRow(divider = i < ui.muscles.lastIndex, left = {
-                    Body(m.muscle)
-                    m.comparison?.let { Small(it) }
-                }) {
-                    Text(m.value, color = c.fg, style = AppTheme.type.tabular(AppTheme.type.bodyStrong))
+                ui.totalKg?.let { kg ->
+                    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("$kg", Modifier.alignByBaseline(), color = c.fg, style = AppTheme.type.tabular(AppTheme.type.big))
+                        Text(
+                            "kg volume load, weighted exercises",
+                            Modifier.alignByBaseline().weight(1f),
+                            color = c.fg,
+                            style = AppTheme.type.body.copy(fontSize = 17.sp),
+                        )
+                    }
+                    ui.kgComparison?.let { Small(it, Modifier.padding(top = 4.dp), color = c.fg) }
+                }
+                ui.repsLine?.let { line ->
+                    val n = line.substringBefore(' ')
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(n) }
+                            append(line.removePrefix(n))
+                        },
+                        Modifier.padding(top = 8.dp),
+                        color = c.fg,
+                        style = AppTheme.type.body,
+                    )
                 }
             }
         }
-        Column(Modifier.padding(top = 8.dp)) { SessionCard(ui.card) }
-        Muted("Here is what changes next time.", Modifier.padding(top = 8.dp))
-        ui.changes.forEach { ch ->
-            Hairline(Modifier.padding(top = 8.dp))
-            Column(Modifier.padding(top = 12.dp)) {
+        if (ui.muscles.isNotEmpty()) {
+            Column(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.soft).padding(horizontal = 16.dp, vertical = 6.dp)) {
+                ui.muscles.forEachIndexed { i, m ->
+                    LineRow(divider = i < ui.muscles.lastIndex, left = {
+                        Body(m.muscle)
+                        m.comparison?.let { Small(it) }
+                    }) {
+                        Text(m.value, color = c.fg, style = AppTheme.type.tabular(AppTheme.type.bodyStrong))
+                    }
+                }
+            }
+        }
+        Column(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.soft).padding(horizontal = 16.dp, vertical = 8.dp)) {
+            SessionCard(ui.card)
+        }
+        H2("What changes next time", top = 28.dp)
+        ui.changes.forEachIndexed { i, ch ->
+            Column(
+                Modifier.fadeLiftIn(minOf(i, 6) * 50).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(if (ch.up) c.tintMint else c.soft).padding(16.dp),
+            ) {
                 Body(ch.name, strong = true)
-                Muted(ch.summary)
-                Body(ch.message)
+                Small(ch.summary)
+                Body(ch.message, Modifier.padding(top = 6.dp))
                 Text(
                     ch.next,
                     Modifier.padding(top = 6.dp),
@@ -349,6 +391,6 @@ fun DoneContent(ui: DoneUi, onWeek: () -> Unit) {
                 )
             }
         }
-        PrimaryButton("See your week", onWeek)
+        AccentButton("See your week", onWeek, Modifier.padding(top = 18.dp))
     }
 }
