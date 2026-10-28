@@ -1,5 +1,10 @@
 package com.homeworkoutcoach.app.ui.shell
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -85,14 +90,13 @@ fun BottomBar(selected: Tab?, onSelect: (Tab) -> Unit) {
     }
 }
 
-/** A tab's page: a hero with today's number, then a card for each page with what is happening there. [header] goes above the cards. */
+/** A tab's page: a hero with today's number, then a colourful tile for each page showing what is happening there. */
 @Composable
 fun HubScreen(tab: Tab, started: Boolean, onOpen: (String) -> Unit, header: @Composable ColumnScope.() -> Unit = {}) {
     val c = AppTheme.colors
     val vm: HubViewModel = viewModel(factory = Factories.Hub)
     val all by vm.ui.collectAsStateWithLifecycle()
     val ui = all?.get(tab)
-    val tints = listOf(c.accentSoft, c.tintMint, c.tintPeach, c.tintRose)
     Page {
         H1(tab.label)
         Muted(tab.tagline)
@@ -106,56 +110,104 @@ fun HubScreen(tab: Tab, started: Boolean, onOpen: (String) -> Unit, header: @Com
                 PrimaryButton("Set up my plan", { onOpen("setup") })
             }
         }
-        tab.pages.filter { started || !it.needsPlan }.forEachIndexed { i, page ->
-            key(page.route) { PageCard(page, ui?.lines?.get(page.route), tints[i % tints.size], i, onOpen) }
+        val pages = tab.pages.filter { started || !it.needsPlan }
+        // Two tiles to a row; an odd one out goes first and takes the whole width.
+        val rows = if (pages.size % 2 == 1) listOf(listOf(pages.first())) + pages.drop(1).chunked(2) else pages.chunked(2)
+        var n = 0
+        rows.forEach { row ->
+            Row(Modifier.padding(top = 12.dp).fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { page ->
+                    val i = n++
+                    key(page.route) {
+                        PageTile(page, ui?.lines?.get(page.route), ui?.fractions?.get(page.route), tileTint(i), i, Modifier.weight(1f), onOpen)
+                    }
+                }
+            }
         }
     }
 }
 
-/** The hub's big number in a ring, on the lavender-to-peach wash. */
+/** The soft colours the tiles take in turn: lavender, mint, peach, rose. */
+@Composable
+private fun tileTint(i: Int): Color {
+    val c = AppTheme.colors
+    return listOf(c.accentSoft, c.tintMint, c.tintPeach, c.tintRose)[i % 4]
+}
+
+/** The hub's big number in a ring, on a lavender-to-peach wash with soft shapes, and a short line under the label. */
 @Composable
 private fun HeroCard(hero: HubHeroUi, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
     val fraction by animateFloatAsState(hero.fraction ?: 0f, tween(700), label = "hubRing")
-    Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 500f)))
-            .padding(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    Box(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
+            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 600f))),
     ) {
-        ProgressRing(fraction, size = 92.dp, stroke = 10.dp, track = c.bg.copy(alpha = 0.7f)) {
-            Text(
-                hero.big, color = c.fg, textAlign = TextAlign.Center,
-                style = AppTheme.type.tabular(AppTheme.type.h2.copy(fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)),
-            )
+        // soft shapes behind, so the card is not a flat wash
+        Canvas(Modifier.matchParentSize()) {
+            drawCircle(c.accent.copy(alpha = 0.07f), radius = size.height * 0.75f, center = Offset(size.width * 0.95f, -size.height * 0.15f))
+            drawCircle(c.coral.copy(alpha = 0.10f), radius = size.height * 0.45f, center = Offset(size.width * 0.78f, size.height * 1.05f))
+            drawCircle(c.bg.copy(alpha = 0.35f), radius = size.height * 0.30f, center = Offset(size.width * 0.05f, size.height * 1.0f))
         }
-        Column(Modifier.weight(1f)) {
-            Text(hero.label, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 19.sp, lineHeight = 25.sp))
-            hero.sub?.let { Text(it, Modifier.padding(top = 4.dp), color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold)) }
+        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            ProgressRing(fraction, size = 104.dp, stroke = 11.dp, track = c.bg.copy(alpha = 0.7f)) {
+                Text(
+                    hero.big, color = c.fg, textAlign = TextAlign.Center,
+                    style = AppTheme.type.tabular(AppTheme.type.h2.copy(fontSize = 25.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold)),
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(hero.label, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp, lineHeight = 26.sp))
+                hero.sub?.let {
+                    Text(
+                        it, Modifier.padding(top = 8.dp).clip(RoundedCornerShape(99.dp)).background(c.bg.copy(alpha = 0.7f)).padding(horizontal = 12.dp, vertical = 5.dp),
+                        color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            }
         }
     }
 }
 
-/** A page's card: a tinted icon, its name, what is happening there now (or what it is for), and a chevron. */
+/**
+ * A page as a coloured tile: a big icon on a white disc, the page's name, what is happening there now (or what it is
+ * for), and a little bar when there is something to fill. The whole tile opens the page.
+ */
 @Composable
-private fun PageCard(page: HubPage, line: String?, tint: Color, index: Int, onOpen: (String) -> Unit) {
+private fun PageTile(
+    page: HubPage,
+    line: String?,
+    fraction: Float?,
+    tint: Color,
+    index: Int,
+    modifier: Modifier,
+    onOpen: (String) -> Unit,
+) {
     val c = AppTheme.colors
-    Row(
-        Modifier.fadeLiftIn(index * 60).padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft)
+    val bar by animateFloatAsState(fraction ?: 0f, tween(700), label = "tileBar")
+    Column(
+        modifier.fadeLiftIn(index * 70).fillMaxHeight().clip(RoundedCornerShape(26.dp)).background(tint)
             .clickable(role = Role.Button) { onOpen(page.route) }.padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(Modifier.size(48.dp).clip(CircleShape).background(tint), contentAlignment = Alignment.Center) {
-            Icon(page.icon, null, Modifier.size(24.dp), tint = c.fg)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Box(Modifier.size(50.dp).clip(CircleShape).background(c.bg.copy(alpha = 0.75f)), contentAlignment = Alignment.Center) {
+                Icon(page.icon, null, Modifier.size(26.dp), tint = c.fg)
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(AppIcons.Forward, null, Modifier.size(18.dp), tint = c.fg.copy(alpha = 0.45f))
         }
-        Column(Modifier.weight(1f)) {
-            Body(page.label, strong = true)
-            if (line != null) Text(line, color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
-            else Small(page.blurb)
+        Spacer(Modifier.height(14.dp))
+        Text(page.label, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 18.sp, lineHeight = 22.sp))
+        Text(
+            line ?: page.blurb, Modifier.padding(top = 2.dp), color = if (line != null) c.fg else c.mut,
+            style = AppTheme.type.small.copy(fontWeight = if (line != null) FontWeight.Medium else FontWeight.Normal),
+        )
+        if (fraction != null) {
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(c.bg.copy(alpha = 0.7f))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(bar.coerceIn(0f, 1f)).clip(RoundedCornerShape(3.dp)).background(c.accent))
+            }
         }
-        Icon(AppIcons.Forward, null, Modifier.size(18.dp), tint = c.mut)
     }
 }
 

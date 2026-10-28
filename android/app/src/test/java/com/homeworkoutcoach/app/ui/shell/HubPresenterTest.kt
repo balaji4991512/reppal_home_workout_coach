@@ -65,6 +65,8 @@ class HubPresenterTest {
         assertEquals("workouts this week", hero.label)
         assertEquals(2f / 3, hero.fraction!!, 0.001f)
         assertEquals("2 of 3 this week", ui.lines.getValue("week"))
+        assertEquals("1 to go this week", hero.sub)
+        assertEquals(2f / 3, ui.fractions.getValue("week"), 0.001f)
         assertEquals("83.6 kg, Tue 27 Oct", ui.lines.getValue("body"))
     }
 
@@ -94,6 +96,11 @@ class HubPresenterTest {
         assertEquals("1 of 2 done today", ui.lines.getValue("routines"))
         assertEquals("1 of 2 done today", ui.lines.getValue("planner"))
         assertEquals("40 min today", ui.lines.getValue("focus"))
+        assertEquals("1 to go today", ui.hero!!.sub)
+        assertEquals(2f / 3, ui.fractions.getValue("habits"), 0.001f)
+        assertEquals(0.5f, ui.fractions.getValue("routines"), 0.001f)
+        assertEquals(0.5f, ui.fractions.getValue("planner"), 0.001f)
+        assertNull(ui.fractions["focus"]) // minutes have no goal to fill
     }
 
     @Test
@@ -131,8 +138,17 @@ class HubPresenterTest {
         assertEquals("–", ui.hero!!.big)
         assertEquals("Set your first goal", ui.lines.getValue("goals"))
         assertEquals("Not written yet today", ui.lines.getValue("journal"))
+        assertTrue(ui.fractions.isEmpty())
         assertNull(ui.lines["character"])
         assertNull(ui.lines["progress"])
+    }
+
+    @Test
+    fun aFinishedWeekAndDayAreSaidWarmly() {
+        val done = hub(workouts = listOf(WorkoutFact(monday), WorkoutFact(today.minusDays(1)), WorkoutFact(today)), habits = listOf(habit("a", true)))
+        assertEquals("Week complete. Well done.", HubPresenter.present(Tab.Train, done).hero!!.sub)
+        assertEquals("All done today. Nice.", HubPresenter.present(Tab.Plan, done).hero!!.sub)
+        assertEquals(1f, HubPresenter.present(Tab.Reflect, hub(journal = setOf(today))).fractions.getValue("journal"), 0f)
     }
 
     @Test

@@ -34,7 +34,12 @@ data class HubInputs(
 data class HubHeroUi(val fraction: Float?, val big: String, val label: String, val sub: String?)
 
 /** A hub's top card, and a live line for each page card (by route): what is happening there right now. */
-data class HubUi(val hero: HubHeroUi?, val lines: Map<String, String>)
+data class HubUi(
+    val hero: HubHeroUi?,
+    val lines: Map<String, String>,
+    /** 0 to 1 for the pages that have something to fill, by route: the little bar on a tile. */
+    val fractions: Map<String, Float> = emptyMap(),
+)
 
 /** Puts today's numbers on the hubs. Nothing here is a score, and nothing is flagged: a quiet day is said plainly. */
 object HubPresenter {
@@ -56,13 +61,17 @@ object HubPresenter {
         val hero = if (!h.started || planned == null) {
             HubHeroUi(null, "–", "Set up your plan to begin", null)
         } else {
-            HubHeroUi((done.toFloat() / planned).coerceIn(0f, 1f), "$done/$planned", "workouts this week", null)
+            HubHeroUi(
+                (done.toFloat() / planned).coerceIn(0f, 1f), "$done/$planned", "workouts this week",
+                if (done >= planned) "Week complete. Well done." else "${planned - done} to go this week",
+            )
         }
         val lines = buildMap {
             if (planned != null) put("week", "${done} of $planned this week")
             h.latestWeight?.let { (day, kg) -> put("body", "${Copy.kg(kg)} kg, ${PlannerFormat.dayShort(day, h.today)}") }
         }
-        return HubUi(hero, lines)
+        val fractions = buildMap { if (planned != null && planned > 0) put("week", (done.toFloat() / planned).coerceIn(0f, 1f)) }
+        return HubUi(hero, lines, fractions)
     }
 
     private fun plan(h: HubInputs): HubUi {
@@ -75,7 +84,10 @@ object HubPresenter {
         val hero = if (due.isEmpty()) {
             HubHeroUi(null, "–", if (i.habits.isEmpty()) "Add a habit to begin" else "No habits due today", null)
         } else {
-            HubHeroUi(habitsDone.toFloat() / due.size, "$habitsDone/${due.size}", "habits today", null)
+            HubHeroUi(
+                habitsDone.toFloat() / due.size, "$habitsDone/${due.size}", "habits today",
+                if (habitsDone == due.size) "All done today. Nice." else "${due.size - habitsDone} to go today",
+            )
         }
         val lines = buildMap {
             put("habits", if (i.habits.isEmpty()) "Add your first habit" else if (due.isEmpty()) "None due today" else "$habitsDone of ${due.size} done today")
@@ -83,7 +95,12 @@ object HubPresenter {
             put("planner", if (tasks.total == 0) "Nothing planned today" else "${tasks.done} of ${tasks.total} done today")
             put("focus", if (focusMinutes > 0) "${HabitFormat.minutes(focusMinutes)} today" else "No session yet today")
         }
-        return HubUi(hero, lines)
+        val fractions = buildMap {
+            if (due.isNotEmpty()) put("habits", habitsDone.toFloat() / due.size)
+            if (i.routines.isNotEmpty()) put("routines", routinesDone.toFloat() / i.routines.size)
+            if (tasks.total > 0) put("planner", tasks.done.toFloat() / tasks.total)
+        }
+        return HubUi(hero, lines, fractions)
     }
 
     private fun reflect(h: HubInputs): HubUi {
@@ -100,6 +117,10 @@ object HubPresenter {
             put("journal", if (h.today in h.inputs.journalDays) "Written today" else "Not written yet today")
             h.characterFocus?.let { put("character", "This week: ${it.lowercase()}") }
         }
-        return HubUi(hero, lines)
+        val fractions = buildMap {
+            if (week.hasHabits) put("progress", week.fraction)
+            if (h.today in h.inputs.journalDays) put("journal", 1f)
+        }
+        return HubUi(hero, lines, fractions)
     }
 }
