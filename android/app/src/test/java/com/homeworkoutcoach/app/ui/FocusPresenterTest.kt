@@ -25,6 +25,9 @@ class FocusPresenterTest {
         assertNull(ui.running)
         assertEquals("No sessions yet today", ui.today)
         assertEquals("0 min this week", ui.week)
+        assertEquals("0 min", ui.todayValue)
+        assertEquals("No sessions yet", ui.todayNote)
+        assertEquals("0 min", ui.weekValue)
         assertTrue(ui.recent.isEmpty() && ui.taskChoices.isEmpty())
         assertEquals(listOf(15, 25, 45, 60), ui.presets)
     }
@@ -40,6 +43,9 @@ class FocusPresenterTest {
         val ui = presenter.present(null, sessions, emptyList(), TODAY, ZONE)
         assertEquals("45 min today, 2 sessions", ui.today)
         assertEquals("1 h 45 min this week", ui.week)
+        assertEquals("45 min", ui.todayValue)
+        assertEquals("2 sessions", ui.todayNote)
+        assertEquals("1 h 45 min", ui.weekValue)
         assertEquals(listOf("Today 2:00 pm", "Today 9:30 am", "Yesterday 4:00 pm", "Sun 25 Oct 10:00 am"), ui.recent.map { it.whenText })
         assertEquals(listOf("20 of 45 min", "25 min", "1 h", "30 min"), ui.recent.map { it.lengthText })
         assertEquals("Write the report", ui.recent.first().note)
@@ -50,6 +56,7 @@ class FocusPresenterTest {
     fun oneSessionReadsInTheSingular() {
         val ui = presenter.present(null, listOf(focusSession("a", at(TODAY, 9), planned = 25)), emptyList(), TODAY, ZONE)
         assertEquals("25 min today, 1 session", ui.today)
+        assertEquals("1 session", ui.todayNote)
     }
 
     @Test

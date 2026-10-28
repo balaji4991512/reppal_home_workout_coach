@@ -22,6 +22,10 @@ data class FocusUi(
     val today: String,
     /** "2 h 5 min this week". */
     val week: String,
+    /** For the stat cards: "45 min" and "2 sessions" (or "No sessions yet"), and "1 h 45 min". */
+    val todayValue: String,
+    val todayNote: String,
+    val weekValue: String,
     val recent: List<SessionRowUi>,
     /** Planner tasks to work on: not done, for today or left over. */
     val taskChoices: List<String>,
@@ -38,6 +42,13 @@ class FocusPresenter {
             },
             today = if (countToday == 0) "No sessions yet today" else "${HabitFormat.minutes(minutesToday)} today, ${if (countToday == 1) "1 session" else "$countToday sessions"}",
             week = "${HabitFormat.minutes(Focus.minutesInWeek(sessions, today, zone))} this week",
+            todayValue = HabitFormat.minutes(minutesToday),
+            todayNote = when (countToday) {
+                0 -> "No sessions yet"
+                1 -> "1 session"
+                else -> "$countToday sessions"
+            },
+            weekValue = HabitFormat.minutes(Focus.minutesInWeek(sessions, today, zone)),
             recent = Focus.recent(sessions, 8).map { s ->
                 val at = Instant.ofEpochMilli(s.startMillis).atZone(zone)
                 SessionRowUi(

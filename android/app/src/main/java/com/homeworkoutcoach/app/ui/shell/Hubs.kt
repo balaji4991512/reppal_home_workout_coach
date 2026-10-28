@@ -60,9 +60,9 @@ fun BottomBar(selected: Tab?, onSelect: (Tab) -> Unit) {
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
-                        Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) c.accs else c.soft).padding(horizontal = 16.dp, vertical = 4.dp),
+                        Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) c.accentSoft else c.soft).padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
-                        Icon(tab.icon, null, Modifier.size(22.dp), tint = if (on) c.fg else c.mut)
+                        Icon(tab.icon, null, Modifier.size(22.dp), tint = if (on) c.accent else c.mut)
                     }
                     Text(
                         tab.label, Modifier.padding(top = 2.dp), color = if (on) c.fg else c.mut, textAlign = TextAlign.Center,
