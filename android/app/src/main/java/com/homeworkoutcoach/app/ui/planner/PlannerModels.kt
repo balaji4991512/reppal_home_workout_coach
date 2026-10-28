@@ -17,6 +17,8 @@ data class TaskRowUi(
     val title: String,
     /** "5:30 pm", or null. */
     val time: String?,
+    /** Minutes since midnight, for placing the task on the timeline, or null. */
+    val minutes: Int?,
     val note: String,
     val done: Boolean,
     val dayLabel: String?,
@@ -77,6 +79,17 @@ object PlannerFormat {
     }
 }
 
+/** The vertical timeline: where "Now" sits among the timed tasks. */
+object Timeline {
+    /**
+     * How many of the [timed] tasks (minutes since midnight, in time order) are at or before [nowMinutes]: the "Now"
+     * marker goes after that many. 0 puts it before the first task, and [timed]'s size puts it after the last.
+     */
+    fun nowIndex(timed: List<Int>, nowMinutes: Int): Int = timed.count { it <= nowMinutes }
+
+    fun minutesOf(t: LocalTime): Int = t.hour * 60 + t.minute
+}
+
 /** The Planner's day view. */
 class PlannerPresenter {
     fun present(all: List<Task>, date: LocalDate, today: LocalDate): PlannerUi {
@@ -85,6 +98,7 @@ class PlannerPresenter {
             id = t.id,
             title = t.title,
             time = t.time?.let(PlannerFormat::time),
+            minutes = t.time?.let { it.hour * 60 + it.minute },
             note = t.note,
             done = t.done,
             dayLabel = if (carried) PlannerFormat.dayTitle(t.date, today) else null,

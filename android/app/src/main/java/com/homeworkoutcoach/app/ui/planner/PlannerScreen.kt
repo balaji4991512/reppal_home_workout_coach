@@ -2,6 +2,32 @@ package com.homeworkoutcoach.app.ui.planner
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import com.homeworkoutcoach.app.ui.components.FlameArt
+import com.homeworkoutcoach.app.ui.components.ProgressRing
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import kotlinx.coroutines.delay
+import java.time.LocalTime
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -97,17 +123,7 @@ fun PlannerScreen(
             s.week.forEach { d -> DayCell(d, Modifier.weight(1f)) { vm.select(d.date) } }
         }
 
-        Row(Modifier.padding(top = 22.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
-                Small(s.subtitle)
-            }
-            Text(
-                s.summary, color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.accentSoft).padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
-        if (!s.isToday) TextLink("Back to today", vm::goToToday)
+        DayHero(s, Modifier.padding(top = 18.dp), onToday = vm::goToToday)
 
         Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(
@@ -127,8 +143,59 @@ fun PlannerScreen(
         }
         problem?.let { Text(it, Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.small) }
 
-        s.tasks.forEach { row ->
-            TaskCard(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) })
+        val untimed = s.tasks.filter { it.minutes == null }
+        val timed = s.tasks.filter { it.minutes != null }
+        // "Now" is only drawn on today, and moves along as the minutes pass.
+        var nowMinutes by remember { mutableIntStateOf(Timeline.minutesOf(LocalTime.now())) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(30_000)
+                nowMinutes = Timeline.minutesOf(LocalTime.now())
+            }
+        }
+
+        if (s.tasks.isEmpty()) {
+            Column(Modifier.fillMaxWidth().padding(top = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                FlameArt()
+                Text("Nothing planned.", Modifier.padding(top = 12.dp), color = c.fg, style = AppTheme.type.h2)
+                Small("Add a task above and it lands here.", Modifier.padding(top = 2.dp))
+            }
+        }
+        if (untimed.isNotEmpty()) {
+            Small("Anytime", Modifier.padding(top = 22.dp), color = c.mut)
+            untimed.forEachIndexed { i, row ->
+                key(row.id) {
+                    TaskCard(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) }, enter = i)
+                }
+            }
+        }
+        if (timed.isNotEmpty()) {
+            Small("By the clock", Modifier.padding(top = 22.dp), color = c.mut)
+            val nowAt = if (s.isToday) Timeline.nowIndex(timed.map { it.minutes!! }, nowMinutes) else null
+            // The timeline's stops in order: each timed task, and the Now marker among them.
+            val stops: List<Any> = buildList {
+                timed.forEachIndexed { i, row ->
+                    if (nowAt == i) add(NowStop)
+                    add(row)
+                }
+                if (nowAt == timed.size) add(NowStop)
+            }
+            stops.forEachIndexed { i, stop ->
+                val first = i == 0
+                val last = i == stops.lastIndex
+                if (stop is TaskRowUi) {
+                    key(stop.id) {
+                        TimelineStop(first, last, stop.done, time = stop.time, enter = i) {
+                            TaskCard(
+                                stop, onTick = { vm.toggle(stop.id) }, onOpen = { onOpen(stop.id) },
+                                onTomorrow = { vm.moveToTomorrow(stop.id) }, showTime = false, enter = i,
+                            )
+                        }
+                    }
+                } else {
+                    NowRow(first, last, PlannerFormat.time(LocalTime.of(nowMinutes / 60, nowMinutes % 60)))
+                }
+            }
         }
 
         if (s.carriedOver.isNotEmpty()) {
@@ -154,10 +221,123 @@ fun PlannerScreen(
     }
 }
 
+/** The marker for the current time on the timeline. */
+private object NowStop
+
+/** The day at a glance: its name and date, how it is going, and a progress ring, on a lavender-to-peach wash. */
+@Composable
+private fun DayHero(s: PlannerUi, modifier: Modifier = Modifier, onToday: () -> Unit) {
+    val c = AppTheme.colors
+    val done = s.tasks.count { it.done }
+    val total = s.tasks.size
+    val fraction by animateFloatAsState(if (total == 0) 0f else done.toFloat() / total, tween(600), label = "dayRing")
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
+            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 500f)))
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 22.sp, lineHeight = 28.sp))
+            Small(s.subtitle, color = c.mut)
+            Text(s.summary, Modifier.padding(top = 8.dp), color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
+            if (!s.isToday) TextLink("Back to today", onToday)
+        }
+        ProgressRing(fraction, size = 76.dp, stroke = 9.dp) {
+            Text(
+                if (total == 0) "–" else "$done/$total", color = c.fg,
+                style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold)),
+            )
+        }
+    }
+}
+
+/**
+ * One stop on the timeline: the time at the left, the rail with a node for the task, and the card. The rail joins the
+ * stops above and below ([first] and [last] stop it short at the ends).
+ */
+@Composable
+private fun TimelineStop(first: Boolean, last: Boolean, done: Boolean, time: String?, enter: Int, card: @Composable () -> Unit) {
+    val c = AppTheme.colors
+    val parts = (time ?: "").split(' ')
+    Row(Modifier.height(IntrinsicSize.Min), verticalAlignment = Alignment.Top) {
+        Column(Modifier.width(52.dp).padding(top = 22.dp)) {
+            Text(parts.firstOrNull().orEmpty(), color = c.fg, style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)))
+            Text(parts.getOrNull(1).orEmpty(), color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, lineHeight = 13.sp))
+        }
+        Canvas(Modifier.width(22.dp).fillMaxHeight()) {
+            val x = size.width / 2
+            val y = NODE_Y.toPx()
+            val line = c.accent.copy(alpha = 0.22f)
+            if (!first) drawLine(line, Offset(x, 0f), Offset(x, y), 3.dp.toPx(), StrokeCap.Round)
+            if (!last) drawLine(line, Offset(x, y), Offset(x, size.height), 3.dp.toPx(), StrokeCap.Round)
+            if (done) drawCircle(c.accent, 7.dp.toPx(), Offset(x, y))
+            else {
+                drawCircle(c.bg, 7.dp.toPx(), Offset(x, y))
+                drawCircle(c.accent, 7.dp.toPx(), Offset(x, y), style = Stroke(2.5.dp.toPx()))
+            }
+        }
+        Box(Modifier.weight(1f)) { card() }
+    }
+}
+
+/** "Now": a pulsing dot on the rail and a thin line across, with the time. */
+@Composable
+private fun NowRow(first: Boolean, last: Boolean, text: String) {
+    val c = AppTheme.colors
+    val pulse = rememberInfiniteTransition(label = "now")
+    val grow by pulse.animateFloat(1f, 2.1f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "grow")
+    val fade by pulse.animateFloat(0.45f, 0f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "fade")
+    Row(Modifier.height(IntrinsicSize.Min).heightIn(min = 34.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Now", Modifier.width(52.dp), color = c.accent, style = AppTheme.type.label.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold))
+        Canvas(Modifier.width(22.dp).fillMaxHeight()) {
+            val x = size.width / 2
+            val y = size.height / 2
+            val line = c.accent.copy(alpha = 0.22f)
+            if (!first) drawLine(line, Offset(x, 0f), Offset(x, y), 3.dp.toPx(), StrokeCap.Round)
+            if (!last) drawLine(line, Offset(x, y), Offset(x, size.height), 3.dp.toPx(), StrokeCap.Round)
+            drawCircle(c.accent.copy(alpha = fade), 6.dp.toPx() * grow, Offset(x, y))
+            drawCircle(c.accent, 6.dp.toPx(), Offset(x, y))
+        }
+        Box(Modifier.weight(1f).height(1.5.dp).background(c.accent.copy(alpha = 0.35f)))
+        Text(text, Modifier.padding(start = 8.dp), color = c.accent, style = AppTheme.type.small.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold))
+    }
+}
+
+/** A tick that fills with a little spring, and the check pops in. */
+@Composable
+private fun TickBox(done: Boolean, label: String, onTick: () -> Unit) {
+    val c = AppTheme.colors
+    val fill by animateFloatAsState(
+        if (done) 1f else 0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium), label = "tick",
+    )
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Checkbox, onClick = onTick).semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(26.dp)) {
+            val r = size.width / 2
+            drawCircle(c.accent.copy(alpha = 0.55f), radius = r - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
+            if (fill > 0f) drawCircle(c.accent, radius = r * fill)
+        }
+        if (fill > 0.15f) {
+            Icon(
+                AppIcons.Check, null,
+                Modifier.size(16.dp).graphicsLayer { scaleX = fill; scaleY = fill; alpha = fill.coerceIn(0f, 1f) },
+                tint = c.onAccent,
+            )
+        }
+    }
+}
+
+private val NODE_Y = 36.dp
+
 /** A day in the strip: weekday, date in a circle (filled when shown, ringed for today), and its done/total. */
 @Composable
 private fun DayCell(d: WeekDayUi, modifier: Modifier, onClick: () -> Unit) {
     val c = AppTheme.colors
+    val fillColor by animateColorAsState(if (d.selected) c.accent else Color.Transparent, tween(250), label = "day")
     Column(
         modifier.clip(RoundedCornerShape(16.dp)).selectable(selected = d.selected, role = Role.Tab, onClick = onClick).padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -165,7 +345,7 @@ private fun DayCell(d: WeekDayUi, modifier: Modifier, onClick: () -> Unit) {
         Text(d.label, color = c.mut, style = AppTheme.type.small.copy(fontSize = 12.sp))
         Box(
             Modifier.padding(top = 6.dp).size(40.dp).clip(CircleShape)
-                .background(if (d.selected) c.accent else Color.Transparent)
+                .background(fillColor)
                 .then(if (d.isToday && !d.selected) Modifier.border(1.5.dp, c.accent, CircleShape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
@@ -193,21 +373,14 @@ private fun TaskCard(
     onTick: () -> Unit,
     onOpen: () -> Unit,
     onTomorrow: (() -> Unit)?,
+    showTime: Boolean = true,
+    enter: Int = 0,
     below: @Composable (() -> Unit)? = null,
 ) {
     val c = AppTheme.colors
-    Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(horizontal = 6.dp, vertical = 6.dp)) {
+    Column(Modifier.fadeLiftIn(enter * 70).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(horizontal = 6.dp, vertical = 6.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Checkbox, onClick = onTick)
-                    .semantics { contentDescription = if (row.done) "Mark ${row.title} not done" else "Mark ${row.title} done" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Canvas(Modifier.size(26.dp)) {
-                    if (row.done) drawCircle(c.accent) else drawCircle(c.accent.copy(alpha = 0.55f), style = Stroke(2.dp.toPx()), radius = size.width / 2 - 1.dp.toPx())
-                }
-                if (row.done) Icon(AppIcons.Check, null, Modifier.size(16.dp), tint = c.onAccent)
-            }
+            TickBox(row.done, if (row.done) "Mark ${row.title} not done" else "Mark ${row.title} done", onTick)
             Column(Modifier.weight(1f).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp, horizontal = 2.dp)) {
                 Text(
                     row.title,
@@ -219,9 +392,10 @@ private fun TaskCard(
                 )
                 val note = row.note.lineSequence().firstOrNull()?.takeIf { it.isNotBlank() }
                 val from = row.dayLabel?.let { "From ${it.replaceFirstChar(Char::lowercase)}" }
-                if (row.time != null || note != null || from != null) {
+                val shownTime = row.time.takeIf { showTime }
+                if (shownTime != null || note != null || from != null) {
                     Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.time?.let {
+                        shownTime?.let {
                             Text(
                                 it, color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
                                 modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.accentSoft).padding(horizontal = 10.dp, vertical = 2.dp),

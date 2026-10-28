@@ -5,6 +5,7 @@ import com.homeworkoutcoach.app.data.task
 import com.homeworkoutcoach.app.ui.planner.PlannerActions
 import com.homeworkoutcoach.app.ui.planner.PlannerFormat
 import com.homeworkoutcoach.app.ui.planner.PlannerPresenter
+import com.homeworkoutcoach.app.ui.planner.Timeline
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -60,6 +61,25 @@ class PlannerPresenterTest {
         val ui = presenter.present(emptyList(), TODAY.plusDays(2), TODAY)
         assertEquals(listOf(false, false, false, false, true, false, false), ui.week.map { it.selected })
         assertEquals(2, ui.week.indexOfFirst { it.isToday })
+    }
+
+    @Test
+    fun rowsCarryTheirMinutesForTheTimeline() {
+        val all = listOf(task("a", time = LocalTime.of(17, 30)), task("b", time = LocalTime.of(0, 5)), task("c"))
+        val ui = presenter.present(all, TODAY, TODAY)
+        assertEquals(listOf(5, 1050, null), ui.tasks.map { it.minutes })
+    }
+
+    @Test
+    fun theNowMarkerSitsAfterTheTasksAtOrBeforeNow() {
+        val timed = listOf(9 * 60, 12 * 60 + 30, 17 * 60)
+        assertEquals(0, Timeline.nowIndex(timed, 8 * 60))
+        assertEquals(1, Timeline.nowIndex(timed, 9 * 60)) // a task starting now is already under way
+        assertEquals(1, Timeline.nowIndex(timed, 12 * 60))
+        assertEquals(2, Timeline.nowIndex(timed, 14 * 60))
+        assertEquals(3, Timeline.nowIndex(timed, 23 * 60 + 59))
+        assertEquals(0, Timeline.nowIndex(emptyList(), 600))
+        assertEquals(17 * 60 + 5, Timeline.minutesOf(LocalTime.of(17, 5)))
     }
 
     @Test
