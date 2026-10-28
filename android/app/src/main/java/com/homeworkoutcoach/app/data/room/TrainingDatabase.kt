@@ -216,6 +216,9 @@ interface WorkoutDao {
     @Insert
     suspend fun insert(workout: WorkoutEntity): Long
 
+    @androidx.room.Update
+    suspend fun update(workout: WorkoutEntity)
+
     @Query("DELETE FROM workout")
     suspend fun clear()
 }

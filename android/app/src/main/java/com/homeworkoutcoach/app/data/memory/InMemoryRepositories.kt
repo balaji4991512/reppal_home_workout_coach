@@ -76,6 +76,11 @@ class InMemoryTrainingRepository : TrainingRepository {
         return saved.id
     }
 
+    override suspend fun updateWorkout(workout: Workout, nextStates: Map<String, ExerciseState>) {
+        workouts.update { list -> list.map { if (it.id == workout.id) workout else it } }
+        putExerciseStates(nextStates)
+    }
+
     override suspend fun wipe() {
         states.value = emptyMap()
         swaps.value = emptyMap()

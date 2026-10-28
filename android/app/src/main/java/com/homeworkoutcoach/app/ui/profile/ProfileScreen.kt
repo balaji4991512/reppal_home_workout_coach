@@ -52,6 +52,7 @@ import com.homeworkoutcoach.app.ui.Factories
 import com.homeworkoutcoach.app.ui.ProfileViewModel
 import com.homeworkoutcoach.app.ui.RestoreUi
 import com.homeworkoutcoach.app.ui.components.Body
+import com.homeworkoutcoach.app.ui.components.OutlineButton
 import com.homeworkoutcoach.app.ui.components.H1
 import com.homeworkoutcoach.app.ui.components.H2
 import com.homeworkoutcoach.app.ui.components.Hairline
@@ -73,6 +74,7 @@ fun ProfileScreen(
     onSetup: () -> Unit,
     onWiped: () -> Unit,
     onPrivacy: () -> Unit = {},
+    onEditWorkout: (Long) -> Unit = {},
     vm: ProfileViewModel = viewModel(factory = Factories.Profile),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -114,6 +116,7 @@ fun ProfileScreen(
             onPrivacy = onPrivacy,
             delete = delete,
             onDeleteAccount = { (context as? Activity)?.let(vm::deleteAccount) },
+            onEditWorkout = onEditWorkout,
         )
     }
 }
@@ -133,6 +136,7 @@ fun ProfileContent(
     onPrivacy: () -> Unit = {},
     delete: DeleteUi = DeleteUi(),
     onDeleteAccount: () -> Unit = {},
+    onEditWorkout: (Long) -> Unit = {},
 ) {
     val c = AppTheme.colors
     var confirmDelete by remember { mutableStateOf(false) }
@@ -209,7 +213,12 @@ fun ProfileContent(
                     }
                     Icon(AppIcons.ChevronDown, null, Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), tint = c.mut)
                 }
-                AnimatedVisibility(expanded) { Box(Modifier.padding(horizontal = 16.dp)) { SessionCard(h.card) } }
+                AnimatedVisibility(expanded) {
+                    Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+                        SessionCard(h.card)
+                        OutlineButton("Edit this workout", { onEditWorkout(h.id) }, tint = c.accent, compact = true)
+                    }
+                }
             }
             if (ui.history.size > HISTORY_PREVIEW) {
                 GroupDivider()

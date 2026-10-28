@@ -38,6 +38,11 @@ class RoomTrainingRepository(private val db: TrainingDatabase) : TrainingReposit
             id
         }
 
+    override suspend fun updateWorkout(workout: Workout, nextStates: Map<String, ExerciseState>) = db.withTransaction {
+        db.workouts().update(WorkoutJson.toEntity(workout))
+        putExerciseStates(nextStates)
+    }
+
     override suspend fun wipe() = db.withTransaction {
         db.exerciseStates().clear()
         db.swaps().clear()

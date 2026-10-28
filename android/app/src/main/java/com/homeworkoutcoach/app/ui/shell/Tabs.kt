@@ -59,7 +59,7 @@ enum class Tab(val label: String, val icon: ImageVector, val root: String, val t
             val r = route?.substringBefore('?') ?: return null
             return when {
                 r == "today" -> Today
-                r == "hub/train" || r in setOf("week", "arrange", "workout", "body") -> Train
+                r == "hub/train" || r in setOf("week", "arrange", "workout", "body") || r.startsWith("edit-workout") -> Train
                 r == "hub/plan" || r.startsWith("habit") || r.startsWith("routine") || r == "planner" || r.startsWith("task") || r == "focus" -> Plan
                 r == "hub/reflect" || r == "progress" || r.startsWith("exercise") || r.startsWith("goal") || r == "journal" || r == "character" -> Reflect
                 r == "hub/me" || r in setOf("profile", "setup", "how", "privacy") -> Me

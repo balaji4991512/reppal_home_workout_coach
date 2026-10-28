@@ -34,6 +34,9 @@ interface TrainingRepository {
     /** Save a finished workout and the next-session states together, so one is never saved without the other. */
     suspend fun saveWorkout(workout: Workout, nextStates: Map<String, ExerciseState>): Long
 
+    /** Replace a saved workout (found by its id) with a corrected one, and save the states that follow from it together. */
+    suspend fun updateWorkout(workout: Workout, nextStates: Map<String, ExerciseState>)
+
     /** Delete states, swaps and history. */
     suspend fun wipe()
 }

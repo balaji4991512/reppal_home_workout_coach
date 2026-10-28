@@ -103,6 +103,21 @@ abstract class TrainingRepositoryContract {
     }
 
     @Test
+    fun updatingAWorkoutReplacesItInPlaceAndSavesTheStatesWithIt() = runTest {
+        val first = repo.saveWorkout(workout(1_000), mapOf("bench" to ExerciseState(6.0, 11, 3)))
+        val second = repo.saveWorkout(workout(2_000, "B"), emptyMap())
+        val corrected = workout(1_000).copy(id = first, sets = mapOf("bench" to listOf(LoggedSet(10, 8.0, 12))))
+
+        repo.updateWorkout(corrected, mapOf("bench" to ExerciseState(9.0, 12, 3)))
+
+        val all = repo.workouts().first()
+        assertEquals(listOf(first, second), all.map { it.id }) // same place, same ids
+        assertEquals(listOf(LoggedSet(10, 8.0, 12)), all[0].sets["bench"])
+        assertEquals("B", all[1].label) // the other workout is untouched
+        assertEquals(ExerciseState(9.0, 12, 3), repo.exerciseStates().first()["bench"])
+    }
+
+    @Test
     fun saveWorkoutAlsoSavesNextStates() = runTest {
         repo.putExerciseStates(mapOf("row" to ExerciseState(8.0)))
         repo.saveWorkout(workout(1_000), mapOf("bench" to ExerciseState(6.0, 11, 3)))

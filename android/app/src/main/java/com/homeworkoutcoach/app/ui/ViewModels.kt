@@ -55,6 +55,7 @@ import com.homeworkoutcoach.app.ui.week.ArrangePresenter
 import com.homeworkoutcoach.app.ui.week.ArrangeViewModel
 import com.homeworkoutcoach.app.ui.week.WeekPresenter
 import com.homeworkoutcoach.app.ui.week.WeekUi
+import com.homeworkoutcoach.app.ui.workout.WorkoutEditViewModel
 import com.homeworkoutcoach.app.ui.workout.WorkoutViewModel
 import com.homeworkoutcoach.engine.ConcernMapper
 import com.homeworkoutcoach.engine.KeywordSetParser
@@ -402,6 +403,9 @@ object Factories {
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }
+    }
+    fun workoutEdit(id: Long) = viewModelFactory {
+        initializer { app(this).let { WorkoutEditViewModel(id, it.library, it.planner, it.training, it.settings) } }
     }
     val TickHint = viewModelFactory {
         initializer { app(this).let { TickHintViewModel(it.settings) } }

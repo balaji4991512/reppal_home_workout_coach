@@ -71,10 +71,11 @@ fun WeekScreen(
     onStart: () -> Unit,
     onArrange: () -> Unit = {},
     onMakeUp: (Long) -> Unit = {},
+    onEditWorkout: (Long) -> Unit = {},
     vm: WeekViewModel = viewModel(factory = Factories.Week),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    ui?.let { WeekContent(it, onStart, vm::swap, onArrange, onMakeUp) }
+    ui?.let { WeekContent(it, onStart, vm::swap, onArrange, onMakeUp, onEditWorkout) }
 }
 
 /** This week [vWeek]: hero, the seven days at a glance, a card per training day, left-out note, planned volume. */
@@ -85,6 +86,7 @@ fun WeekContent(
     onSwap: (baseId: String, chosenId: String) -> Unit,
     onArrange: () -> Unit = {},
     onMakeUp: (Long) -> Unit = {},
+    onEditWorkout: (Long) -> Unit = {},
 ) {
     // Days the user opened; the next workout starts open.
     var open by rememberSaveable { mutableStateOf<List<Int>?>(null) }
@@ -111,6 +113,7 @@ fun WeekContent(
                     onSwapKey = { swapKey = if (swapKey == it) null else it },
                     onSwap = { base, to -> swapKey = null; onSwap(base, to) },
                     onMakeUp = onMakeUp,
+                    onEditWorkout = onEditWorkout,
                 )
             }
         }
@@ -234,6 +237,7 @@ private fun TrainingDay(
     onSwapKey: (String) -> Unit,
     onSwap: (String, String) -> Unit,
     onMakeUp: (Long) -> Unit,
+    onEditWorkout: (Long) -> Unit,
 ) {
     val c = AppTheme.colors
     val disc = when (day.status) {
@@ -272,6 +276,7 @@ private fun TrainingDay(
                 if (day.status == DayStatus.DONE || day.status == DayStatus.MADE_UP) {
                     day.madeUpOn?.let { Small("Not done on ${day.abbr}. Made up on $it.", Modifier.padding(bottom = 4.dp)) }
                     day.session?.let { SessionCard(it) }
+                    day.workoutId?.let { OutlineButton("Edit workout", { onEditWorkout(it) }, tint = c.accent) }
                 } else if (day.status == DayStatus.SKIPPED) {
                     Muted("This workout was not done on ${day.abbr}, so it is marked as skipped. You can still make it up before the week ends.")
                     OutlineButton("Make it up now", { onMakeUp(day.date.toEpochDay()) }, tint = c.accent)

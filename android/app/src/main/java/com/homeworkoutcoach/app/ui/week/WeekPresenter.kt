@@ -79,6 +79,8 @@ sealed interface WeekdayUi {
         val session: SessionCardUi?,
         /** For a made-up day, the weekday it was done on ("Wed"). */
         val madeUpOn: String? = null,
+        /** The saved workout for a done or made-up day, so it can be corrected. */
+        val workoutId: Long? = null,
     ) : WeekdayUi
 }
 
@@ -217,6 +219,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
                 },
                 missing = day.missing,
                 session = history?.let { SessionCards.card(lib, it) },
+                workoutId = history?.id,
                 madeUpOn = if (status == DayStatus.MADE_UP) madeUp[slot.date]?.let { lib.dayNames[dateOf(it).dayOfWeek.value - 1].take(3) } else null,
             )
         }

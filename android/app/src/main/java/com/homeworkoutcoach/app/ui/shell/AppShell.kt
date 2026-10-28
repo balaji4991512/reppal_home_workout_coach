@@ -92,6 +92,9 @@ private const val PRIVACY = "privacy"
 /** The workout page; "makeup" is the epoch day of a skipped workout being made up, or -1 for today's own. */
 private const val WORKOUT_PATTERN = "workout?makeup={makeup}"
 
+/** Correcting a saved workout, opened from the Week page or the Profile history. */
+private const val EDIT_WORKOUT = "edit-workout/{id}"
+
 /** Route of Rearrange days, opened from the Week page. */
 private const val ARRANGE = "arrange"
 
@@ -246,7 +249,16 @@ private fun AppNavHost(
         composable(Tab.Reflect.root) { HubScreen(Tab.Reflect, started, onOpen) }
         composable(Tab.Me.root) { me() }
         composable(Dest.Week.route) {
-            WeekScreen(onStart = { go(Dest.Workout) }, onArrange = { nav.navigate(ARRANGE) }, onMakeUp = onMakeUp)
+            WeekScreen(
+                onStart = { go(Dest.Workout) }, onArrange = { nav.navigate(ARRANGE) }, onMakeUp = onMakeUp,
+                onEditWorkout = { nav.navigate("edit-workout/$it") },
+            )
+        }
+        composable(
+            EDIT_WORKOUT,
+            arguments = listOf(androidx.navigation.navArgument("id") { type = androidx.navigation.NavType.LongType }),
+        ) { entry ->
+            com.homeworkoutcoach.app.ui.workout.WorkoutEditScreen(entry.arguments?.getLong("id") ?: 0L, onDone = { nav.popBackStack() })
         }
         composable(ARRANGE) { ArrangeScreen(onDone = { nav.popBackStack() }) }
         composable(Dest.Habits.route) {
@@ -348,6 +360,7 @@ private fun AppNavHost(
                 onSetup = { go(Dest.Setup) },
                 onWiped = { nav.navigate(Dest.Setup.route) { popUpTo(nav.graph.id) { inclusive = true } } },
                 onPrivacy = { nav.navigate(PRIVACY) },
+                onEditWorkout = { nav.navigate("edit-workout/$it") },
             )
         }
     }
