@@ -330,7 +330,7 @@ private fun DayHero(s: PlannerUi, modifier: Modifier = Modifier, onToday: () -> 
             Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 22.sp, lineHeight = 28.sp))
             Small(s.subtitle, color = c.mut)
             Text(s.summary, Modifier.padding(top = 8.dp), color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
-            if (!s.isToday) TextLink("Back to today", onToday)
+            if (!s.isToday) Chip("Back to today", false, onToday, Modifier.padding(top = 8.dp), small = true)
         }
         ProgressRing(fraction, size = 76.dp, stroke = 9.dp, track = c.bg.copy(alpha = 0.7f)) {
             Text(

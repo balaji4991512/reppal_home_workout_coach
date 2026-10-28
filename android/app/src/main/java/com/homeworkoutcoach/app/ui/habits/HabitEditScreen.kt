@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.habits
 
+import com.homeworkoutcoach.app.ui.components.DeleteAction
+import com.homeworkoutcoach.app.ui.components.FormButtons
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,7 +68,6 @@ fun HabitEditScreen(
     val s = st ?: return
     val d = s.draft
     val c = AppTheme.colors
-    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Page {
         H1(if (id == null) "New habit" else "Edit habit")
@@ -130,27 +131,17 @@ fun HabitEditScreen(
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
         PrimaryButton("Save", { vm.save(onDone) })
-
         if (id == null) {
-            OutlineButton("Cancel", onDone)
-        } else if (confirmDelete) {
-            Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bad.copy(alpha = 0.08f)).padding(14.dp)) {
-                Text("Delete ${d.name.ifBlank { "this habit" }} and all its history? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
-                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) { OutlineButton("Keep it", { confirmDelete = false }, compact = true) }
-                    Box(Modifier.weight(1f)) { OutlineButton("Delete", { vm.delete(onGone) }, tint = c.bad, compact = true) }
-                }
-            }
+            FormButtons(onDone)
         } else {
             // Cancel and Archive share a row; Delete sits well apart so it is not hit by accident.
-            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f)) { OutlineButton("Cancel", onDone, compact = true) }
-                Box(Modifier.weight(1f)) {
-                    OutlineButton(if (d.archived) "Bring back" else "Archive", { vm.setArchived(!d.archived, onGone) }, tint = c.accent, compact = true)
-                }
-            }
+            FormButtons(
+                onDone,
+                extraLabel = if (d.archived) "Bring back" else "Archive",
+                onExtra = { vm.setArchived(!d.archived, onGone) },
+            )
             if (!d.archived) Small("Archive hides a habit and keeps its history.", Modifier.padding(top = 8.dp))
-            OutlineButton("Delete habit", { confirmDelete = true }, Modifier.padding(top = 36.dp), tint = c.bad, compact = true)
+            DeleteAction("Delete habit", "Delete ${d.name.ifBlank { "this habit" }} and all its history? This can’t be undone.", { vm.delete(onGone) })
         }
     }
 }

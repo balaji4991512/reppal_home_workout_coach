@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.routines
 
+import com.homeworkoutcoach.app.ui.components.DeleteAction
+import com.homeworkoutcoach.app.ui.components.FormButtons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -72,7 +74,6 @@ fun RoutineEditScreen(
     val c = AppTheme.colors
     var newStep by rememberSaveable { mutableStateOf("") }
     var linkOpen by rememberSaveable { mutableStateOf<String?>(null) }
-    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     // Drag and drop: the step being dragged, how far it has moved, and where each step sits on screen.
     var dragging by remember { mutableStateOf<String?>(null) }
@@ -199,20 +200,12 @@ fun RoutineEditScreen(
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
         PrimaryButton("Save", { vm.save(onDone) })
-        TextLink("Cancel", onDone)
-
+        FormButtons(onDone)
         if (id != null) {
-            if (confirmDelete) {
-                Column(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp)) {
-                    Text("Delete ${d.name.ifBlank { "this routine" }} and the days you finished it? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
-                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) { PrimaryButton("Keep it", { confirmDelete = false }, alt = true, compact = true) }
-                        Box(Modifier.weight(1f)) { PrimaryButton("Delete", { vm.delete(onGone) }, compact = true) }
-                    }
-                }
-            } else {
-                TextLink("Delete routine", { confirmDelete = true })
-            }
+            DeleteAction(
+                "Delete routine", "Delete ${d.name.ifBlank { "this routine" }} and the days you finished it? This can’t be undone.",
+                { vm.delete(onGone) },
+            )
         }
     }
 }

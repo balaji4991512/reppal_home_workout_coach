@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.week
 
+import com.homeworkoutcoach.app.ui.components.FormButtons
+import com.homeworkoutcoach.app.ui.components.OutlineButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -321,7 +323,7 @@ fun ArrangeScreen(onDone: () -> Unit, vm: ArrangeViewModel = viewModel(factory =
         Small("Saving starts a fresh week from its first day. Your history and progress are kept.", Modifier.padding(top = 12.dp))
 
         PrimaryButton("Save", { if (ui.canSave) vm.save(onDone) }, alt = !ui.canSave)
-        if (!ui.isDefault) TextLink("Back to the plan's own days", vm::resetToDefault)
-        TextLink("Cancel", onDone)
+        if (!ui.isDefault) OutlineButton("Back to the plan's own days", vm::resetToDefault, tint = AppTheme.colors.accent)
+        FormButtons(onDone)
     }
 }

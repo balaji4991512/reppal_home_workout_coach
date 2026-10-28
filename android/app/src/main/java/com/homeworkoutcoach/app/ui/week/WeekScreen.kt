@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.week
 
+import com.homeworkoutcoach.app.ui.components.OutlineButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -92,7 +93,7 @@ fun WeekContent(
             }
         }
         Hairline()
-        TextLink("Rearrange days", onArrange)
+        OutlineButton("Rearrange days", onArrange, tint = AppTheme.colors.accent)
         if (ui.leftOut.isNotEmpty()) Muted("Left out because of what you told me: ${ui.leftOut.joinToString(", ")}.")
         PlannedVolume(ui.volume)
     }

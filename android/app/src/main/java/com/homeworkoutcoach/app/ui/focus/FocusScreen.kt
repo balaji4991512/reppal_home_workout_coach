@@ -245,7 +245,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
             )
             Row(Modifier.padding(top = 18.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(s.title, Modifier.weight(1f), color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
-                if (!s.isToday) TextLink("Back to today", vm::goToToday)
+                if (!s.isToday) Chip("Back to today", false, vm::goToToday, small = true)
             }
             if (s.sessions.isEmpty()) {
                 Small(if (s.isToday) "No sessions yet today." else "No sessions on this day.", Modifier.padding(top = 4.dp))

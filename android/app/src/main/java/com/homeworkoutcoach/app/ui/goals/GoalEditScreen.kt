@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.goals
 
+import com.homeworkoutcoach.app.ui.components.DeleteAction
+import com.homeworkoutcoach.app.ui.components.FormButtons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +60,6 @@ fun GoalEditScreen(
     val d = s.draft
     val c = AppTheme.colors
     var pickDate by rememberSaveable { mutableStateOf(false) }
-    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val weekEnd = Goals.endFor(EndPreset.THIS_WEEK, s.today)
     val monthEnd = Goals.endFor(EndPreset.THIS_MONTH, s.today)
     val thirty = Goals.endFor(EndPreset.THIRTY_DAYS, s.today)
@@ -129,21 +130,8 @@ fun GoalEditScreen(
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
         PrimaryButton("Save", { vm.save(onDone) })
-        TextLink("Cancel", onDone)
-
-        if (id != null) {
-            if (confirmDelete) {
-                Column(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp)) {
-                    Text("Delete this goal? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
-                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) { PrimaryButton("Keep it", { confirmDelete = false }, alt = true, compact = true) }
-                        Box(Modifier.weight(1f)) { PrimaryButton("Delete", { vm.delete(onDone) }, compact = true) }
-                    }
-                }
-            } else {
-                TextLink("Delete goal", { confirmDelete = true })
-            }
-        }
+        FormButtons(onDone)
+        if (id != null) DeleteAction("Delete goal", "Delete this goal? This can’t be undone.", { vm.delete(onDone) })
     }
 
     if (pickDate) {

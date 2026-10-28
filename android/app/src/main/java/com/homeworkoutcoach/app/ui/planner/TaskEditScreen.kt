@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.planner
 
+import com.homeworkoutcoach.app.ui.components.DeleteAction
+import com.homeworkoutcoach.app.ui.components.FormButtons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,7 +74,6 @@ private fun TaskForm(isNew: Boolean, vm: TaskEditViewModel, onDone: () -> Unit) 
     val today = LocalDate.now()
     var pickDate by rememberSaveable { mutableStateOf(false) }
     var picking by rememberSaveable { mutableStateOf(Picking.NONE) }
-    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Page {
         H1(if (isNew) "New task" else "Edit task")
@@ -129,21 +130,8 @@ private fun TaskForm(isNew: Boolean, vm: TaskEditViewModel, onDone: () -> Unit) 
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
         PrimaryButton(if (isNew) "Add task" else "Save", { vm.save(onDone) })
-        TextLink("Cancel", onDone)
-
-        if (isNew) {
-            // nothing to delete yet
-        } else if (confirmDelete) {
-            Column(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp)) {
-                Text("Delete this task? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) { PrimaryButton("Keep it", { confirmDelete = false }, alt = true, compact = true) }
-                    Box(Modifier.weight(1f)) { PrimaryButton("Delete", { vm.delete(onDone) }, compact = true) }
-                }
-            }
-        } else {
-            TextLink("Delete task", { confirmDelete = true })
-        }
+        FormButtons(onDone)
+        if (!isNew) DeleteAction("Delete task", "Delete this task? This can’t be undone.", { vm.delete(onDone) })
     }
 
     if (pickDate) {

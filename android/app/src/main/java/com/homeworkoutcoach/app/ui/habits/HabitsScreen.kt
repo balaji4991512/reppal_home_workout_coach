@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.habits
 
+import com.homeworkoutcoach.app.ui.components.Chip
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -89,7 +90,7 @@ fun HabitsScreen(
         Column(Modifier.padding(top = 22.dp)) {
             Text(s.title, color = AppTheme.colors.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
             Small(s.summary)
-            if (!s.isToday) TextLink("Back to today", vm::goToToday)
+            if (!s.isToday) Chip("Back to today", false, vm::goToToday, Modifier.padding(top = 8.dp), small = true)
             if (s.isFuture) Small("This day has not happened yet, so nothing can be ticked.", Modifier.padding(top = 6.dp))
         }
         if (s.isToday && s.today.isNotEmpty() && s.today.none { it.done }) TickHint(Modifier.padding(top = 14.dp))
@@ -100,7 +101,7 @@ fun HabitsScreen(
         }
         PrimaryButton("Add habit", onAdd)
         if (s.archived.isNotEmpty()) {
-            TextLink(if (showArchived) "Hide archived" else "Archived (${s.archived.size})", { showArchived = !showArchived })
+            Chip(if (showArchived) "Hide archived" else "Archived (${s.archived.size})", false, { showArchived = !showArchived }, Modifier.padding(top = 12.dp), small = true)
             if (showArchived) {
                 Hairline()
                 s.archived.forEach { row ->
@@ -190,6 +191,6 @@ fun TickHint(modifier: Modifier = Modifier, vm: TickHintViewModel = viewModel(fa
             Body("Tap the circle to mark a habit done", strong = true)
             Small("Tap the rest of the card to see its history.", color = c.fg)
         }
-        TextLink("Got it", vm::dismiss)
+        Chip("Got it", false, vm::dismiss, small = true)
     }
 }

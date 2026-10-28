@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.character
 
+import com.homeworkoutcoach.app.ui.components.DeleteAction
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,7 +47,6 @@ fun CharacterScreen(vm: CharacterViewModel = viewModel(factory = Factories.Chara
     var differently by rememberSaveable(s.reflection.differently) { mutableStateOf(s.reflection.differently) }
     var problem by rememberSaveable { mutableStateOf<String?>(null) }
     var saved by rememberSaveable { mutableStateOf(false) }
-    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Page {
         H1("Character")
@@ -91,15 +91,10 @@ fun CharacterScreen(vm: CharacterViewModel = viewModel(factory = Factories.Chara
             saved = problem == null
         }, alt = saved)
         if (s.reflection.hasEntry) {
-            if (confirmDelete) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Small("Delete this week’s reflection?", Modifier.weight(1f))
-                    TextLink("Keep it", { confirmDelete = false })
-                    TextLink("Delete", { confirmDelete = false; wentWell = ""; differently = ""; vm.deleteReflection() }, Modifier.padding(start = 16.dp))
-                }
-            } else {
-                TextLink("Delete this reflection", { confirmDelete = true })
-            }
+            DeleteAction(
+                "Delete this reflection", "Delete this week’s reflection?",
+                { wentWell = ""; differently = ""; vm.deleteReflection() }, gap = 24.dp,
+            )
         }
 
         if (s.earlier.isNotEmpty()) {

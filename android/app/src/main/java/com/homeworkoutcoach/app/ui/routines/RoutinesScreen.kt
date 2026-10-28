@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.routines
 
+import com.homeworkoutcoach.app.ui.components.OutlineButton
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,7 +72,7 @@ fun RoutinesScreen(
         Column(Modifier.padding(top = 22.dp)) {
             Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
             Small(s.summary)
-            if (!s.isToday) TextLink("Back to today", vm::goToToday)
+            if (!s.isToday) Chip("Back to today", false, vm::goToToday, Modifier.padding(top = 8.dp), small = true)
             if (s.isFuture) Small("This day has not happened yet, so nothing can be marked.", Modifier.padding(top = 6.dp))
         }
         s.routines.forEachIndexed { i, r ->
@@ -183,11 +184,11 @@ fun RoutineRunScreen(
                 Icon(AppIcons.Check, null, Modifier.size(22.dp), tint = c.ok)
                 Text("Done today", color = c.ok, style = AppTheme.type.bodyStrong)
             }
-            TextLink("Mark as not done", vm::undoFinish)
+            OutlineButton("Mark as not done", vm::undoFinish)
         } else {
             PrimaryButton("Finish", { if (s.canFinish) vm.finish(onClose) }, alt = !s.canFinish)
             if (!s.canFinish) Small("Tick every step to finish.", Modifier.padding(top = 8.dp))
         }
-        TextLink("Close", onClose)
+        OutlineButton("Close", onClose)
     }
 }

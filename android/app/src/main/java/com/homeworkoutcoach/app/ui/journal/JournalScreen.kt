@@ -1,5 +1,7 @@
 package com.homeworkoutcoach.app.ui.journal
 
+import com.homeworkoutcoach.app.ui.components.Chip
+import com.homeworkoutcoach.app.ui.components.DeleteAction
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -54,7 +56,6 @@ fun JournalScreen(vm: JournalViewModel = viewModel(factory = Factories.Journal))
     var improve by rememberSaveable(s.date, s.improve) { mutableStateOf(s.improve) }
     var problem by rememberSaveable(s.date) { mutableStateOf<String?>(null) }
     var saved by rememberSaveable(s.date) { mutableStateOf(false) }
-    var confirmDelete by rememberSaveable(s.date) { mutableStateOf(false) }
 
     Page {
         val today = LocalDate.now()
@@ -68,7 +69,7 @@ fun JournalScreen(vm: JournalViewModel = viewModel(factory = Factories.Journal))
         Column(Modifier.padding(top = 22.dp)) {
             Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
             Small(s.subtitle)
-            if (!s.isToday) TextLink("Back to today", vm::goToToday)
+            if (!s.isToday) Chip("Back to today", false, vm::goToToday, Modifier.padding(top = 8.dp), small = true)
         }
         Muted(s.summary, Modifier.padding(top = 4.dp))
 
@@ -88,17 +89,7 @@ fun JournalScreen(vm: JournalViewModel = viewModel(factory = Factories.Journal))
             saved = problem == null
         }, alt = saved)
 
-        if (s.hasEntry) {
-            if (confirmDelete) {
-                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Small("Delete this day’s entry?", Modifier.weight(1f))
-                    TextLink("Keep it", { confirmDelete = false })
-                    TextLink("Delete", { confirmDelete = false; vm.delete() }, Modifier.padding(start = 16.dp))
-                }
-            } else {
-                TextLink("Delete this entry", { confirmDelete = true })
-            }
-        }
+        if (s.hasEntry) DeleteAction("Delete this entry", "Delete this day’s entry?", { vm.delete() }, gap = 24.dp)
 
         if (s.past.isNotEmpty()) {
             H2("Earlier", top = 32.dp)

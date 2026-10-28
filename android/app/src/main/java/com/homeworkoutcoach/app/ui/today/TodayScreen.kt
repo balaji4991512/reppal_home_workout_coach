@@ -110,13 +110,13 @@ fun TodayScreen(
         } else if (!s.hasHabits) {
             Section("Habits", null, {})
             Muted("Track the things you want to do every day or every week.")
-            TextLink("Add a habit", onAddHabit)
+            Chip("Add a habit", false, onAddHabit, small = true)
         }
 
         Section("Tasks", "Planner", onPlanner)
         if (s.tasks.tasks.isEmpty() && s.tasks.carriedOver.isEmpty()) {
             Muted("Nothing planned for today.")
-            TextLink("Add a task", onPlanner)
+            Chip("Add a task", false, onPlanner, small = true)
         } else {
             s.tasks.tasks.forEachIndexed { i, row ->
                 key(row.id) { TaskCard(row, onTick = { vm.toggleTask(row.id) }, onOpen = { onOpenTask(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) }, enter = i) }
@@ -251,7 +251,7 @@ private fun WorkoutCard(card: WorkoutCardUi, onStart: () -> Unit, onSetup: () ->
             is WorkoutCardUi.Rest -> {
                 Body("Rest day", strong = true)
                 Small("Next up: ${card.nextTitle} on ${card.nextDay}")
-                if (card.canStart) TextLink("Start it anyway", onStart)
+                if (card.canStart) Chip("Start it anyway", false, onStart, Modifier.padding(top = 8.dp), small = true)
             }
         }
     }
