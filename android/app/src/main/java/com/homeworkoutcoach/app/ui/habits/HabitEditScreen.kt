@@ -38,6 +38,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.homeworkoutcoach.app.ui.Factories
 import com.homeworkoutcoach.app.ui.components.Chip
 import com.homeworkoutcoach.app.ui.components.Chips
+import com.homeworkoutcoach.app.ui.components.OutlineButton
 import com.homeworkoutcoach.app.ui.components.Field
 import com.homeworkoutcoach.app.ui.components.H1
 import com.homeworkoutcoach.app.ui.components.Muted
@@ -79,10 +80,7 @@ fun HabitEditScreen(
         Field(d.name, { v -> vm.edit { it.copy(name = v) } }, "For example, Drink water")
 
         Label("Icon")
-        IconPicker(d.icon, d.color) { v -> vm.edit { it.copy(icon = v) } }
-
-        Label("Colour")
-        ColorPicker(d.color) { v -> vm.edit { it.copy(color = v) } }
+        IconPicker(d.icon, d.color) { v -> vm.edit { it.copy(icon = v, color = HabitStyles.colorFor(v)) } }
 
         Label("How do you track it?")
         Chips {
@@ -132,20 +130,25 @@ fun HabitEditScreen(
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
         PrimaryButton("Save", { vm.save(onDone) })
-        TextLink("Cancel", onDone)
+        OutlineButton("Cancel", onDone)
 
         if (id != null) {
             if (confirmDelete) {
-                Column(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp)) {
+                Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bad.copy(alpha = 0.08f)).padding(14.dp)) {
                     Text("Delete ${d.name.ifBlank { "this habit" }} and all its history? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
-                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) { PrimaryButton("Keep it", { confirmDelete = false }, alt = true, compact = true) }
-                        Box(Modifier.weight(1f)) { PrimaryButton("Delete", { vm.delete(onGone) }, compact = true) }
+                    Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.weight(1f)) { OutlineButton("Keep it", { confirmDelete = false }, compact = true) }
+                        Box(Modifier.weight(1f)) { OutlineButton("Delete", { vm.delete(onGone) }, tint = c.bad, compact = true) }
                     }
                 }
             } else {
-                TextLink(if (d.archived) "Bring this habit back" else "Archive (hides it, keeps its history)", { vm.setArchived(!d.archived, onGone) })
-                TextLink("Delete habit", { confirmDelete = true })
+                OutlineButton(
+                    if (d.archived) "Bring this habit back" else "Archive",
+                    { vm.setArchived(!d.archived, onGone) },
+                    tint = c.accent,
+                )
+                if (!d.archived) Small("Hides it from your lists and keeps its history.", Modifier.padding(top = 6.dp))
+                OutlineButton("Delete habit", { confirmDelete = true }, tint = c.bad)
             }
         }
     }
@@ -175,21 +178,3 @@ private fun IconPicker(selected: String, color: String, onPick: (String) -> Unit
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ColorPicker(selected: String, onPick: (String) -> Unit) {
-    val c = AppTheme.colors
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HabitStyles.colors.forEach { key ->
-            val on = key == selected
-            Box(
-                Modifier.size(44.dp).clip(CircleShape)
-                    .border(if (on) BorderStroke(2.dp, c.fg) else BorderStroke(0.dp, c.bg), CircleShape)
-                    .clickable(role = Role.RadioButton) { onPick(key) }
-                    .semantics { this.selected = on; contentDescription = "Colour $key" }
-                    .padding(5.dp),
-                contentAlignment = Alignment.Center,
-            ) { Box(Modifier.size(32.dp).clip(CircleShape).background(HabitLook.color(key))) }
-        }
-    }
-}

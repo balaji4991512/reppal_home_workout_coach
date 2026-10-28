@@ -158,6 +158,35 @@ fun PrimaryButton(
     }
 }
 
+/**
+ * A full-width button with a coloured outline and text, for the quieter actions on a form. [tint] is the outline and
+ * text colour (red for something that deletes); a soft wash of it fills the button.
+ */
+@Composable
+fun OutlineButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = AppTheme.colors.fg,
+    compact: Boolean = false,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier
+            .padding(top = if (compact) 0.dp else 12.dp)
+            .fillMaxWidth()
+            .heightIn(min = if (compact) 44.dp else 52.dp)
+            .clip(shape)
+            .background(tint.copy(alpha = 0.07f))
+            .border(BorderStroke(1.dp, tint.copy(alpha = 0.55f)), shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(if (compact) 10.dp else 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = tint, style = if (compact) AppTheme.type.bodyStrong.copy(fontSize = 15.sp) else AppTheme.type.bodyStrong)
+    }
+}
+
 @Composable
 fun Field(
     value: String,

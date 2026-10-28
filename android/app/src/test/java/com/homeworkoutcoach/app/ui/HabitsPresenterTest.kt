@@ -109,6 +109,19 @@ class HabitsPresenterTest {
     }
 
     @Test
+    fun everyIconHasAColourThatSuitsItSoNobodyHasToPickOne() {
+        HabitStyles.icons.forEach { assertTrue("$it has no colour", HabitStyles.colorFor(it) in HabitStyles.colors) }
+        assertEquals("blue", HabitStyles.colorFor("drop"))
+        assertEquals("orange", HabitStyles.colorFor("dumbbell"))
+        assertEquals(HabitStyles.DEFAULT_COLOR, HabitStyles.colorFor("something-new"))
+        // the named starting habits already agree with this
+        listOf("Water", "Workout", "Reading", "Walking").forEach { n ->
+            val (icon, color) = HabitStyles.forName(n)
+            assertEquals(n, color, HabitStyles.colorFor(icon))
+        }
+    }
+
+    @Test
     fun summaryReadsGently() {
         val journal = storedHabit("journal", name = "Journal")
         val water = storedHabit("water", kind = HabitKind.COUNT, target = 8)

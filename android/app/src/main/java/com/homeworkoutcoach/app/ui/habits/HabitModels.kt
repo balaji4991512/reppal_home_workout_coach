@@ -381,5 +381,16 @@ object HabitStyles {
         "Walking" to ("walk" to "green"),
     )
 
+    /** The colour that goes with an icon, so a habit's tint always suits its emoji and nobody has to choose one. */
+    fun colorFor(icon: String): String = iconColors[icon] ?: DEFAULT_COLOR
+
+    private val iconColors = mapOf(
+        "check" to "blue", "drop" to "blue", "moon" to "purple", "sun" to "amber", "book" to "green", "pen" to "teal",
+        "dumbbell" to "orange", "walk" to "green", "lotus" to "pink", "heart" to "red", "star" to "amber", "list" to "blue",
+        "bolt" to "orange", "shower" to "teal", "run" to "orange", "apple" to "red", "sleep" to "purple", "tooth" to "teal",
+        "pill" to "pink", "broom" to "green", "brain" to "purple", "money" to "green", "music" to "pink", "plant" to "green",
+        "phone" to "red",
+    )
+
     fun forName(name: String): Pair<String, String> = named[name] ?: (DEFAULT_ICON to DEFAULT_COLOR)
 }
