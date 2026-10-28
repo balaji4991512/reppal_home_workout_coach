@@ -97,7 +97,7 @@ object FocusNotifications {
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = listOfNotNull(session.taskTitle, "${session.actualMinutes} minutes").joinToString(" · ")
+        val text = listOfNotNull(session.taskTitle, if (session.actualMinutes == 1) "1 minute" else "${session.actualMinutes} minutes").joinToString(" · ")
         val notification = android.app.Notification.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Focus session finished")
