@@ -293,14 +293,22 @@ fun PillTabs(options: List<String>, selected: Int, modifier: Modifier = Modifier
 
 /** A round progress meter: [fraction] of the ring is filled, with [content] in the middle. */
 @Composable
-fun ProgressRing(fraction: Float, modifier: Modifier = Modifier, size: Dp = 88.dp, stroke: Dp = 9.dp, content: @Composable () -> Unit) {
+fun ProgressRing(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    size: Dp = 88.dp,
+    stroke: Dp = 9.dp,
+    /** The unfilled part; on a tinted card a white wash reads better than the default lavender. */
+    track: Color = AppTheme.colors.accentSoft,
+    content: @Composable () -> Unit,
+) {
     val c = AppTheme.colors
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = stroke.toPx()
             val topLeft = Offset(w / 2, w / 2)
             val arc = Size(this.size.width - w, this.size.height - w)
-            drawArc(c.accentSoft, 0f, 360f, false, topLeft, arc, style = Stroke(w))
+            drawArc(track, 0f, 360f, false, topLeft, arc, style = Stroke(w))
             if (fraction > 0f) drawArc(c.accent, -90f, 360f * fraction.coerceIn(0f, 1f), false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
         }
         content()

@@ -1,6 +1,18 @@
 package com.homeworkoutcoach.app.ui.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.homeworkoutcoach.app.ui.Factories
+import com.homeworkoutcoach.app.ui.components.ProgressRing
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +43,6 @@ import androidx.compose.ui.unit.sp
 import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.ThemeMode
 import com.homeworkoutcoach.app.data.UserSettings
-import com.homeworkoutcoach.app.ui.Copy
 import com.homeworkoutcoach.app.ui.components.Body
 import com.homeworkoutcoach.app.ui.components.Chip
 import com.homeworkoutcoach.app.ui.components.H1
@@ -74,64 +85,107 @@ fun BottomBar(selected: Tab?, onSelect: (Tab) -> Unit) {
     }
 }
 
-/** A tab's page: a card for each of its pages. [header] goes above the cards. */
+/** A tab's page: a hero with today's number, then a card for each page with what is happening there. [header] goes above the cards. */
 @Composable
 fun HubScreen(tab: Tab, started: Boolean, onOpen: (String) -> Unit, header: @Composable ColumnScope.() -> Unit = {}) {
     val c = AppTheme.colors
+    val vm: HubViewModel = viewModel(factory = Factories.Hub)
+    val all by vm.ui.collectAsStateWithLifecycle()
+    val ui = all?.get(tab)
+    val tints = listOf(c.accentSoft, c.tintMint, c.tintPeach, c.tintRose)
     Page {
         H1(tab.label)
         Muted(tab.tagline)
+        ui?.hero?.let { HeroCard(it, Modifier.padding(top = 14.dp)) }
         header()
         val waiting = !started && tab.pages.any { it.needsPlan }
         if (waiting) {
-            Column(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(16.dp)) {
+            Column(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft).padding(16.dp)) {
                 Body("Set up your plan first", strong = true)
                 Small("Tell Wick what equipment you have and these pages open.")
                 PrimaryButton("Set up my plan", { onOpen("setup") })
             }
         }
-        tab.pages.filter { started || !it.needsPlan }.forEach { PageCard(it, onOpen) }
+        tab.pages.filter { started || !it.needsPlan }.forEachIndexed { i, page ->
+            key(page.route) { PageCard(page, ui?.lines?.get(page.route), tints[i % tints.size], i, onOpen) }
+        }
     }
 }
 
+/** The hub's big number in a ring, on the lavender-to-peach wash. */
 @Composable
-private fun PageCard(page: HubPage, onOpen: (String) -> Unit) {
+private fun HeroCard(hero: HubHeroUi, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    val fraction by animateFloatAsState(hero.fraction ?: 0f, tween(700), label = "hubRing")
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 500f)))
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        ProgressRing(fraction, size = 92.dp, stroke = 10.dp, track = c.bg.copy(alpha = 0.7f)) {
+            Text(
+                hero.big, color = c.fg, textAlign = TextAlign.Center,
+                style = AppTheme.type.tabular(AppTheme.type.h2.copy(fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)),
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            Text(hero.label, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 19.sp, lineHeight = 25.sp))
+            hero.sub?.let { Text(it, Modifier.padding(top = 4.dp), color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold)) }
+        }
+    }
+}
+
+/** A page's card: a tinted icon, its name, what is happening there now (or what it is for), and a chevron. */
+@Composable
+private fun PageCard(page: HubPage, line: String?, tint: Color, index: Int, onOpen: (String) -> Unit) {
     val c = AppTheme.colors
     Row(
-        Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft)
+        Modifier.fadeLiftIn(index * 60).padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft)
             .clickable(role = Role.Button) { onOpen(page.route) }.padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(c.accs), contentAlignment = Alignment.Center) {
-            Icon(page.icon, null, Modifier.size(22.dp), tint = c.fg)
+        Box(Modifier.size(48.dp).clip(CircleShape).background(tint), contentAlignment = Alignment.Center) {
+            Icon(page.icon, null, Modifier.size(24.dp), tint = c.fg)
         }
         Column(Modifier.weight(1f)) {
             Body(page.label, strong = true)
-            Small(page.blurb)
+            if (line != null) Text(line, color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
+            else Small(page.blurb)
         }
         Icon(AppIcons.Forward, null, Modifier.size(18.dp), tint = c.mut)
     }
 }
 
-/** What the old side menu kept at its foot: who you are, the plan in a line, the theme and signing in or out. */
+/** Who you are and the plan in a line, with signing in or out; then the theme. */
 @Composable
 fun MeHeader(settings: UserSettings, account: Account?, onTheme: (ThemeMode) -> Unit, onAccount: () -> Unit) {
     val c = AppTheme.colors
-    Column(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(16.dp)) {
-        Body(settings.name.ifBlank { "Your plan" }, strong = true)
-        Small(account?.email ?: "Guest")
-        Small(
-            if (settings.started) "${Copy.levelName(settings.level)}, ${Copy.count(settings.daysPerWeek, "day")} a week"
-            else "Set up your plan to begin.",
-        )
-        Row(
-            Modifier.padding(top = 14.dp).clip(RoundedCornerShape(10.dp)).clickable(role = Role.Button, onClick = onAccount).heightIn(min = 44.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(AppIcons.SignInOut, null, Modifier.size(20.dp), tint = c.mut)
-            Text(if (account == null) "Sign in" else "Sign out", color = c.fg, style = AppTheme.type.label)
+    val initial = settings.name.trim().firstOrNull()?.uppercase() ?: "W"
+    Row(
+        Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp))
+            .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 500f)))
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(Modifier.size(64.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+            Text(initial, color = c.onAccent, style = AppTheme.type.h1.copy(fontSize = 28.sp, lineHeight = 32.sp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(settings.name.ifBlank { "Your plan" }, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp, lineHeight = 26.sp))
+            Small(account?.email ?: "Guest on this phone")
+            Row(
+                Modifier.padding(top = 6.dp).clip(RoundedCornerShape(99.dp)).background(c.bg.copy(alpha = 0.75f))
+                    .clickable(role = Role.Button, onClick = onAccount).heightIn(min = 40.dp).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(AppIcons.SignInOut, null, Modifier.size(18.dp), tint = c.fg)
+                Text(if (account == null) "Sign in" else "Sign out", color = c.fg, style = AppTheme.type.label)
+            }
         }
     }
     H2("Appearance", top = 24.dp)

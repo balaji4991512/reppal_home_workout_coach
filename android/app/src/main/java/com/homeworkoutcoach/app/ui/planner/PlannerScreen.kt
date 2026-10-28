@@ -354,7 +354,7 @@ private fun DayHero(s: PlannerUi, modifier: Modifier = Modifier, onToday: () -> 
             Text(s.summary, Modifier.padding(top = 8.dp), color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
             if (!s.isToday) TextLink("Back to today", onToday)
         }
-        ProgressRing(fraction, size = 76.dp, stroke = 9.dp) {
+        ProgressRing(fraction, size = 76.dp, stroke = 9.dp, track = c.bg.copy(alpha = 0.7f)) {
             Text(
                 if (total == 0) "–" else "$done/$total", color = c.fg,
                 style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold)),
