@@ -18,6 +18,7 @@ import com.homeworkoutcoach.engine.PlannedExercise
 import com.homeworkoutcoach.engine.Routine
 import com.homeworkoutcoach.engine.RoutineItem
 import com.homeworkoutcoach.engine.Task
+import com.homeworkoutcoach.engine.WeeklyReflection
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -34,8 +35,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions (older files still restore). */
-    const val FORMAT = 7
+    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections (older files still restore). */
+    const val FORMAT = 8
 
     @Serializable
     data class File(
@@ -60,6 +61,8 @@ object DataExport {
         val goals: List<GoalDto>? = null,
         /** Null in files from before the focus timer existed; restoring such a file leaves the phone's sessions alone. */
         val focus: List<FocusDto>? = null,
+        /** Null in files from before weekly reflections existed; restoring such a file leaves the phone's alone. */
+        val reflections: List<ReflectionDto>? = null,
     )
 
     @Serializable
@@ -165,6 +168,10 @@ object DataExport {
         val task: String? = null,
     )
 
+    /** [week] is the Monday of the week (2026-10-26). */
+    @Serializable
+    data class ReflectionDto(val week: String, val wentWell: String = "", val differently: String = "")
+
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
@@ -187,6 +194,7 @@ object DataExport {
         journal: List<JournalEntry> = emptyList(),
         goals: List<Goal> = emptyList(),
         focus: List<FocusSession> = emptyList(),
+        reflections: List<WeeklyReflection> = emptyList(),
     ): String {
         val planner = Planner(lib)
         fun iso(ms: Long) = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -247,6 +255,7 @@ object DataExport {
                 )
             },
             journal = journal.sortedBy { it.date }.map { JournalDto(it.date.toString(), it.win, it.improve) },
+            reflections = reflections.sortedBy { it.weekStart }.map { ReflectionDto(it.weekStart.toString(), it.wentWell, it.differently) },
             focus = focus.sortedBy { it.startMillis }.map {
                 FocusDto(it.id, iso(it.startMillis), it.plannedMinutes, it.actualMinutes, it.completed, it.taskTitle)
             },
@@ -281,6 +290,8 @@ data class Restore(
     val goals: List<Goal>?,
     /** Null when the file predates the focus timer: the phone's sessions stay as they are. */
     val focus: List<FocusSession>?,
+    /** Null when the file predates weekly reflections: the phone's stay as they are. */
+    val reflections: List<WeeklyReflection>?,
     val exportedAt: Long,
 )
 
@@ -338,6 +349,7 @@ object DataImport {
                     tasks = file.tasks?.map(::task),
                     routines = file.routines?.map(::routine),
                     journal = file.journal?.map { JournalEntry(LocalDate.parse(it.date), it.win, it.improve) },
+                    reflections = file.reflections?.map { WeeklyReflection(LocalDate.parse(it.week), it.wentWell, it.differently) },
                     focus = file.focus?.map { f -> FocusSession(f.id, millis(f.start), f.plannedMinutes, f.actualMinutes, f.completed, f.task) },
                     goals = file.goals?.map { g ->
                         Goal(
@@ -417,6 +429,7 @@ class DataImporter(
     private val journal: JournalRepository? = null,
     private val goals: GoalRepository? = null,
     private val focus: FocusRepository? = null,
+    private val reflections: ReflectionRepository? = null,
 ) {
     suspend fun restore(r: Restore) {
         training.wipe()
@@ -463,6 +476,11 @@ class DataImporter(
             focus.wipe()
             r.focus.forEach { focus.save(it) }
         }
+        // And for a file from before weekly reflections.
+        if (r.reflections != null && reflections != null) {
+            reflections.wipe()
+            r.reflections.forEach { reflections.save(it) }
+        }
         // Keep how the user is signed in on this phone; everything else comes from the file.
         settings.update { now -> r.settings.copy(guest = now.guest, activeFocus = now.activeFocus) }
     }
@@ -482,6 +500,7 @@ class DataExporter(
     private val journal: JournalRepository? = null,
     private val goals: GoalRepository? = null,
     private val focus: FocusRepository? = null,
+    private val reflections: ReflectionRepository? = null,
 ) {
     data class Result(
         val json: String,
@@ -493,6 +512,7 @@ class DataExporter(
         val journal: Int = 0,
         val goals: Int = 0,
         val focus: Int = 0,
+        val reflections: Int = 0,
     )
 
     suspend fun export(appName: String, nowMillis: Long = System.currentTimeMillis()): Result {
@@ -510,10 +530,14 @@ class DataExporter(
         val journalList = journal?.entries()?.first().orEmpty()
         val goalList = goals?.goals()?.first().orEmpty()
         val focusList = focus?.sessions()?.first().orEmpty()
+        val reflectionList = reflections?.reflections()?.first().orEmpty()
         val text = DataExport.build(
             lib, appName, settings.settings.first(), training.exerciseStates().first(), training.swaps().first(),
-            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData, journalList, goalList, focusList,
+            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData, journalList, goalList, focusList, reflectionList,
         )
-        return Result(text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size, journalList.size, goalList.size, focusList.size)
+        return Result(
+            text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size, journalList.size, goalList.size,
+            focusList.size, reflectionList.size,
+        )
     }
 }

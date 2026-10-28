@@ -147,17 +147,20 @@ object Habits {
     /**
      * Done against due from the start date (or [from]) to [today]. Fixed schedules count the days that were due and
      * over (today counts only if done). A times-a-week habit counts N for each finished week and, for the week in
-     * progress, only what is already done, so it is never behind before the week ends.
+     * progress, only what is already done, so it is never behind before the week ends. [until] stops the count earlier,
+     * for a period that has already ended (a past week), whose last day is then counted like any other.
      */
-    fun stats(habit: Habit, log: HabitLog, from: LocalDate, today: LocalDate): HabitStats {
+    fun stats(habit: Habit, log: HabitLog, from: LocalDate, today: LocalDate, until: LocalDate = today): HabitStats {
         val start = maxOf(from, habit.startDate)
-        if (start > today) return HabitStats(0, 0)
+        // Only days up to [until] are counted; days before [today] count as over, and [today] only if done.
+        val end = minOf(until, today)
+        if (start > end) return HabitStats(0, 0)
         val schedule = habit.schedule
         if (schedule !is HabitSchedule.TimesPerWeek) {
             var done = 0
             var due = 0
             var day = start
-            while (day <= today) {
+            while (day <= end) {
                 val doneToday = isDone(habit, log, day)
                 if (doneToday) done++
                 // A day done on a non-scheduled day still counts as due, so done never passes due.
@@ -169,8 +172,8 @@ object Habits {
         var done = 0
         var due = 0
         var week = weekStart(start)
-        while (week <= today) {
-            val days = (0L..6L).map { week.plusDays(it) }.filter { it >= start && it <= today }
+        while (week <= end) {
+            val days = (0L..6L).map { week.plusDays(it) }.filter { it >= start && it <= end }
             val inWeek = days.count { isDone(habit, log, it) }
             val counted = minOf(inWeek, schedule.times)
             val last = week.plusDays(6)

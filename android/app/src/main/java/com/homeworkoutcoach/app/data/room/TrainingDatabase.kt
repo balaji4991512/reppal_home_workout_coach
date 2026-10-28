@@ -168,6 +168,14 @@ data class FocusSessionEntity(
     val taskTitle: String?,
 )
 
+/** A weekly reflection. [weekStartEpochDay] is the Monday of the week, a local calendar day. */
+@Entity(tableName = "weekly_reflection")
+data class WeeklyReflectionEntity(
+    @PrimaryKey val weekStartEpochDay: Long,
+    val wentWell: String,
+    val differently: String,
+)
+
 @Dao
 interface ExerciseStateDao {
     @Query("SELECT * FROM exercise_state")
@@ -327,6 +335,21 @@ interface FocusDao {
 }
 
 @Dao
+interface ReflectionDao {
+    @Query("SELECT * FROM weekly_reflection ORDER BY weekStartEpochDay DESC")
+    fun observeAll(): Flow<List<WeeklyReflectionEntity>>
+
+    @Upsert
+    suspend fun upsert(reflection: WeeklyReflectionEntity)
+
+    @Query("DELETE FROM weekly_reflection WHERE weekStartEpochDay = :weekStartEpochDay")
+    suspend fun delete(weekStartEpochDay: Long)
+
+    @Query("DELETE FROM weekly_reflection")
+    suspend fun clear()
+}
+
+@Dao
 interface GoalDao {
     @Query("SELECT * FROM goal ORDER BY endEpochDay, startEpochDay, id")
     fun observeAll(): Flow<List<GoalEntity>>
@@ -361,15 +384,17 @@ interface JournalDao {
         ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class,
         HabitEntity::class, HabitEntryEntity::class, TaskEntity::class,
         RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class, GoalEntity::class, FocusSessionEntity::class,
+        WeeklyReflectionEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added.
+    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8),
+        AutoMigration(from = 8, to = 9),
     ],
 )
 abstract class TrainingDatabase : RoomDatabase() {
@@ -383,6 +408,7 @@ abstract class TrainingDatabase : RoomDatabase() {
     abstract fun journal(): JournalDao
     abstract fun goals(): GoalDao
     abstract fun focus(): FocusDao
+    abstract fun reflections(): ReflectionDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =

@@ -18,6 +18,10 @@ data class ActiveFocus(val startMillis: Long, val plannedMinutes: Int, val taskT
     fun toRun() = com.homeworkoutcoach.engine.FocusRun(startMillis, plannedMinutes, taskTitle)
 }
 
+/** The quality picked for the week that starts on [weekStartEpochDay] (a Monday). A new week goes back to the suggestion. */
+@Serializable
+data class CharacterFocus(val weekStartEpochDay: Long, val quality: String)
+
 /** Everything set up on the "Plan settings" screen, plus app state that is not history. */
 @Serializable
 data class UserSettings(
@@ -53,6 +57,8 @@ data class UserSettings(
     val sessionWeekdays: List<Int>? = null,
     /** The focus timer, while one is running. */
     val activeFocus: ActiveFocus? = null,
+    /** The quality chosen for this week on the Character screen, if the person changed the suggestion. */
+    val characterFocus: CharacterFocus? = null,
 ) {
     fun equipment(): Equipment = Equipment(bench, dumbbellsKg.toSet())
 

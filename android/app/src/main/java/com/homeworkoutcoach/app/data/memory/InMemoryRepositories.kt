@@ -10,6 +10,7 @@ import com.homeworkoutcoach.app.data.FocusRepository
 import com.homeworkoutcoach.app.data.GoalRepository
 import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.JournalRepository
+import com.homeworkoutcoach.app.data.ReflectionRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
@@ -26,6 +27,7 @@ import com.homeworkoutcoach.engine.Routine
 import com.homeworkoutcoach.engine.RoutineDone
 import com.homeworkoutcoach.engine.Routines
 import com.homeworkoutcoach.engine.Task
+import com.homeworkoutcoach.engine.WeeklyReflection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -244,6 +246,22 @@ class InMemoryFocusRepository : FocusRepository {
     }
 
     override suspend fun delete(id: String) = state.update { list -> list.filterNot { it.id == id } }
+
+    override suspend fun wipe() {
+        state.value = emptyList()
+    }
+}
+
+class InMemoryReflectionRepository : ReflectionRepository {
+    private val state = MutableStateFlow<List<WeeklyReflection>>(emptyList())
+
+    override fun reflections(): Flow<List<WeeklyReflection>> = state
+
+    override suspend fun save(reflection: WeeklyReflection) = state.update { list ->
+        (list.filterNot { it.weekStart == reflection.weekStart } + reflection).sortedByDescending { it.weekStart }
+    }
+
+    override suspend fun delete(weekStart: LocalDate) = state.update { list -> list.filterNot { it.weekStart == weekStart } }
 
     override suspend fun wipe() {
         state.value = emptyList()

@@ -151,6 +151,16 @@ class HabitsTest {
     }
 
     @Test
+    fun aPastPeriodCountsItsLastDayLikeAnyOther() {
+        val h = habit(start = mon.minusDays(30))
+        // the week Mon..Sun before this one, nothing done on its Sunday: 6 of 7, with today well after it
+        val log = ticks(-7, -6, -5, -4, -3, -2)
+        assertEquals(HabitStats(6, 7), Habits.stats(h, log, day(-7), day(2), until = day(-1)))
+        // without [until] the range runs to today, which is not counted as missed
+        assertEquals(HabitStats(6, 9), Habits.stats(h, log, day(-7), day(2)))
+    }
+
+    @Test
     fun doneDaysCountsARange() {
         assertEquals(2, Habits.doneDays(habit(), ticks(0, 3), day(0), day(6)))
         assertEquals(1, Habits.doneDays(habit(), ticks(0, 3), day(1), day(6)))

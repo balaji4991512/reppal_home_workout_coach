@@ -6,6 +6,7 @@ import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.FocusRepository
 import com.homeworkoutcoach.app.data.GoalRepository
+import com.homeworkoutcoach.app.data.ReflectionRepository
 import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
@@ -21,6 +22,7 @@ import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.room.RoomBodyRepository
 import com.homeworkoutcoach.app.data.room.RoomFocusRepository
 import com.homeworkoutcoach.app.data.room.RoomGoalRepository
+import com.homeworkoutcoach.app.data.room.RoomReflectionRepository
 import com.homeworkoutcoach.app.data.room.RoomHabitRepository
 import com.homeworkoutcoach.app.data.room.RoomJournalRepository
 import com.homeworkoutcoach.app.data.room.RoomRoutineRepository
@@ -47,12 +49,13 @@ class AppContainer(private val context: Context) {
     val journal: JournalRepository by lazy { RoomJournalRepository(database) }
     val goals: GoalRepository by lazy { RoomGoalRepository(database) }
     val focus: FocusRepository by lazy { RoomFocusRepository(database) }
+    val reflections: ReflectionRepository by lazy { RoomReflectionRepository(database) }
     val focusSessions: FocusSessions by lazy { FocusSessions(settings, focus, AndroidFocusAlarms(context)) }
     val concerns: ConcernMapper by lazy { KeywordConcernMapper(library) }
-    val actions: PlanActions by lazy { PlanActions(settings, training, concerns, body, habits, tasks, routines, journal, goals, focus) }
+    val actions: PlanActions by lazy { PlanActions(settings, training, concerns, body, habits, tasks, routines, journal, goals, focus, reflections) }
     val auth: AuthRepository by lazy { FirebaseAuthRepository(context) }
-    val exporter: DataExporter by lazy { DataExporter(library, settings, training, body, auth, habits = habits, tasks = tasks, routines = routines, journal = journal, goals = goals, focus = focus) }
-    val importer: DataImporter by lazy { DataImporter(settings, training, body, habits, tasks, routines, journal, goals, focus) }
+    val exporter: DataExporter by lazy { DataExporter(library, settings, training, body, auth, habits = habits, tasks = tasks, routines = routines, journal = journal, goals = goals, focus = focus, reflections = reflections) }
+    val importer: DataImporter by lazy { DataImporter(settings, training, body, habits, tasks, routines, journal, goals, focus, reflections) }
 }
 
 class HomeWorkoutCoachApp : Application() {
