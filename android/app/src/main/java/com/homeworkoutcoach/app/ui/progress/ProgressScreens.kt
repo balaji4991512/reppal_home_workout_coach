@@ -48,18 +48,32 @@ import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 
 @Composable
-fun ProgressScreen(onOpen: (String) -> Unit, vm: ProgressViewModel = viewModel(factory = Factories.Progress)) {
+fun ProgressScreen(
+    onOpen: (String) -> Unit,
+    vm: ProgressViewModel = viewModel(factory = Factories.Progress),
+    overviewVm: OverviewViewModel = viewModel(factory = Factories.Overview),
+) {
     val workouts by vm.workouts.collectAsStateWithLifecycle()
+    val overview by overviewVm.ui.collectAsStateWithLifecycle()
     val items = remember(workouts) { workouts?.let(vm.presenter::list) } ?: return
-    ProgressContent(items, onOpen)
+    ProgressContent(items, onOpen, overview, overviewVm::select)
 }
 
 /** Exercise list [vProg]. */
 @Composable
-fun ProgressContent(items: List<ProgressItemUi>, onOpen: (String) -> Unit) {
+fun ProgressContent(
+    items: List<ProgressItemUi>,
+    onOpen: (String) -> Unit,
+    overview: OverviewUi? = null,
+    onRange: (com.homeworkoutcoach.engine.OverviewRange) -> Unit = {},
+) {
     val c = AppTheme.colors
     Page {
-        H1("Progress")
+        H1("Your progress")
+        if (overview != null) {
+            Column(Modifier.padding(top = 12.dp)) { OverviewSection(overview, onRange) }
+        }
+        H2("Exercises", top = 32.dp)
         Muted("Volume per session for each exercise you have logged.")
         if (items.isEmpty()) {
             EmptyNote("No workouts logged yet. Finish a workout and your progress shows up here.")

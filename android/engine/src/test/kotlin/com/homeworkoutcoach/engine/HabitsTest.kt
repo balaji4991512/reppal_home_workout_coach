@@ -161,6 +161,13 @@ class HabitsTest {
     }
 
     @Test
+    fun aPeriodEndingMidWeekOnlyOwnsItsOwnDaysOfATimesAWeekHabit() {
+        val run = habit(HabitSchedule.TimesPerWeek(3), start = mon)
+        // Monday and Tuesday of a finished week, ticked both days: 2 of 2, not 2 of the week's 3
+        assertEquals(HabitStats(2, 2), Habits.stats(run, ticks(0, 1), mon, day(9), until = day(1)))
+    }
+
+    @Test
     fun doneDaysCountsARange() {
         assertEquals(2, Habits.doneDays(habit(), ticks(0, 3), day(0), day(6)))
         assertEquals(1, Habits.doneDays(habit(), ticks(0, 3), day(1), day(6)))

@@ -46,6 +46,7 @@ import com.homeworkoutcoach.app.ui.routines.RoutineRunViewModel
 import com.homeworkoutcoach.app.ui.routines.RoutineRunner
 import com.homeworkoutcoach.app.ui.routines.RoutinesViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfileUi
+import com.homeworkoutcoach.app.ui.progress.OverviewViewModel
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
 import com.homeworkoutcoach.app.ui.week.ArrangePresenter
 import com.homeworkoutcoach.app.ui.week.ArrangeViewModel
@@ -388,6 +389,11 @@ object Factories {
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }
+    }
+    val Overview = viewModelFactory {
+        initializer {
+            app(this).let { OverviewViewModel(it.settings, it.training, it.habits, it.routines, it.tasks, it.journal, it.focus) }
+        }
     }
     val Progress = viewModelFactory {
         initializer { app(this).let { ProgressViewModel(it.training, ProgressPresenter(it.library)) } }

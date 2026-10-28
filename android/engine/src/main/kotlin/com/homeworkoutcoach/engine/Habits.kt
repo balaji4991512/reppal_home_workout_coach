@@ -177,7 +177,7 @@ object Habits {
             val inWeek = days.count { isDone(habit, log, it) }
             val counted = minOf(inWeek, schedule.times)
             val last = week.plusDays(6)
-            val sinceStart = (0L..6L).map { week.plusDays(it) }.count { it >= start }
+            val sinceStart = (0L..6L).map { week.plusDays(it) }.count { it >= start && it <= end }
             done += counted
             due += if (last < today) minOf(schedule.times, sinceStart) else counted
             week = week.plusDays(7)
