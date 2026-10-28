@@ -49,7 +49,7 @@ class DataExportTest {
 
         val o = Json.parseToJsonElement(r.json).jsonObject
         assertEquals("RepPal", o.getValue("app").jsonPrimitive.content)
-        assertEquals(9, o.getValue("format").jsonPrimitive.int)
+        assertEquals(10, o.getValue("format").jsonPrimitive.int)
         assertEquals("2026-10-27T14:57:36+05:30", o.getValue("exportedAt").jsonPrimitive.content)
         assertEquals("me@gmail.com", o.getValue("account").jsonPrimitive.content)
         assertEquals("Balaji", o.getValue("settings").jsonObject.getValue("name").jsonPrimitive.content)
@@ -140,5 +140,25 @@ class DataExportTest {
         assertEquals("null", o.getValue("account").toString())
         assertEquals(0, o.getValue("workouts").jsonArray.size)
         assertEquals("reppal-export-2026-10-27.json", DataExport.fileName("RepPal", now, ist))
+    }
+
+    @Test
+    fun aMadeUpWorkoutKeepsTheDayItMakesUpThroughAnExportFile() = runTest {
+        val settings = InMemorySettingsRepository(UserSettings(started = true, guest = true))
+        val training = InMemoryTrainingRepository()
+        val body = InMemoryBodyRepository()
+        val monday = java.time.LocalDate.of(2026, 10, 26).toEpochDay()
+        training.saveWorkout(Workout(dateMillis = now, label = "A", plan = emptyList(), sets = emptyMap(), madeUpForEpochDay = monday), emptyMap())
+        training.saveWorkout(Workout(dateMillis = now + 1_000, label = "B", plan = emptyList(), sets = emptyMap()), emptyMap())
+        val file = DataExporter(lib, settings, training, body, InMemoryAuthRepository(), ist).export("RepPal", now).json
+
+        val rows = Json.parseToJsonElement(file).jsonObject.getValue("workouts").jsonArray.map { it.jsonObject }
+        assertEquals("2026-10-26", rows[0].getValue("madeUpFor").jsonPrimitive.content)
+        assertEquals(null, rows[1]["madeUpFor"]?.jsonPrimitive?.content?.takeIf { it != "null" })
+
+        val t2 = InMemoryTrainingRepository()
+        DataImporter(InMemorySettingsRepository(UserSettings(guest = true)), t2, InMemoryBodyRepository())
+            .restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
+        assertEquals(listOf(monday, null), t2.workouts().first().map { it.madeUpForEpochDay })
     }
 }

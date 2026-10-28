@@ -48,14 +48,20 @@ data class SetInput(
     val shownPain: Boolean get() = notePreview()?.pain ?: pain
 }
 
+/** A skipped workout that can be made up: its day (epoch day) and a label such as "Mon: Full body A". */
+data class MakeUpOption(val epochDay: Long, val label: String)
+
 sealed interface WorkoutState {
     data object Loading : WorkoutState
 
     /** Nothing to train today (no exercises for this day). */
     data object Empty : WorkoutState
 
-    /** There is no workout to start today: a rest day, or today's is already done. [title] and [note] say which. */
-    data class NotToday(val title: String, val note: String) : WorkoutState
+    /**
+     * There is no workout to start today: a rest day, or today's is already done. [title] and [note] say which, and
+     * [makeUps] are this week's skipped workouts that can still be made up.
+     */
+    data class NotToday(val title: String, val note: String, val makeUps: List<MakeUpOption> = emptyList()) : WorkoutState
 
     data class Logging(val session: WorkoutSession, val input: SetInput, val note: String?) : WorkoutState
 
@@ -74,7 +80,12 @@ class WorkoutViewModel(
     private val parser: SetParser,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val now: () -> Long = System::currentTimeMillis,
+    /** The skipped day (epoch day) this workout makes up, or null for today's own workout. */
+    private val makeUpEpochDay: Long? = null,
 ) : ViewModel() {
+    /** Set when this session makes up a skipped day; saved with the workout. */
+    private var madeUpFor: Long? = null
+
     private val _state = MutableStateFlow<WorkoutState>(WorkoutState.Loading)
     val state: StateFlow<WorkoutState> = _state
 
@@ -92,15 +103,32 @@ class WorkoutViewModel(
         val stored = training.exerciseStates().first()
         val seq = planner.weekSequence(ps)
         val today = Instant.ofEpochMilli(now()).atZone(zone).toLocalDate()
-        val doneDates = training.workouts().first().map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
-        val schedule = Schedule.week(planner.weekdays(ps), today, doneDates, s.planStartEpochDay?.let(LocalDate::ofEpochDay))
+        val workouts = training.workouts().first()
+        val madeUpDates = workouts.mapNotNull { it.madeUpForEpochDay }.map(LocalDate::ofEpochDay).toSet()
+        val own = workouts.filter { it.madeUpForEpochDay == null }.map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
+        val schedule = Schedule.week(planner.weekdays(ps), today, own, s.planStartEpochDay?.let(LocalDate::ofEpochDay), madeUpDates)
+        val makeUps = Schedule.toMakeUp(schedule).map {
+            MakeUpOption(it.date.toEpochDay(), "${lib.dayNames[it.weekday].take(3)}: ${planner.dayName(seq[it.index])}")
+        }
+        if (makeUpEpochDay != null) {
+            // Making up a skipped workout from earlier this week, on any day after it.
+            val skipped = Schedule.toMakeUp(schedule).firstOrNull { it.date.toEpochDay() == makeUpEpochDay }
+                ?: return WorkoutState.NotToday("Nothing to make up", "That workout is already done, or its week has ended.", makeUps)
+            madeUpFor = skipped.date.toEpochDay()
+            val day = planner.buildDay(seq[skipped.index], ps)
+            if (day.items.isEmpty()) return WorkoutState.Empty
+            val session = WorkoutSession.start(lib, ps.equipment, day) { id ->
+                Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)
+            }
+            return WorkoutState.Logging(session, SetInput(), note = null)
+        }
         val slot = Schedule.today(schedule) ?: run {
             val next = Schedule.next(schedule)
             val nextText = next?.let { "Next: ${lib.dayNames[it.weekday].take(3)}, ${planner.dayName(seq[it.index])}." } ?: "No more workouts this week."
             return if (schedule.any { it.date == today && it.status == SessionStatus.DONE }) {
-                WorkoutState.NotToday("Workout done", "Today’s workout is done. $nextText")
+                WorkoutState.NotToday("Workout done", "Today’s workout is done. $nextText", makeUps)
             } else {
-                WorkoutState.NotToday("Rest day", "There is no workout today. $nextText")
+                WorkoutState.NotToday("Rest day", "There is no workout today. $nextText", makeUps)
             }
         }
         val day = planner.buildDay(seq[slot.index], ps)
@@ -198,7 +226,7 @@ class WorkoutViewModel(
         _state.value = WorkoutState.Saving
         viewModelScope.launch {
             val history = training.workouts().first()
-            val result = next.finish(now())
+            val result = next.finish(now(), madeUpFor)
             actions.finishWorkout(result)
             _state.value = WorkoutState.Done(DonePresenter(lib).present(result, history))
         }

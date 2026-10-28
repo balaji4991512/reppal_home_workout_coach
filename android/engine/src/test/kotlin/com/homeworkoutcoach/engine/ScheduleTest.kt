@@ -92,4 +92,43 @@ class ScheduleTest {
         val w = Schedule.week(listOf(1, 3, 5), day(3), emptySet(), day(-30)) // Tue, Thu, Sat
         assertEquals(listOf(SessionStatus.SKIPPED, SessionStatus.TODAY, SessionStatus.UPCOMING), w.map { it.status })
     }
+
+    // ---- Making up a skipped workout ----
+
+    @Test
+    fun aSkippedWorkoutDoneLaterInTheWeekIsMadeUp() {
+        // Monday skipped, made up on Wednesday: Monday shows made up; Wednesday's own is still to do
+        val w = Schedule.week(mwf, day(2), emptySet(), day(-30), madeUpDates = setOf(day(0)))
+        assertEquals(listOf(SessionStatus.MADE_UP, SessionStatus.TODAY, SessionStatus.UPCOMING), w.map { it.status })
+        // nothing is left to make up
+        assertEquals(emptyList<ScheduledSession>(), Schedule.toMakeUp(w))
+    }
+
+    @Test
+    fun theMakeUpDoesNotCountAsTodaysOwnWorkout() {
+        // a make-up done on Wednesday is not in doneDates, so Wednesday stays today's to do
+        assertEquals(SessionStatus.TODAY, Schedule.week(mwf, day(2), emptySet(), day(-30), setOf(day(0)))[1].status)
+        // doing Wednesday's own as well makes it done
+        assertEquals(SessionStatus.DONE, Schedule.week(mwf, day(2), setOf(day(2)), day(-30), setOf(day(0)))[1].status)
+    }
+
+    @Test
+    fun onlySkippedSessionsCanBeMadeUp() {
+        val w = Schedule.week(mwf, day(4), setOf(day(2)), day(-30)) // Friday: Monday skipped, Wednesday done, Friday today
+        assertEquals(listOf(0), Schedule.toMakeUp(w).map { it.index })
+    }
+
+    @Test
+    fun aMakeUpIsLaterAndInTheSameWeek() {
+        assertEquals(true, Schedule.canMakeUp(day(0), doneOn = day(2)))
+        assertEquals(true, Schedule.canMakeUp(day(0), doneOn = day(6))) // Sunday of the same week
+        assertEquals(false, Schedule.canMakeUp(day(2), doneOn = day(2))) // the same day is just the workout
+        assertEquals(false, Schedule.canMakeUp(day(2), doneOn = day(0))) // never earlier
+        assertEquals(false, Schedule.canMakeUp(day(4), doneOn = day(7))) // the next week
+    }
+
+    @Test
+    fun aDoneDayWinsOverAMadeUpOne() {
+        assertEquals(SessionStatus.DONE, Schedule.status(day(0), day(2), setOf(day(0)), day(-30), setOf(day(0))))
+    }
 }

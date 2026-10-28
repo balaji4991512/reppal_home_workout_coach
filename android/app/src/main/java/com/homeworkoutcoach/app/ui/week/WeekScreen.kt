@@ -67,9 +67,14 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.SetCountStatus
 
 @Composable
-fun WeekScreen(onStart: () -> Unit, onArrange: () -> Unit = {}, vm: WeekViewModel = viewModel(factory = Factories.Week)) {
+fun WeekScreen(
+    onStart: () -> Unit,
+    onArrange: () -> Unit = {},
+    onMakeUp: (Long) -> Unit = {},
+    vm: WeekViewModel = viewModel(factory = Factories.Week),
+) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    ui?.let { WeekContent(it, onStart, vm::swap, onArrange) }
+    ui?.let { WeekContent(it, onStart, vm::swap, onArrange, onMakeUp) }
 }
 
 /** This week [vWeek]: hero, the seven days at a glance, a card per training day, left-out note, planned volume. */
@@ -79,6 +84,7 @@ fun WeekContent(
     onStart: () -> Unit,
     onSwap: (baseId: String, chosenId: String) -> Unit,
     onArrange: () -> Unit = {},
+    onMakeUp: (Long) -> Unit = {},
 ) {
     // Days the user opened; the next workout starts open.
     var open by rememberSaveable { mutableStateOf<List<Int>?>(null) }
@@ -104,6 +110,7 @@ fun WeekContent(
                     swapKey = swapKey,
                     onSwapKey = { swapKey = if (swapKey == it) null else it },
                     onSwap = { base, to -> swapKey = null; onSwap(base, to) },
+                    onMakeUp = onMakeUp,
                 )
             }
         }
@@ -173,7 +180,7 @@ private fun WeekStrip(days: List<WeekdayUi>, modifier: Modifier = Modifier) {
                     Modifier.size(40.dp).clip(CircleShape)
                         .background(
                             when (status) {
-                                DayStatus.DONE -> c.ok
+                                DayStatus.DONE, DayStatus.MADE_UP -> c.ok
                                 DayStatus.TODAY -> c.accent
                                 DayStatus.SKIPPED -> c.tintRose
                                 else -> Color.Transparent
@@ -183,7 +190,7 @@ private fun WeekStrip(days: List<WeekdayUi>, modifier: Modifier = Modifier) {
                     contentAlignment = Alignment.Center,
                 ) {
                     when (status) {
-                        DayStatus.DONE -> Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.bg)
+                        DayStatus.DONE, DayStatus.MADE_UP -> Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.bg)
                         DayStatus.TODAY -> Icon(AppIcons.Dumbbell, null, Modifier.size(20.dp), tint = c.onAccent)
                         DayStatus.SKIPPED -> Icon(AppIcons.Close, null, Modifier.size(18.dp), tint = c.coral)
                         DayStatus.UPCOMING -> Icon(AppIcons.Dumbbell, null, Modifier.size(18.dp), tint = c.accent)
@@ -226,10 +233,11 @@ private fun TrainingDay(
     swapKey: String?,
     onSwapKey: (String) -> Unit,
     onSwap: (String, String) -> Unit,
+    onMakeUp: (Long) -> Unit,
 ) {
     val c = AppTheme.colors
     val disc = when (day.status) {
-        DayStatus.DONE -> c.tintMint
+        DayStatus.DONE, DayStatus.MADE_UP -> c.tintMint
         DayStatus.TODAY -> c.accentSoft
         DayStatus.SKIPPED -> c.tintRose
         DayStatus.UPCOMING -> c.tintPeach
@@ -252,6 +260,7 @@ private fun TrainingDay(
             }
             when (day.status) {
                 DayStatus.DONE -> Pill("Done", c.oks, c.ok)
+                DayStatus.MADE_UP -> Pill("Made up", c.oks, c.ok)
                 DayStatus.TODAY -> Pill("Today", c.accent, c.onAccent)
                 DayStatus.SKIPPED -> Pill("Skipped", c.tintRose, c.coral)
                 DayStatus.UPCOMING -> Unit
@@ -260,10 +269,12 @@ private fun TrainingDay(
         }
         AnimatedVisibility(expanded) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                if (day.status == DayStatus.DONE) {
+                if (day.status == DayStatus.DONE || day.status == DayStatus.MADE_UP) {
+                    day.madeUpOn?.let { Small("Not done on ${day.abbr}. Made up on $it.", Modifier.padding(bottom = 4.dp)) }
                     day.session?.let { SessionCard(it) }
                 } else if (day.status == DayStatus.SKIPPED) {
-                    Muted("This workout was not done on ${day.abbr}. Each workout belongs to its own day, so it stays marked as skipped.")
+                    Muted("This workout was not done on ${day.abbr}, so it is marked as skipped. You can still make it up before the week ends.")
+                    OutlineButton("Make it up now", { onMakeUp(day.date.toEpochDay()) }, tint = c.accent)
                 } else {
                     day.exercises.forEachIndexed { i, ex ->
                         val key = "${day.index}:$i"

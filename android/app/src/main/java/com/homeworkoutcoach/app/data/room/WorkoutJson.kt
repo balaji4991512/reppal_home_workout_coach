@@ -38,6 +38,7 @@ internal object WorkoutJson {
             list.map { SetDto(id, it.reps, it.weightKg, it.targetReps, it.effort, it.comment) }
         }),
         painIdsJson = json.encodeToString(ids, w.painIds.toList()),
+        madeUpForEpochDay = w.madeUpForEpochDay,
     )
 
     fun fromEntity(e: WorkoutEntity) = Workout(
@@ -50,5 +51,6 @@ internal object WorkoutJson {
             valueTransform = { LoggedSet(it.reps, it.w, it.target, it.effort, it.comment) },
         ),
         painIds = json.decodeFromString(ids, e.painIdsJson).toSet(),
+        madeUpForEpochDay = e.madeUpForEpochDay,
     )
 }

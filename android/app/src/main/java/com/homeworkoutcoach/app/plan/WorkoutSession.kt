@@ -79,7 +79,7 @@ data class WorkoutSession(
     }
 
     /** Results for Workout done, the record to save and the next-session states. */
-    fun finish(dateMillis: Long): SessionResult {
+    fun finish(dateMillis: Long, madeUpForEpochDay: Long? = null): SessionResult {
         check(finished) { "Workout not finished" }
         val changes = plan.map { p ->
             val e = lib.exercise(p.exerciseId)
@@ -93,7 +93,10 @@ data class WorkoutSession(
             }
         }
         return SessionResult(
-            workout = Workout(dateMillis = dateMillis, label = day.label, plan = plan, sets = sets, painIds = pain.toSet()),
+            workout = Workout(
+                dateMillis = dateMillis, label = day.label, plan = plan, sets = sets, painIds = pain.toSet(),
+                madeUpForEpochDay = madeUpForEpochDay,
+            ),
             changes = changes,
             nextStates = changes.mapNotNull { c -> c.next?.let { c.exercise.id to it } }.toMap(),
             painIds = pain,

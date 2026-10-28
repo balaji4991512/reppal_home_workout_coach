@@ -130,6 +130,29 @@ class WeekPresenterTest {
     }
 
     @Test
+    fun aWorkoutDoneLaterForASkippedDayShowsAsMadeUpAndKeepsItsOwnDayFree() {
+        // Monday was skipped and made up on Wednesday, which is today
+        val makeUp = on(mon.plusDays(2)).copy(madeUpForEpochDay = mon.toEpochDay())
+        val ui = presenter.present(started, emptyMap(), emptyMap(), listOf(makeUp), today = mon.plusDays(2))
+        assertEquals(listOf(DayStatus.MADE_UP, DayStatus.TODAY, DayStatus.UPCOMING), training(ui).map { it.status })
+        assertEquals("Wed", training(ui)[0].madeUpOn)
+        assertTrue(training(ui)[0].session != null) // its saved session is shown
+        assertEquals(1, ui.hero.done)
+        // Wednesday's own workout is still to do
+        assertEquals(HeroKind.TODAY, ui.hero.kind)
+        assertTrue(ui.hero.canStart)
+    }
+
+    @Test
+    fun aSkippedDayIsOfferedForMakeUpUntilItIsMadeUp() {
+        val before = presenter.present(started, emptyMap(), emptyMap(), emptyList(), today = mon.plusDays(1))
+        assertEquals(DayStatus.SKIPPED, training(before)[0].status)
+        assertEquals(mon, training(before)[0].date) // the day the make-up button hands on
+        val after = presenter.present(started, emptyMap(), emptyMap(), listOf(on(mon.plusDays(1)).copy(madeUpForEpochDay = mon.toEpochDay())), today = mon.plusDays(1))
+        assertEquals(DayStatus.MADE_UP, training(after)[0].status)
+    }
+
+    @Test
     fun aRestDayOffersNothingToStartAndSaysWhatIsNext() {
         val tuesday = presenter.present(started, emptyMap(), emptyMap(), listOf(on(mon)), today = mon.plusDays(1))
         assertEquals(HeroKind.REST, tuesday.hero.kind)

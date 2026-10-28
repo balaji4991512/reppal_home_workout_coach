@@ -75,13 +75,15 @@ sealed interface WeekdayUi {
         val status: DayStatus,
         val exercises: List<ExerciseRowUi>,
         val missing: List<String>,
-        /** Summary of the saved session, for days already done. */
+        /** Summary of the saved session, for days already done or made up. */
         val session: SessionCardUi?,
+        /** For a made-up day, the weekday it was done on ("Wed"). */
+        val madeUpOn: String? = null,
     ) : WeekdayUi
 }
 
 /** A training day against the calendar: done, skipped (its day passed without one), today, or still to come. */
-enum class DayStatus { DONE, SKIPPED, TODAY, UPCOMING }
+enum class DayStatus { DONE, MADE_UP, SKIPPED, TODAY, UPCOMING }
 
 data class ExerciseRowUi(
     val id: String,
@@ -131,8 +133,11 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
         val weekdays = planner.weekdays(ps)
 
         // Each session sits on its own weekday of this calendar week: done, skipped, today or still to come.
-        val doneDates = workouts.map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
-        val schedule = Schedule.week(weekdays, today, doneDates, settings.planStartEpochDay?.let(LocalDate::ofEpochDay))
+        fun dateOf(w: Workout) = Instant.ofEpochMilli(w.dateMillis).atZone(zone).toLocalDate()
+        // A workout with a "makes up" day does not count for the day it was done on, only for the day it makes up.
+        val doneDates = workouts.filter { it.madeUpForEpochDay == null }.map(::dateOf).toSet()
+        val madeUp = workouts.filter { it.madeUpForEpochDay != null }.associateBy { LocalDate.ofEpochDay(it.madeUpForEpochDay!!) }
+        val schedule = Schedule.week(weekdays, today, doneDates, settings.planStartEpochDay?.let(LocalDate::ofEpochDay), madeUp.keys)
 
         val states = week.flatMap { d -> d.items.map { it.exerciseId } }.distinct().associateWith { id ->
             Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)
@@ -144,7 +149,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
         }
 
         val counted = schedule.count { it.status != SessionStatus.BEFORE_PLAN }
-        val done = schedule.count { it.status == SessionStatus.DONE }
+        val done = schedule.count { it.status == SessionStatus.DONE || it.status == SessionStatus.MADE_UP }
         val todaySession = Schedule.today(schedule)
         val doneToday = schedule.firstOrNull { it.date == today && it.status == SessionStatus.DONE }
         val upcoming = Schedule.next(schedule)
@@ -181,13 +186,16 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
             val day = week[j]
             val status = when (slot.status) {
                 SessionStatus.DONE -> DayStatus.DONE
+                SessionStatus.MADE_UP -> DayStatus.MADE_UP
                 SessionStatus.SKIPPED -> DayStatus.SKIPPED
                 SessionStatus.TODAY -> DayStatus.TODAY
                 else -> DayStatus.UPCOMING
             }
-            val history = if (status == DayStatus.DONE) {
-                workouts.lastOrNull { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() == slot.date }
-            } else null
+            val history = when (status) {
+                DayStatus.DONE -> workouts.lastOrNull { it.madeUpForEpochDay == null && dateOf(it) == slot.date }
+                DayStatus.MADE_UP -> madeUp[slot.date]
+                else -> null
+            }
             WeekdayUi.Training(
                 abbr = abbr,
                 index = j,
@@ -209,6 +217,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
                 },
                 missing = day.missing,
                 session = history?.let { SessionCards.card(lib, it) },
+                madeUpOn = if (status == DayStatus.MADE_UP) madeUp[slot.date]?.let { lib.dayNames[dateOf(it).dayOfWeek.value - 1].take(3) } else null,
             )
         }
 

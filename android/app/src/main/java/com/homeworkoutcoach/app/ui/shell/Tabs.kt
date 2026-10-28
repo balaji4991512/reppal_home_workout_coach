@@ -56,7 +56,7 @@ enum class Tab(val label: String, val icon: ImageVector, val root: String, val t
     companion object {
         /** The tab a screen belongs to, from its route pattern (for example "habit/{id}"), so the bar highlights the right one. */
         fun of(route: String?): Tab? {
-            val r = route ?: return null
+            val r = route?.substringBefore('?') ?: return null
             return when {
                 r == "today" -> Today
                 r == "hub/train" || r in setOf("week", "arrange", "workout", "body") -> Train
@@ -68,6 +68,6 @@ enum class Tab(val label: String, val icon: ImageVector, val root: String, val t
         }
 
         /** Whether [route] is a page opened from a hub, which gets a back arrow in the top bar. */
-        fun isHubPage(route: String?): Boolean = entries.any { t -> t.pages.any { it.route == route } }
+        fun isHubPage(route: String?): Boolean = route?.substringBefore('?').let { r -> entries.any { t -> t.pages.any { it.route == r } } }
     }
 }

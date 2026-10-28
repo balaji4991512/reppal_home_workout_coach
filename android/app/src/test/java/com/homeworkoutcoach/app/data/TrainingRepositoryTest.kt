@@ -93,6 +93,16 @@ abstract class TrainingRepositoryContract {
     }
 
     @Test
+    fun aMadeUpWorkoutRemembersTheDayItMakesUp() = runTest {
+        val makeUp = workout(2_000).copy(madeUpForEpochDay = 20_000)
+        repo.saveWorkout(makeUp, emptyMap())
+        repo.saveWorkout(workout(3_000), emptyMap())
+        val stored = repo.workouts().first()
+        assertEquals(20_000L, stored[0].madeUpForEpochDay)
+        assertEquals(null, stored[1].madeUpForEpochDay) // an ordinary workout makes nothing up
+    }
+
+    @Test
     fun saveWorkoutAlsoSavesNextStates() = runTest {
         repo.putExerciseStates(mapOf("row" to ExerciseState(8.0)))
         repo.saveWorkout(workout(1_000), mapOf("bench" to ExerciseState(6.0, 11, 3)))

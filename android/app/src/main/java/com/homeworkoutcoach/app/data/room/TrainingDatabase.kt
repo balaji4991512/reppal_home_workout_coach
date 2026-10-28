@@ -39,6 +39,7 @@ data class WorkoutEntity(
     val planJson: String,
     val setsJson: String,
     val painIdsJson: String,
+    val madeUpForEpochDay: Long? = null,
 )
 
 /** One weigh-in. [source] is "scale" or "manual". */
@@ -390,15 +391,15 @@ interface JournalDao {
         RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class, GoalEntity::class, FocusSessionEntity::class,
         WeeklyReflectionEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added. 10: task.endMinuteOfDay added.
+    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added. 10: task.endMinuteOfDay added. 11: workout.madeUpForEpochDay added.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8),
-        AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10),
+        AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11),
     ],
 )
 abstract class TrainingDatabase : RoomDatabase() {

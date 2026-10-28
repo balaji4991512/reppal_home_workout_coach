@@ -92,6 +92,7 @@ fun WorkoutScreen(
     onActive: (Boolean) -> Unit,
     onLeaveRequest: () -> Unit,
     onWeek: () -> Unit,
+    onMakeUp: (Long) -> Unit = {},
     vm: WorkoutViewModel = viewModel(factory = Factories.Workout),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -102,7 +103,7 @@ fun WorkoutScreen(
     when (val s = state) {
         WorkoutState.Loading, WorkoutState.Saving -> Unit
         WorkoutState.Empty -> LaunchedEffect(Unit) { onWeek() }
-        is WorkoutState.NotToday -> NotTodayContent(s.title, s.note, onWeek)
+        is WorkoutState.NotToday -> NotTodayContent(s.title, s.note, s.makeUps, onWeek, onMakeUp)
         is WorkoutState.Logging -> LoggingContent(
             s,
             onText = vm::onText,
@@ -119,7 +120,7 @@ fun WorkoutScreen(
 
 /** Rest day, or today's workout already done: nothing to start, and where to look instead. */
 @Composable
-private fun NotTodayContent(title: String, note: String, onWeek: () -> Unit) {
+private fun NotTodayContent(title: String, note: String, makeUps: List<MakeUpOption>, onWeek: () -> Unit, onMakeUp: (Long) -> Unit) {
     val c = AppTheme.colors
     val rest = title == "Rest day"
     Page {
@@ -134,6 +135,13 @@ private fun NotTodayContent(title: String, note: String, onWeek: () -> Unit) {
                 H1(title, Modifier.padding(top = 14.dp))
                 Body(note, Modifier.padding(top = 6.dp))
                 Small("Each workout is done on its own day.", Modifier.padding(top = 10.dp), color = c.mut)
+            }
+        }
+        if (makeUps.isNotEmpty()) {
+            H2("Skipped this week", top = 24.dp)
+            Small("You can still make these up before the week ends.")
+            makeUps.forEach { m ->
+                OutlineButton("Make up ${m.label}", { onMakeUp(m.epochDay) }, tint = c.accent)
             }
         }
         AccentButton("See your week", onWeek, Modifier.padding(top = 18.dp))

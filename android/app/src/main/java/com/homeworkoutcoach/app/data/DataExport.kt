@@ -36,7 +36,7 @@ import java.time.format.DateTimeFormatter
  */
 object DataExport {
     /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections (older files still restore). */
-    const val FORMAT = 9
+    const val FORMAT = 10
 
     @Serializable
     data class File(
@@ -76,6 +76,8 @@ object DataExport {
         val plan: List<PlannedDto>,
         val sets: List<SetDto>,
         val pain: List<String>,
+        /** The date (2026-10-26) of the skipped workout this one makes up; absent for a workout done on its own day. */
+        val madeUpFor: String? = null,
     )
 
     @Serializable
@@ -218,6 +220,7 @@ object DataExport {
                         list.map { SetDto(id, it.reps, it.weightKg, it.targetReps, it.effort.key, it.comment) }
                     },
                     pain = w.painIds.sorted(),
+                    madeUpFor = w.madeUpForEpochDay?.let { LocalDate.ofEpochDay(it).toString() },
                 )
             },
             weighIns = weights.sortedBy { it.dateMillis }.map {
@@ -337,6 +340,7 @@ object DataImport {
                                 LoggedSet(it.reps, it.weightKg, it.targetReps, efforts[it.effort] ?: Effort.JUST_RIGHT, it.comment)
                             },
                             painIds = w.pain.toSet(),
+                            madeUpForEpochDay = w.madeUpFor?.let { LocalDate.parse(it).toEpochDay() },
                         )
                     },
                     weights = file.weighIns.map {

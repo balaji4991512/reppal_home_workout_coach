@@ -2,6 +2,7 @@ package com.homeworkoutcoach.app.ui
 
 import android.app.Activity
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -334,8 +335,10 @@ object Factories {
     }
     val Workout = viewModelFactory {
         initializer {
+            // The route's "makeup" argument (an epoch day) says which skipped day is being made up; -1 means today's own.
+            val makeUp = createSavedStateHandle().get<Long>("makeup")?.takeIf { it >= 0 }
             app(this).let {
-                WorkoutViewModel(it.library, it.planner, it.settings, it.training, it.actions, KeywordSetParser)
+                WorkoutViewModel(it.library, it.planner, it.settings, it.training, it.actions, KeywordSetParser, makeUpEpochDay = makeUp)
             }
         }
     }

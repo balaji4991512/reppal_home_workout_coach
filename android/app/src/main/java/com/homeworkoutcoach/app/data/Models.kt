@@ -90,4 +90,6 @@ data class Workout(
     val plan: List<PlannedExercise>,
     val sets: Map<String, List<LoggedSet>>,
     val painIds: Set<String> = emptySet(),
+    /** The day (epoch day) of the skipped workout this one makes up, or null for a workout done on its own day. */
+    val madeUpForEpochDay: Long? = null,
 )

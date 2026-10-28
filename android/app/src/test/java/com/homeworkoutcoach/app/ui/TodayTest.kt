@@ -73,6 +73,15 @@ class WorkoutCardTest {
     }
 
     @Test
+    fun aMakeUpDoneTodayDoesNotMakeTodaysOwnWorkoutDone() {
+        val makeUp = Workout(
+            dateMillis = WED.atTime(9, 0).toInstant(ZoneOffset.UTC).toEpochMilli(), label = "A", plan = emptyList(), sets = emptyMap(),
+            madeUpForEpochDay = WED.minusDays(2).toEpochDay(),
+        )
+        assertTrue(card(WED, workouts = listOf(makeUp)) is WorkoutCardUi.Next)
+    }
+
+    @Test
     fun aWorkoutFinishedTodayShowsAsDone() {
         fun at(day: LocalDate) = Workout(dateMillis = day.atTime(9, 0).toInstant(ZoneOffset.UTC).toEpochMilli(), label = "B", plan = emptyList(), sets = emptyMap())
         assertEquals(WorkoutCardUi.Done("Full body B"), card(WED, workouts = listOf(at(WED.minusDays(2)), at(WED))))

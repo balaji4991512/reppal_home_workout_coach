@@ -48,7 +48,7 @@ object WorkoutCardPresenter {
         zone: ZoneId,
     ): WorkoutCardUi {
         if (!settings.started || week == null) return WorkoutCardUi.NoPlan
-        workouts.lastOrNull { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() == today }
+        workouts.lastOrNull { it.madeUpForEpochDay == null && Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() == today }
             ?.let { return WorkoutCardUi.Done(planner.dayName(it.label)) }
         val hero = week.hero
         return when (hero.kind) {

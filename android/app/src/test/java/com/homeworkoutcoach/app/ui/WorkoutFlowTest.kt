@@ -7,6 +7,7 @@ import com.homeworkoutcoach.app.data.memory.InMemoryTrainingRepository
 import com.homeworkoutcoach.app.plan.PlanActions
 import com.homeworkoutcoach.app.plan.WorkoutSession
 import com.homeworkoutcoach.app.ui.workout.DonePresenter
+import com.homeworkoutcoach.app.ui.workout.MakeUpOption
 import com.homeworkoutcoach.app.ui.workout.WorkoutState
 import com.homeworkoutcoach.app.ui.workout.WorkoutViewModel
 import com.homeworkoutcoach.app.ui.workout.recordJson
@@ -159,7 +160,8 @@ class WorkoutViewModelTest {
 
     /** Monday 26 Oct 2026, 09:00 UTC: a 1-day plan trains on Mondays. */
     private val monday = java.time.LocalDate.of(2026, 10, 26).atTime(9, 0).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
-    private fun vm(at: Long = monday) = WorkoutViewModel(lib, Planner(lib), settings, training, actions, KeywordSetParser, java.time.ZoneOffset.UTC) { at }
+    private fun vm(at: Long = monday, makeUp: Long? = null) =
+        WorkoutViewModel(lib, Planner(lib), settings, training, actions, KeywordSetParser, java.time.ZoneOffset.UTC, { at }, makeUp)
     private fun WorkoutViewModel.logging() = state.value as WorkoutState.Logging
 
     @Test
@@ -294,5 +296,52 @@ class WorkoutViewModelTest {
         // 3 x 12 at 6 kg with nothing heavier: one more set next time, 4 x 10 at 6 kg (240 kg, +11%)
         assertEquals(ExerciseState(6.0, 10, 4), training.exerciseStates().first()["bench"])
         assertTrue(sets > 3)
+    }
+
+    private val tuesday = monday + 24 * 3_600_000L
+    private val mondayDay = java.time.LocalDate.of(2026, 10, 26).toEpochDay()
+
+    @Test
+    fun aSkippedWorkoutCanBeMadeUpLaterInTheWeekAndIsSavedAsSuch() = runTest {
+        settings.update { it.copy(planStartEpochDay = mondayDay - 30) } // the plan has been running a while
+        // the 1-day plan trains on Monday; on Tuesday Monday's workout is offered as a make-up
+        val rest = vm(tuesday).state.value as WorkoutState.NotToday
+        assertEquals(listOf(MakeUpOption(mondayDay, "Mon: Full body")), rest.makeUps)
+
+        val vm = vm(tuesday, makeUp = mondayDay)
+        assertEquals("bench", vm.logging().session.exercise.id) // Monday's own session
+        while (vm.state.value is WorkoutState.Logging) {
+            val l = vm.logging()
+            vm.onReps(l.session.target.targetReps)
+            vm.onSave()
+        }
+        val saved = training.workouts().first().single()
+        assertEquals(tuesday, saved.dateMillis) // done on Tuesday
+        assertEquals(mondayDay, saved.madeUpForEpochDay) // for Monday
+
+        // nothing is left to make up, and the same day cannot be made up twice
+        val again = vm(tuesday).state.value as WorkoutState.NotToday
+        assertTrue(again.makeUps.isEmpty())
+        assertEquals("Nothing to make up", (vm(tuesday, makeUp = mondayDay).state.value as WorkoutState.NotToday).title)
+    }
+
+    @Test
+    fun aWorkoutFromAnEarlierWeekCannotBeMadeUp() {
+        val nextTuesday = tuesday + 7 * 24 * 3_600_000L
+        val s = vm(nextTuesday, makeUp = mondayDay).state.value as WorkoutState.NotToday
+        assertEquals("Nothing to make up", s.title)
+    }
+
+    @Test
+    fun aMakeUpDoesNotCountAsTodaysOwnWorkout() = runTest {
+        settings.update { it.copy(planStartEpochDay = mondayDay - 30) }
+        // Monday made up on Tuesday: Monday's workout is no longer offered, and nothing marks Tuesday as done
+        val vm = vm(tuesday, makeUp = mondayDay)
+        while (vm.state.value is WorkoutState.Logging) {
+            vm.onReps(vm.logging().session.target.targetReps)
+            vm.onSave()
+        }
+        val rest = vm(tuesday).state.value as WorkoutState.NotToday
+        assertEquals("Rest day", rest.title) // Tuesday is still a rest day, not "workout done"
     }
 }

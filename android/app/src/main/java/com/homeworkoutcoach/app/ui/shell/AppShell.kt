@@ -89,6 +89,9 @@ import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
 /** Route of the privacy policy, linked from the menu footer, How it works and Profile. */
 private const val PRIVACY = "privacy"
 
+/** The workout page; "makeup" is the epoch day of a skipped workout being made up, or -1 for today's own. */
+private const val WORKOUT_PATTERN = "workout?makeup={makeup}"
+
 /** Route of Rearrange days, opened from the Week page. */
 private const val ARRANGE = "arrange"
 
@@ -149,7 +152,7 @@ fun AppShell(
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     fun guarded(action: () -> Unit) {
-        if (workoutActive && current == Dest.Workout.route) pending = action else action()
+        if (workoutActive && current?.startsWith(Dest.Workout.route) == true) pending = action else action()
     }
 
     /** Opens a page on top of where you are, so Back returns here. */
@@ -181,9 +184,17 @@ fun AppShell(
                 // Back from a workout in progress asks first, then returns to the screen it was opened from.
                 onLeaveRequest = { guarded { nav.popBackStack() } },
                 // The workout is over (or there is none): show the week in its place, so Back goes to where you came from.
+                // Make up a skipped workout: a fresh workout page for that day, replacing this one if it is showing.
+                onMakeUp = { day ->
+                    guarded {
+                        nav.navigate("${Dest.Workout.route}?makeup=$day") {
+                            popUpTo(WORKOUT_PATTERN) { inclusive = true }
+                        }
+                    }
+                },
                 onWeekInstead = {
                     nav.navigate(Dest.Week.route) {
-                        popUpTo(Dest.Workout.route) { inclusive = true }
+                        popUpTo(WORKOUT_PATTERN) { inclusive = true }
                         launchSingleTop = true
                     }
                 },
@@ -226,6 +237,7 @@ private fun AppNavHost(
     onWorkoutActive: (Boolean) -> Unit,
     onLeaveRequest: () -> Unit,
     onWeekInstead: () -> Unit,
+    onMakeUp: (Long) -> Unit,
     me: @Composable () -> Unit,
 ) {
     NavHost(nav, startDestination = if (started) Dest.Today.route else Dest.Setup.route) {
@@ -233,7 +245,9 @@ private fun AppNavHost(
         composable(Tab.Plan.root) { HubScreen(Tab.Plan, started, onOpen) }
         composable(Tab.Reflect.root) { HubScreen(Tab.Reflect, started, onOpen) }
         composable(Tab.Me.root) { me() }
-        composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Workout) }, onArrange = { nav.navigate(ARRANGE) }) }
+        composable(Dest.Week.route) {
+            WeekScreen(onStart = { go(Dest.Workout) }, onArrange = { nav.navigate(ARRANGE) }, onMakeUp = onMakeUp)
+        }
         composable(ARRANGE) { ArrangeScreen(onDone = { nav.popBackStack() }) }
         composable(Dest.Habits.route) {
             HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
@@ -318,8 +332,11 @@ private fun AppNavHost(
                 onJournal = { go(Dest.Journal) },
             )
         }
-        composable(Dest.Workout.route) {
-            WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = onWeekInstead)
+        composable(
+            WORKOUT_PATTERN,
+            arguments = listOf(androidx.navigation.navArgument("makeup") { type = androidx.navigation.NavType.LongType; defaultValue = -1L }),
+        ) {
+            WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = onWeekInstead, onMakeUp = onMakeUp)
         }
         composable(Dest.Progress.route) { ProgressScreen(onOpen = { nav.navigate("exercise/$it") }) }
         composable("exercise/{id}") { entry ->
