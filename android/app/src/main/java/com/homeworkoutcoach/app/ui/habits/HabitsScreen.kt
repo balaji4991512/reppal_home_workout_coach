@@ -188,7 +188,7 @@ fun TickHint(modifier: Modifier = Modifier, vm: TickHintViewModel = viewModel(fa
             Box(Modifier.size(20.dp).border(2.dp, c.mut, androidx.compose.foundation.shape.CircleShape))
         }
         Column(Modifier.weight(1f)) {
-            Body("Tap the circle to mark a habit done", strong = true)
+            Body("Tap the circle to mark it done", strong = true)
             Small("Tap the rest of the card to see its history.", color = c.fg)
         }
         Chip("Got it", false, vm::dismiss, small = true)

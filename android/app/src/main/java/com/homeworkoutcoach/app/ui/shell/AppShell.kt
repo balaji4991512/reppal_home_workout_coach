@@ -178,7 +178,15 @@ fun AppShell(
                 nav, appName, settings.started, ::go,
                 onOpen = { r -> guarded { open(r) } },
                 onWorkoutActive = { workoutActive = it },
-                onLeaveRequest = { go(Dest.Week) },
+                // Back from a workout in progress asks first, then returns to the screen it was opened from.
+                onLeaveRequest = { guarded { nav.popBackStack() } },
+                // The workout is over (or there is none): show the week in its place, so Back goes to where you came from.
+                onWeekInstead = {
+                    nav.navigate(Dest.Week.route) {
+                        popUpTo(Dest.Workout.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
                 me = {
                     HubScreen(Tab.Me, settings.started, { r -> guarded { open(r) } }) {
                         MeHeader(settings, account, onTheme) { if (account == null) onSignIn() else onSignOut() }
@@ -217,6 +225,7 @@ private fun AppNavHost(
     onOpen: (String) -> Unit,
     onWorkoutActive: (Boolean) -> Unit,
     onLeaveRequest: () -> Unit,
+    onWeekInstead: () -> Unit,
     me: @Composable () -> Unit,
 ) {
     NavHost(nav, startDestination = if (started) Dest.Today.route else Dest.Setup.route) {
@@ -310,7 +319,7 @@ private fun AppNavHost(
             )
         }
         composable(Dest.Workout.route) {
-            WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = { go(Dest.Week) })
+            WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = onWeekInstead)
         }
         composable(Dest.Progress.route) { ProgressScreen(onOpen = { nav.navigate("exercise/$it") }) }
         composable("exercise/{id}") { entry ->
