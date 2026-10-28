@@ -30,6 +30,7 @@ import com.homeworkoutcoach.app.ui.body.BodyViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitDetailViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitEditViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitsViewModel
+import com.homeworkoutcoach.app.ui.focus.FocusViewModel
 import com.homeworkoutcoach.app.ui.goals.GoalEditViewModel
 import com.homeworkoutcoach.app.ui.goals.GoalsViewModel
 import com.homeworkoutcoach.app.ui.journal.JournalActions
@@ -373,6 +374,9 @@ object Factories {
     }
     fun goalEdit(id: String?) = viewModelFactory {
         initializer { app(this).let { GoalEditViewModel(id, it.goals, it.habits, it.body) } }
+    }
+    val Focus = viewModelFactory {
+        initializer { app(this).let { FocusViewModel(it.settings, it.focus, it.tasks, it.focusSessions) } }
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }

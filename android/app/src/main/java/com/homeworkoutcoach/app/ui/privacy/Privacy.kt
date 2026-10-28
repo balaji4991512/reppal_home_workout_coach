@@ -26,8 +26,9 @@ object PrivacyPolicy {
             "Your setup (name if you give one, equipment, level, days, split, anything you asked to work around, " +
             "height), your plan and progress for each exercise, your workouts with every set, any notes you " +
             "typed or said, your weigh-ins, your habits with what you ticked or entered for each day, your " +
-            "planner tasks, your routines with the days you finished them, your journal, and your goals. It " +
-            "stays in the app's private storage on this phone.",
+            "planner tasks, your routines with the days you finished them, your journal, your goals, and your " +
+            "focus sessions. It stays in the app's private storage on this phone. The focus timer asks to show a " +
+            "notification when a session ends, and sets an alarm for that; nothing is sent anywhere.",
         "Signing in with Google" to
             "Signing in is optional. If you choose it, Google confirms your account through Google Play services " +
             "and Firebase Authentication, and $app receives your name and email address. Google keeps a record " +

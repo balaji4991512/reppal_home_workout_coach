@@ -15,7 +15,10 @@ private class FakeAlarms : FocusAlarms {
     var scheduledAt: Long? = null
     var cancels = 0
 
-    override fun schedule(endMillis: Long) {
+    var scheduledFor: Long? = null
+
+    override fun schedule(startMillis: Long, endMillis: Long) {
+        scheduledFor = startMillis
         scheduledAt = endMillis
     }
 
@@ -41,6 +44,8 @@ class FocusSessionsTest {
         assertTrue(service.start(25, "  Write the report "))
         assertEquals(ActiveFocus(t0, 25, "Write the report"), active())
         assertEquals(t0 + 25 * min, alarms.scheduledAt)
+        assertEquals(t0, alarms.scheduledFor) // the alarm carries the start time, to find the session again
+        assertEquals("focus-$t0", FocusSessions.idFor(t0))
     }
 
     @Test

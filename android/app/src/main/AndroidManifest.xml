@@ -5,6 +5,9 @@
     <!-- The focus timer tells you when a session is finished (Android 13+ asks first, when you start one). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Rings the focus timer on time, even while the phone dozes (an alarm and timer app permission). -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <!-- Voice input for set notes. Asked for only when the Mic button is first tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 

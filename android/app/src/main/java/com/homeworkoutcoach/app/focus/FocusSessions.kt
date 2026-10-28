@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.first
 
 /** Sets and cancels the alarm that goes off when a focus session ends. */
 interface FocusAlarms {
-    fun schedule(endMillis: Long)
+    /** [startMillis] identifies the session, so whoever the alarm wakes can find it again. */
+    fun schedule(startMillis: Long, endMillis: Long)
 
     fun cancel()
 }
@@ -25,7 +26,7 @@ class FocusSessions(
     private val alarms: FocusAlarms,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
-    private fun idOf(run: ActiveFocus) = "focus-${run.startMillis}"
+    private fun idOf(run: ActiveFocus) = idFor(run.startMillis)
 
     /** Starts a session. Returns false if one is already running or the length is not allowed. */
     suspend fun start(minutes: Int, taskTitle: String?): Boolean {
@@ -33,7 +34,7 @@ class FocusSessions(
         if (settings.settings.first().activeFocus != null) return false
         val run = ActiveFocus(now(), minutes, taskTitle?.trim()?.takeIf { it.isNotEmpty() })
         settings.update { it.copy(activeFocus = run) }
-        alarms.schedule(run.toRun().endMillis)
+        alarms.schedule(run.startMillis, run.toRun().endMillis)
         return true
     }
 
@@ -52,5 +53,10 @@ class FocusSessions(
         settings.update { if (it.activeFocus == run) it.copy(activeFocus = null) else it }
         alarms.cancel()
         return session
+    }
+
+    companion object {
+        /** The id of the session that started at [startMillis]. */
+        fun idFor(startMillis: Long) = "focus-$startMillis"
     }
 }
