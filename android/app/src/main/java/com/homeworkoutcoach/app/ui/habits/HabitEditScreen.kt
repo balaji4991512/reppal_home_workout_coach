@@ -130,26 +130,27 @@ fun HabitEditScreen(
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
         PrimaryButton("Save", { vm.save(onDone) })
-        OutlineButton("Cancel", onDone)
 
-        if (id != null) {
-            if (confirmDelete) {
-                Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bad.copy(alpha = 0.08f)).padding(14.dp)) {
-                    Text("Delete ${d.name.ifBlank { "this habit" }} and all its history? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
-                    Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) { OutlineButton("Keep it", { confirmDelete = false }, compact = true) }
-                        Box(Modifier.weight(1f)) { OutlineButton("Delete", { vm.delete(onGone) }, tint = c.bad, compact = true) }
-                    }
+        if (id == null) {
+            OutlineButton("Cancel", onDone)
+        } else if (confirmDelete) {
+            Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bad.copy(alpha = 0.08f)).padding(14.dp)) {
+                Text("Delete ${d.name.ifBlank { "this habit" }} and all its history? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { OutlineButton("Keep it", { confirmDelete = false }, compact = true) }
+                    Box(Modifier.weight(1f)) { OutlineButton("Delete", { vm.delete(onGone) }, tint = c.bad, compact = true) }
                 }
-            } else {
-                OutlineButton(
-                    if (d.archived) "Bring this habit back" else "Archive",
-                    { vm.setArchived(!d.archived, onGone) },
-                    tint = c.accent,
-                )
-                if (!d.archived) Small("Hides it from your lists and keeps its history.", Modifier.padding(top = 6.dp))
-                OutlineButton("Delete habit", { confirmDelete = true }, tint = c.bad)
             }
+        } else {
+            // Cancel and Archive share a row; Delete sits well apart so it is not hit by accident.
+            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { OutlineButton("Cancel", onDone, compact = true) }
+                Box(Modifier.weight(1f)) {
+                    OutlineButton(if (d.archived) "Bring back" else "Archive", { vm.setArchived(!d.archived, onGone) }, tint = c.accent, compact = true)
+                }
+            }
+            if (!d.archived) Small("Archive hides a habit and keeps its history.", Modifier.padding(top = 8.dp))
+            OutlineButton("Delete habit", { confirmDelete = true }, Modifier.padding(top = 36.dp), tint = c.bad, compact = true)
         }
     }
 }
