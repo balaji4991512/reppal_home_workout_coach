@@ -39,7 +39,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.Role
@@ -248,11 +247,9 @@ fun Logo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
         drawRoundRect(c.acc, cornerRadius = CornerRadius(11 * this.size.width / 40f))
         // The launcher icon's candle (108 grid), with the middle 72 of it filling the square.
         val flame = Path().apply {
-            fillType = PathFillType.EvenOdd
-            moveTo(54f, 24f); cubicTo(58f, 32f, 66f, 38f, 66f, 50f); cubicTo(66f, 58f, 61f, 64f, 54f, 64f)
-            cubicTo(47f, 64f, 42f, 58f, 42f, 50f); cubicTo(42f, 38f, 50f, 32f, 54f, 24f); close()
-            moveTo(54f, 44f); cubicTo(56f, 48f, 59f, 51f, 59f, 55f); cubicTo(59f, 58.5f, 56.8f, 61f, 54f, 61f)
-            cubicTo(51.2f, 61f, 49f, 58.5f, 49f, 55f); cubicTo(49f, 51f, 52f, 48f, 54f, 44f); close()
+            moveTo(55f, 21f); cubicTo(56f, 28f, 64f, 33f, 64f, 42f); cubicTo(64f, 47.5f, 59.5f, 51.5f, 54f, 51.5f)
+            cubicTo(48.5f, 51.5f, 44f, 47.5f, 44f, 42f); cubicTo(44f, 37f, 47f, 33.5f, 49f, 30.5f)
+            cubicTo(49.5f, 33f, 51f, 34.5f, 52.5f, 34.5f); cubicTo(53.5f, 30f, 52.5f, 25f, 55f, 21f); close()
         }
         val k = this.size.width / 72f
         withTransform({
@@ -260,8 +257,8 @@ fun Logo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
             translate(-18f, -18f)
         }) {
             drawPath(flame, c.on)
-            drawRect(c.on, Offset(52.5f, 65f), Size(3f, 7f))
-            drawRoundRect(c.on, Offset(42f, 72f), Size(24f, 14f), CornerRadius(2f))
+            drawRect(c.on, Offset(52.8f, 51f), Size(2.4f, 6.5f))
+            drawRoundRect(c.on, Offset(43f, 57f), Size(22f, 27f), CornerRadius(2f))
         }
     }
 }
