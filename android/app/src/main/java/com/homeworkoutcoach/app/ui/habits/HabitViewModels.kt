@@ -36,11 +36,11 @@ internal fun todayFlow(clock: () -> LocalDate): Flow<LocalDate> = flow {
 }.distinctUntilChanged()
 
 /** What makes the self-ticking habits tick: the days with a workout, and the days the routines were finished. */
-data class AutoInputs(val workoutDays: Set<LocalDate>, val routineDays: Map<AutoSource, Set<LocalDate>>)
+data class AutoInputs(val workoutDays: Set<LocalDate>, val sourceDays: Map<AutoSource, Set<LocalDate>>)
 
 fun autoInputs(training: TrainingRepository, routines: RoutineRepository, zone: ZoneId): Flow<AutoInputs> =
     combine(training.workouts(), routines.routines(), routines.done()) { workouts, list, done ->
-        AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.routineDays(list, done))
+        AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.sourceDays(list, done))
     }
 
 class HabitsViewModel(
@@ -55,7 +55,7 @@ class HabitsViewModel(
     val ui: StateFlow<HabitsUi?> = combine(
         habits.habits(), habits.entries(), autoInputs(training, routines, zone), todayFlow(clock),
     ) { list, entries, auto, today ->
-        presenter.present(list, entries, auto.workoutDays, today, auto.routineDays)
+        presenter.present(list, entries, auto.workoutDays, today, auto.sourceDays)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -83,7 +83,7 @@ class HabitDetailViewModel(
     val ui: StateFlow<HabitDetailUi?> = combine(
         habits.habits(), habits.entries(), autoInputs(training, routines, zone), todayFlow(clock), month,
     ) { list, entries, auto, today, m ->
-        list.firstOrNull { it.habit.id == id }?.let { presenter.present(it, entries, auto.workoutDays, today, m, auto.routineDays) }
+        list.firstOrNull { it.habit.id == id }?.let { presenter.present(it, entries, auto.workoutDays, today, m, auto.sourceDays) }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

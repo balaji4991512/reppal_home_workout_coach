@@ -88,10 +88,10 @@ object HabitRows {
         entries: Map<String, Map<LocalDate, Int>>,
         workoutDays: Set<LocalDate>,
         today: LocalDate,
-        routineDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
     ): HabitRowUi {
         val h = s.habit
-        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, routineDays)
+        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, sourceDays)
         val amount = Habits.amount(h, log, today)
         return HabitRowUi(
             id = h.id,
@@ -120,9 +120,9 @@ class HabitsPresenter {
         entries: Map<String, Map<LocalDate, Int>>,
         workoutDays: Set<LocalDate>,
         today: LocalDate,
-        routineDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
     ): HabitsUi {
-        val rows = habits.map { HabitRows.row(it, entries, workoutDays, today, routineDays) }
+        val rows = habits.map { HabitRows.row(it, entries, workoutDays, today, sourceDays) }
         val live = rows.filterNot { it.archived }
         val due = live.filter { it.due }
         val done = due.count { it.done }
@@ -177,10 +177,10 @@ class HabitDetailPresenter {
         workoutDays: Set<LocalDate>,
         today: LocalDate,
         month: YearMonth,
-        routineDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
     ): HabitDetailUi {
         val h = s.habit
-        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, routineDays)
+        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, sourceDays)
         val first = month.atDay(1)
         val days = (0 until month.lengthOfMonth()).map { i ->
             val date = first.plusDays(i.toLong())
@@ -201,7 +201,7 @@ class HabitDetailPresenter {
         val monthStart = maxOf(first, h.startDate)
         val week = Habits.weekProgress(h, log, today)
         return HabitDetailUi(
-            row = HabitRows.row(s, entries, workoutDays, today, routineDays),
+            row = HabitRows.row(s, entries, workoutDays, today, sourceDays),
             schedule = HabitFormat.schedule(h.schedule),
             monthTitle = "${month.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${month.year}",
             weeks = weeks,

@@ -28,7 +28,7 @@ sealed interface HabitSchedule {
 }
 
 /** What ticks a habit by itself. A tick made by hand always wins, including unticking. */
-enum class AutoSource { NONE, WORKOUT, MORNING_ROUTINE, NIGHT_ROUTINE }
+enum class AutoSource { NONE, WORKOUT, MORNING_ROUTINE, NIGHT_ROUTINE, JOURNAL }
 
 data class Habit(
     val id: String,
@@ -198,7 +198,7 @@ object Habits {
         Suggestion("Workout", HabitKind.DONE, 1, AutoSource.WORKOUT),
         Suggestion("Morning routine", HabitKind.DONE, 1, AutoSource.MORNING_ROUTINE),
         Suggestion("Night routine", HabitKind.DONE, 1, AutoSource.NIGHT_ROUTINE),
-        Suggestion("Journal", HabitKind.DONE, 1),
+        Suggestion("Journal", HabitKind.DONE, 1, AutoSource.JOURNAL),
         Suggestion("Water", HabitKind.COUNT, 8),
         Suggestion("Sleep", HabitKind.TIME, 7 * 60),
         Suggestion("Reading", HabitKind.TIME, 20),

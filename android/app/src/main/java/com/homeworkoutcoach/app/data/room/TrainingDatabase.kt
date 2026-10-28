@@ -133,6 +133,14 @@ data class RoutineDoneEntity(
     val epochDay: Long,
 )
 
+/** A journal entry for a local calendar day. */
+@Entity(tableName = "journal_entry")
+data class JournalEntity(
+    @PrimaryKey val epochDay: Long,
+    val win: String,
+    val improve: String,
+)
+
 @Dao
 interface ExerciseStateDao {
     @Query("SELECT * FROM exercise_state")
@@ -276,19 +284,34 @@ abstract class RoutineDao {
     abstract suspend fun clearRoutines()
 }
 
+@Dao
+interface JournalDao {
+    @Query("SELECT * FROM journal_entry ORDER BY epochDay DESC")
+    fun observeAll(): Flow<List<JournalEntity>>
+
+    @Upsert
+    suspend fun upsert(entry: JournalEntity)
+
+    @Query("DELETE FROM journal_entry WHERE epochDay = :epochDay")
+    suspend fun delete(epochDay: Long)
+
+    @Query("DELETE FROM journal_entry")
+    suspend fun clear()
+}
+
 @Database(
     entities = [
         ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class,
         HabitEntity::class, HabitEntryEntity::class, TaskEntity::class,
-        RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class,
+        RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    // 5: routine, routine_item and routine_done tables added.
+    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
-        AutoMigration(from = 4, to = 5),
+        AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6),
     ],
 )
 abstract class TrainingDatabase : RoomDatabase() {
@@ -299,6 +322,7 @@ abstract class TrainingDatabase : RoomDatabase() {
     abstract fun habits(): HabitDao
     abstract fun tasks(): TaskDao
     abstract fun routines(): RoutineDao
+    abstract fun journal(): JournalDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =

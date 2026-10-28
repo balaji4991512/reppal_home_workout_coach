@@ -89,13 +89,13 @@ class TodayPresenterTest {
         habits: List<com.homeworkoutcoach.app.data.StoredHabit> = emptyList(),
         habitAmounts: Map<String, Int> = emptyMap(),
         workoutDays: Set<LocalDate> = emptySet(),
-        routineDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
         tasks: List<com.homeworkoutcoach.engine.Task> = emptyList(),
         name: String = "Asha Rao",
     ) = TodayPresenter.present(
         name, now, workout,
         routinesP.present(routines, routinesDone.map { RoutineDone(it, WED) }.toSet(), WED, now.toLocalTime()),
-        habitsP.present(habits, habitAmounts.mapValues { mapOf(WED to it.value) }, workoutDays, WED, routineDays),
+        habitsP.present(habits, habitAmounts.mapValues { mapOf(WED to it.value) }, workoutDays, WED, sourceDays),
         tasksP.present(tasks, WED, WED),
     )
 

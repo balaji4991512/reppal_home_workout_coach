@@ -181,7 +181,7 @@ class HabitLogsTest {
         val morning = com.homeworkoutcoach.engine.Routine("m", "Morning", com.homeworkoutcoach.engine.DayPart.MORNING, listOf(com.homeworkoutcoach.engine.RoutineItem("a", "A")))
         val evening = com.homeworkoutcoach.engine.Routine("e", "Evening", com.homeworkoutcoach.engine.DayPart.EVENING, listOf(com.homeworkoutcoach.engine.RoutineItem("b", "B")))
         val done = listOf(RoutineDone("m", DAY), RoutineDone("e", DAY.minusDays(1)))
-        val days = HabitLogs.routineDays(listOf(morning, evening), done)
+        val days = HabitLogs.sourceDays(listOf(morning, evening), done)
         assertEquals(setOf(DAY), days.getValue(AutoSource.MORNING_ROUTINE))
         assertEquals(setOf(DAY.minusDays(1)), days.getValue(AutoSource.NIGHT_ROUTINE))
 
@@ -193,7 +193,7 @@ class HabitLogsTest {
         // unticked by hand wins here too
         assertFalse(Habits.isDone(morningHabit, HabitLogs.log(morningHabit, mapOf(DAY to 0), emptySet(), days), DAY))
         // and without routines nothing ticks
-        assertFalse(Habits.isDone(morningHabit, HabitLogs.log(morningHabit, emptyMap(), emptySet(), HabitLogs.routineDays(emptyList(), done)), DAY))
+        assertFalse(Habits.isDone(morningHabit, HabitLogs.log(morningHabit, emptyMap(), emptySet(), HabitLogs.sourceDays(emptyList(), done)), DAY))
     }
 
     @Test

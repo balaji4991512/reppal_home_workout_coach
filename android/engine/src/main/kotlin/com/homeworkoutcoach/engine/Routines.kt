@@ -53,7 +53,7 @@ object Routines {
     fun partOf(auto: AutoSource): DayPart? = when (auto) {
         AutoSource.MORNING_ROUTINE -> DayPart.MORNING
         AutoSource.NIGHT_ROUTINE -> DayPart.EVENING
-        AutoSource.WORKOUT, AutoSource.NONE -> null
+        AutoSource.WORKOUT, AutoSource.JOURNAL, AutoSource.NONE -> null
     }
 
     val order: Comparator<Routine> = compareBy<Routine>({ it.position }, { it.name.lowercase() }, { it.id })

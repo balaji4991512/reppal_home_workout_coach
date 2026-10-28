@@ -54,24 +54,29 @@ object HabitLogs {
         workouts.map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
 
     /**
-     * The days the Morning and Night routine habits tick themselves: days every Morning (or Evening) routine was
-     * finished. Deleting a routine takes its finished days with it, so those days stop counting.
+     * The days the self-ticking habits (other than Workout) tick themselves: days every Morning (or Evening) routine
+     * was finished, and days with a journal entry. Deleting a routine takes its finished days with it, so those days stop counting.
      */
-    fun routineDays(routines: List<Routine>, done: Collection<RoutineDone>): Map<AutoSource, Set<LocalDate>> = mapOf(
+    fun sourceDays(
+        routines: List<Routine>,
+        done: Collection<RoutineDone>,
+        journalDays: Set<LocalDate> = emptySet(),
+    ): Map<AutoSource, Set<LocalDate>> = mapOf(
         AutoSource.MORNING_ROUTINE to Routines.autoDays(routines, done, DayPart.MORNING),
         AutoSource.NIGHT_ROUTINE to Routines.autoDays(routines, done, DayPart.EVENING),
+        AutoSource.JOURNAL to journalDays,
     )
 
     fun log(
         habit: Habit,
         entries: Map<LocalDate, Int>,
         workoutDays: Set<LocalDate>,
-        routineDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
     ): HabitLog = HabitLog(
         entries = entries,
         autoDays = when (habit.auto) {
             AutoSource.WORKOUT -> workoutDays
-            AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE -> routineDays[habit.auto].orEmpty()
+            AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE, AutoSource.JOURNAL -> sourceDays[habit.auto].orEmpty()
             AutoSource.NONE -> emptySet()
         },
     )

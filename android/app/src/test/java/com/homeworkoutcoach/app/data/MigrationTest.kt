@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.homeworkoutcoach.app.data.room.RoomBodyRepository
 import com.homeworkoutcoach.app.data.room.RoomHabitRepository
+import com.homeworkoutcoach.app.data.room.RoomJournalRepository
 import com.homeworkoutcoach.app.data.room.RoomRoutineRepository
 import com.homeworkoutcoach.app.data.room.RoomTaskRepository
 import com.homeworkoutcoach.app.data.room.RoomTrainingRepository
@@ -38,6 +39,10 @@ class MigrationTest {
         schema.getValue("entities").jsonArray.forEach { e ->
             val o = e.jsonObject
             db.execSQL(o.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", o.getValue("tableName").jsonPrimitive.content))
+            // Indices were added to the schema in version 5; older schema files have none.
+            o["indices"]?.jsonArray?.forEach { i ->
+                db.execSQL(i.jsonObject.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", o.getValue("tableName").jsonPrimitive.content))
+            }
         }
         schema.getValue("setupQueries").jsonArray.forEach { db.execSQL(it.jsonPrimitive.content) }
         insertRows(db)
@@ -81,7 +86,33 @@ class MigrationTest {
         assertEquals(1, RoomTaskRepository(db).tasks().first().size)
         RoomRoutineRepository(db).save(routine("r"))
         assertEquals(1, RoomRoutineRepository(db).routines().first().size)
-        assertEquals(5, db.openHelper.readableDatabase.version)
+        RoomJournalRepository(db).save(com.homeworkoutcoach.engine.JournalEntry(java.time.LocalDate.of(2026, 10, 28), "won"))
+        assertEquals(1, RoomJournalRepository(db).entries().first().size)
+        assertEquals(6, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test
+    fun version5DataSurvivesAndTheJournalWorks() = runTest {
+        val file = tmp.newFile("training.db").also { it.delete() }
+        create(file, 5) { db ->
+            insertWorkoutAndState(db)
+            db.execSQL("INSERT INTO routine (id, name, part, position) VALUES ('r', 'Morning', 'morning', 0)")
+            db.execSQL("INSERT INTO routine_item (routineId, id, title, habitId, position) VALUES ('r', 's', 'Stretch', NULL, 0)")
+            db.execSQL("INSERT INTO routine_done (routineId, epochDay) VALUES ('r', 20001)")
+        }
+
+        val db = open(file)
+        val routines = RoomRoutineRepository(db)
+        assertEquals("Stretch", routines.routines().first().single().items.single().title)
+        assertEquals(1, routines.done().first().size)
+        assertEquals("A", RoomTrainingRepository(db).workouts().first().single().label)
+
+        val journal = RoomJournalRepository(db)
+        assertEquals(emptyList<com.homeworkoutcoach.engine.JournalEntry>(), journal.entries().first())
+        journal.save(com.homeworkoutcoach.engine.JournalEntry(java.time.LocalDate.of(2026, 10, 28), "a win", "do better"))
+        assertEquals("a win", journal.entries().first().single().win)
+        assertEquals(6, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -106,7 +137,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Routine>(), routines.routines().first())
         routines.save(routine("r", linkedTo = "h"))
         assertEquals("h", routines.routines().first().single().items.first().habitId)
-        assertEquals(5, db.openHelper.readableDatabase.version)
+        assertEquals(6, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -133,7 +164,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Task>(), tasks.tasks().first())
         tasks.save(task("t"))
         assertEquals(listOf("t"), tasks.tasks().first().map { it.id })
-        assertEquals(5, db.openHelper.readableDatabase.version)
+        assertEquals(6, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -154,7 +185,7 @@ class MigrationTest {
         habits.save(storedHabit("water"))
         habits.setAmount("water", java.time.LocalDate.of(2026, 10, 27), 1)
         assertEquals(1, habits.entries().first().getValue("water").size)
-        assertEquals(5, db.openHelper.readableDatabase.version)
+        assertEquals(6, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

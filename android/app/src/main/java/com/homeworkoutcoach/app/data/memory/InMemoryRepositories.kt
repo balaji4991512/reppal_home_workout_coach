@@ -7,6 +7,7 @@ import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.BodyWeight
 import com.homeworkoutcoach.app.data.DeleteResult
 import com.homeworkoutcoach.app.data.HabitRepository
+import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.SignInResult
@@ -16,6 +17,7 @@ import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.JournalEntry
 import com.homeworkoutcoach.engine.Routine
 import com.homeworkoutcoach.engine.RoutineDone
 import com.homeworkoutcoach.engine.Routines
@@ -193,5 +195,21 @@ class InMemoryRoutineRepository : RoutineRepository {
     override suspend fun wipe() {
         routines.value = emptyList()
         done.value = emptySet()
+    }
+}
+
+class InMemoryJournalRepository : JournalRepository {
+    private val state = MutableStateFlow<List<JournalEntry>>(emptyList())
+
+    override fun entries(): Flow<List<JournalEntry>> = state
+
+    override suspend fun save(entry: JournalEntry) = state.update { list ->
+        (list.filterNot { it.date == entry.date } + entry).sortedByDescending { it.date }
+    }
+
+    override suspend fun delete(date: LocalDate) = state.update { list -> list.filterNot { it.date == date } }
+
+    override suspend fun wipe() {
+        state.value = emptyList()
     }
 }

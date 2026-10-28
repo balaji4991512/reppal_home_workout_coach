@@ -5,6 +5,7 @@ import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Habit
+import com.homeworkoutcoach.engine.JournalEntry
 import com.homeworkoutcoach.engine.HabitKind
 import com.homeworkoutcoach.engine.HabitSchedule
 import com.homeworkoutcoach.engine.Library
@@ -30,8 +31,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits added. 3: planner tasks added. 4: routines added (older files still restore). */
-    const val FORMAT = 4
+    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal (older files still restore). */
+    const val FORMAT = 5
 
     @Serializable
     data class File(
@@ -50,6 +51,8 @@ object DataExport {
         val tasks: List<TaskDto>? = null,
         /** Null in files from before routines existed; restoring such a file leaves the phone's routines alone. */
         val routines: List<RoutineDto>? = null,
+        /** Null in files from before the journal existed; restoring such a file leaves the phone's journal alone. */
+        val journal: List<JournalDto>? = null,
     )
 
     @Serializable
@@ -127,6 +130,10 @@ object DataExport {
     @Serializable
     data class StepDto(val id: String, val title: String, val habit: String? = null)
 
+    /** [date] is a calendar day (2026-10-27). */
+    @Serializable
+    data class JournalDto(val date: String, val win: String = "", val improve: String = "")
+
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
@@ -146,6 +153,7 @@ object DataExport {
         habits: List<HabitData> = emptyList(),
         tasks: List<Task> = emptyList(),
         routines: List<RoutineBundle> = emptyList(),
+        journal: List<JournalEntry> = emptyList(),
     ): String {
         val planner = Planner(lib)
         fun iso(ms: Long) = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -205,6 +213,7 @@ object DataExport {
                     done = b.done.sorted().map { it.toString() },
                 )
             },
+            journal = journal.sortedBy { it.date }.map { JournalDto(it.date.toString(), it.win, it.improve) },
         )
         return json.encodeToString(File.serializer(), file)
     }
@@ -227,6 +236,8 @@ data class Restore(
     val tasks: List<Task>?,
     /** Null when the file predates routines: the phone's routines stay as they are. */
     val routines: List<RoutineBundle>?,
+    /** Null when the file predates the journal: the phone's journal stays as it is. */
+    val journal: List<JournalEntry>?,
     val exportedAt: Long,
 )
 
@@ -283,6 +294,7 @@ object DataImport {
                     habits = file.habits?.map(::habitData),
                     tasks = file.tasks?.map(::task),
                     routines = file.routines?.map(::routine),
+                    journal = file.journal?.map { JournalEntry(LocalDate.parse(it.date), it.win, it.improve) },
                     exportedAt = millis(file.exportedAt),
                 ),
             )
@@ -346,6 +358,7 @@ class DataImporter(
     private val habits: HabitRepository? = null,
     private val tasks: TaskRepository? = null,
     private val routines: RoutineRepository? = null,
+    private val journal: JournalRepository? = null,
 ) {
     suspend fun restore(r: Restore) {
         training.wipe()
@@ -377,6 +390,11 @@ class DataImporter(
                 b.done.forEach { routines.setDone(b.routine.id, it, true) }
             }
         }
+        // And for a file from before the journal.
+        if (r.journal != null && journal != null) {
+            journal.wipe()
+            r.journal.forEach { journal.save(it) }
+        }
         // Keep how the user is signed in on this phone; everything else comes from the file.
         settings.update { now -> r.settings.copy(guest = now.guest) }
     }
@@ -393,8 +411,17 @@ class DataExporter(
     private val habits: HabitRepository? = null,
     private val tasks: TaskRepository? = null,
     private val routines: RoutineRepository? = null,
+    private val journal: JournalRepository? = null,
 ) {
-    data class Result(val json: String, val workouts: Int, val weighIns: Int, val habits: Int = 0, val tasks: Int = 0, val routines: Int = 0)
+    data class Result(
+        val json: String,
+        val workouts: Int,
+        val weighIns: Int,
+        val habits: Int = 0,
+        val tasks: Int = 0,
+        val routines: Int = 0,
+        val journal: Int = 0,
+    )
 
     suspend fun export(appName: String, nowMillis: Long = System.currentTimeMillis()): Result {
         val workouts = training.workouts().first()
@@ -408,10 +435,11 @@ class DataExporter(
             val done = repo.done().first()
             repo.routines().first().map { r -> RoutineBundle(r, done.filter { it.routineId == r.id }.map { it.date }.toSet()) }
         }.orEmpty()
+        val journalList = journal?.entries()?.first().orEmpty()
         val text = DataExport.build(
             lib, appName, settings.settings.first(), training.exerciseStates().first(), training.swaps().first(),
-            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData,
+            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData, journalList,
         )
-        return Result(text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size)
+        return Result(text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size, journalList.size)
     }
 }

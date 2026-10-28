@@ -42,6 +42,7 @@ class RoutinesTest {
         assertEquals(DayPart.MORNING, Routines.partOf(AutoSource.MORNING_ROUTINE))
         assertEquals(DayPart.EVENING, Routines.partOf(AutoSource.NIGHT_ROUTINE))
         assertNull(Routines.partOf(AutoSource.WORKOUT))
+        assertNull(Routines.partOf(AutoSource.JOURNAL))
         assertNull(Routines.partOf(AutoSource.NONE))
     }
 

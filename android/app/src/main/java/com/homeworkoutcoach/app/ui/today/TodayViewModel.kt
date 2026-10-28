@@ -68,7 +68,7 @@ class TodayViewModel(
             now = now,
             workout = WorkoutCardPresenter.present(p.settings, p.swaps, week, p.workouts, lib, planner, today, zone),
             routines = routinesPresenter.present(r.routines, r.done, today, now.toLocalTime()),
-            habits = habitsPresenter.present(h.habits, h.entries, h.auto.workoutDays, today, h.auto.routineDays),
+            habits = habitsPresenter.present(h.habits, h.entries, h.auto.workoutDays, today, h.auto.sourceDays),
             tasks = tasksPresenter.present(t, today, today),
         )
         ui to week?.statesToStore.orEmpty()

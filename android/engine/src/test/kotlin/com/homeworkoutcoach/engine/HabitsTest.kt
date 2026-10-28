@@ -198,7 +198,7 @@ class HabitsTest {
             s.map { it.name },
         )
         assertEquals(
-            listOf(AutoSource.WORKOUT, AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE),
+            listOf(AutoSource.WORKOUT, AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE, AutoSource.JOURNAL),
             s.map { it.auto }.filter { it != AutoSource.NONE },
         )
         assertEquals(Habits.Suggestion("Water", HabitKind.COUNT, 8), s.first { it.name == "Water" })
