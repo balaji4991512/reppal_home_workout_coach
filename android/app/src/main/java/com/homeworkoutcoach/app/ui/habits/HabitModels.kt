@@ -8,6 +8,7 @@ import com.homeworkoutcoach.app.ui.planner.PlannerFormat
 import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.DayState
 import com.homeworkoutcoach.engine.Habit
+import com.homeworkoutcoach.engine.HabitLog
 import com.homeworkoutcoach.engine.HabitKind
 import com.homeworkoutcoach.engine.HabitSchedule
 import com.homeworkoutcoach.engine.Habits
@@ -182,8 +183,31 @@ data class DayCellUi(
     val amount: Int,
 )
 
+/** One square in the history grid. [state] is null for a day that cannot show (before the start, or still to come). */
+data class HeatCellUi(val date: LocalDate, val state: DayState?, val isToday: Boolean, val fraction: Float)
+
+/** The last [WEEKS] weeks as columns, oldest first; each column is Monday to Sunday. */
+data class HeatmapUi(
+    val columns: List<List<HeatCellUi>>,
+    /** "Sep", "Oct": where a month begins, as (column, label). */
+    val months: List<Pair<Int, String>>,
+) {
+    companion object {
+        const val WEEKS = 26
+    }
+}
+
 data class HabitDetailUi(
     val row: HabitRowUi,
+    /** "37" and what it counts, "days" (or "weeks" for a times-a-week habit). */
+    val currentStreak: Int,
+    val bestStreak: Int,
+    val streakUnit: String,
+    val heatmap: HeatmapUi,
+    /** Done days over the days due since the start, as a whole percent, or null if nothing has been due yet. */
+    val completionRate: Int?,
+    /** "Since 30 Jul 2025 (180 days)". */
+    val sinceLong: String,
     val schedule: String,
     val monthTitle: String,
     /** Monday first; null cells pad the first and last week. */
@@ -228,8 +252,18 @@ class HabitDetailPresenter {
         val monthEnd = minOf(month.atEndOfMonth(), today)
         val monthStart = maxOf(first, h.startDate)
         val week = Habits.weekProgress(h, log, today)
+        val streaks = Habits.streaks(h, log, today)
+        val rate = Habits.stats(h, log, h.startDate, today).let { if (it.due == 0) null else it.done * 100 / it.due }
+        val daysSince = if (h.startDate <= today) java.time.temporal.ChronoUnit.DAYS.between(h.startDate, today).toInt() + 1 else 0
         return HabitDetailUi(
             row = HabitRows.row(s, entries, workoutDays, today, sourceDays),
+            currentStreak = streaks.current,
+            bestStreak = streaks.best,
+            streakUnit = if (streaks.weekly) "weeks" else "days",
+            heatmap = heatmap(h, log, today),
+            completionRate = rate,
+            sinceLong = "Since ${h.startDate.dayOfMonth} ${h.startDate.month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)} ${h.startDate.year}" +
+                " (${if (daysSince == 1) "1 day" else "$daysSince days"})",
             schedule = HabitFormat.schedule(h.schedule),
             monthTitle = "${month.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${month.year}",
             weeks = weeks,
@@ -243,6 +277,32 @@ class HabitDetailPresenter {
             since = "${h.startDate.dayOfMonth} ${h.startDate.month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)} ${h.startDate.year}",
         )
     }
+}
+
+/** The history grid: the last [HeatmapUi.WEEKS] weeks ending with the week of [today]. */
+internal fun heatmap(h: Habit, log: HabitLog, today: LocalDate): HeatmapUi {
+    val firstMonday = Habits.weekStart(today).minusWeeks(HeatmapUi.WEEKS - 1L)
+    val columns = (0 until HeatmapUi.WEEKS).map { w ->
+        (0L..6L).map { d ->
+            val date = firstMonday.plusWeeks(w.toLong()).plusDays(d)
+            val shown = date >= h.startDate && date <= today
+            HeatCellUi(
+                date = date,
+                state = if (shown) Habits.dayState(h, log, date) else null,
+                isToday = date == today,
+                fraction = if (shown) Habits.fraction(h, log, date).toFloat() else 0f,
+            )
+        }
+    }
+    // A month's name sits over the first column that starts in it.
+    val months = columns.mapIndexedNotNull { i, col ->
+        val monday = col.first().date
+        val startsMonth = monday.dayOfMonth <= 7
+        if (startsMonth && (i == 0 || columns[i - 1].first().date.month != monday.month)) {
+            i to monday.month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+        } else null
+    }
+    return HeatmapUi(columns, months)
 }
 
 /** Writes for habit amounts. */

@@ -73,6 +73,13 @@ data class WeekProgress(val done: Int, val target: Int) {
 /** [done] days of the [due] days that were due so far. A day or week still in progress is never counted as missed. */
 data class HabitStats(val done: Int, val due: Int)
 
+/**
+ * How long a habit has gone on without a break. [current] and [best] count days, or weeks for a times-a-week habit
+ * ([weekly]). A break only ever shows on a day or week that has finished, so a streak is never lost by today not being
+ * done yet.
+ */
+data class Streaks(val current: Int, val best: Int, val weekly: Boolean)
+
 object Habits {
     // ---- Days and amounts ----
 
@@ -183,6 +190,45 @@ object Habits {
             week = week.plusDays(7)
         }
         return HabitStats(done, due)
+    }
+
+    /**
+     * The streaks up to [today]. A fixed-schedule habit counts the days it was done in a row: a scheduled day that has
+     * passed undone resets it, while a day it is not scheduled, and today until it is done, change nothing. A
+     * times-a-week habit counts the weeks in a row that reached the count; the week in progress adds one once it
+     * does, and never breaks. Nothing counts before the start date.
+     */
+    fun streaks(habit: Habit, log: HabitLog, today: LocalDate): Streaks {
+        val schedule = habit.schedule
+        val weekly = schedule is HabitSchedule.TimesPerWeek
+        if (habit.startDate.isAfter(today)) return Streaks(0, 0, weekly)
+        var run = 0
+        var best = 0
+        if (schedule is HabitSchedule.TimesPerWeek) {
+            var week = weekStart(habit.startDate)
+            while (!week.isAfter(today)) {
+                val days = (0L..6L).map { week.plusDays(it) }
+                val counted = days.filter { it >= habit.startDate }
+                val target = minOf(schedule.times, counted.size)
+                val done = counted.count { isDone(habit, log, it) }
+                val finished = week.plusDays(6) < today
+                when {
+                    done >= target -> { run++; best = maxOf(best, run) }
+                    finished -> run = 0
+                }
+                week = week.plusDays(7)
+            }
+        } else {
+            var day = habit.startDate
+            while (!day.isAfter(today)) {
+                when {
+                    isDone(habit, log, day) -> { run++; best = maxOf(best, run) }
+                    isDueBySchedule(habit, day) && day < today -> run = 0
+                }
+                day = day.plusDays(1)
+            }
+        }
+        return Streaks(run, best, weekly)
     }
 
     /** Fixed-schedule due check that ignores what was logged (used for counting past days). */

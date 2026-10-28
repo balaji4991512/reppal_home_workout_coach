@@ -173,6 +173,71 @@ class HabitsTest {
         assertEquals(1, Habits.doneDays(habit(), ticks(0, 3), day(1), day(6)))
     }
 
+    // ---- Streaks ----
+
+    @Test
+    fun aDailyStreakCountsDaysInARowAndTodayNotYetDoneDoesNotBreakIt() {
+        val h = habit(start = mon.minusDays(10))
+        // done Sat, Sun, Mon, Tue; today is Wednesday and not done yet
+        val s = Habits.streaks(h, ticks(-2, -1, 0, 1), day(2))
+        assertEquals(Streaks(4, 4, false), s)
+        // ticking today makes it five
+        assertEquals(5, Habits.streaks(h, ticks(-2, -1, 0, 1, 2), day(2)).current)
+    }
+
+    @Test
+    fun aMissedDayResetsTheCurrentStreakButTheBestIsKept() {
+        val h = habit(start = mon.minusDays(20))
+        // a run of 5 (days -9..-5), a gap, then 2 (days 0, 1) with today (day 2) not done
+        val log = ticks(-9, -8, -7, -6, -5, 0, 1)
+        assertEquals(Streaks(2, 5, false), Habits.streaks(h, log, day(2)))
+        // a missed day just before today ends it: nothing done yesterday
+        assertEquals(0, Habits.streaks(h, ticks(-9, -8, 0), day(2)).current)
+    }
+
+    @Test
+    fun aHabitNotYetStartedOrNeverDoneHasNoStreak() {
+        assertEquals(Streaks(0, 0, false), Habits.streaks(habit(start = day(3)), HabitLog(), day(2)))
+        assertEquals(Streaks(0, 0, false), Habits.streaks(habit(start = mon.minusDays(5)), HabitLog(), day(2)))
+    }
+
+    @Test
+    fun aWeekdayHabitSkipsTheDaysItIsNotScheduled() {
+        val gym = habit(HabitSchedule.Weekdays(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)), start = mon.minusDays(14))
+        // last Mon, Wed, Fri and this Mon, Wed (today, done): the days between do not break it
+        val log = ticks(-7, -5, -3, 0, 2)
+        assertEquals(Streaks(5, 5, false), Habits.streaks(gym, log, day(2)))
+        // missing last Wednesday breaks it
+        assertEquals(Streaks(3, 3, false), Habits.streaks(gym, ticks(-7, -3, 0, 2), day(2)))
+    }
+
+    @Test
+    fun aTimesAWeekHabitCountsWeeksInARow() {
+        val run = habit(HabitSchedule.TimesPerWeek(3), start = mon.minusDays(28))
+        // three weeks ago: 3 done; two weeks ago: 2 (short); last week: 3; this week so far: 1 (in progress)
+        val log = HabitLog(listOf(-21, -20, -19, -14, -13, -7, -6, -5, 0).associate { day(it) to 1 })
+        assertEquals(Streaks(1, 1, true), Habits.streaks(run, log, day(2)))
+        // this week reaching 3 adds it
+        val met = HabitLog((listOf(-21, -20, -19, -14, -13, -7, -6, -5, 0, 1, 2)).associate { day(it) to 1 })
+        assertEquals(Streaks(2, 2, true), Habits.streaks(run, met, day(2)))
+    }
+
+    @Test
+    fun theFirstShortWeekOfATimesAWeekHabitNeedsOnlyTheDaysLeft() {
+        val run = habit(HabitSchedule.TimesPerWeek(5), start = day(4)) // starts Friday: 3 days left in the week
+        val log = HabitLog(listOf(4, 5, 6).associate { day(it) to 1 })
+        assertEquals(1, Habits.streaks(run, log, day(8)).current)
+    }
+
+    @Test
+    fun anAutoTickedHabitStreaksFromItsAutoDays() {
+        val workout = habit(auto = AutoSource.WORKOUT, start = mon.minusDays(5))
+        val log = HabitLog(autoDays = setOf(day(-1), day(0), day(1)))
+        assertEquals(3, Habits.streaks(workout, log, day(2)).current)
+        // unticked by hand on one of them breaks it
+        assertEquals(1, Habits.streaks(workout, log.copy(entries = mapOf(day(0) to 0)), day(2)).current)
+    }
+
     // ---- Ticking itself ----
 
     @Test

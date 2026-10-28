@@ -202,10 +202,80 @@ class HabitsPresenterTest {
 
 class HabitDetailPresenterTest {
     private val presenter = HabitDetailPresenter()
+
+    private fun entries(vararg e: Pair<String, Map<LocalDate, Int>>) = mapOf(*e)
     private val oct = YearMonth.of(2026, 10)
 
     private fun cell(ui: com.homeworkoutcoach.app.ui.habits.HabitDetailUi, day: Int): DayCellUi =
         ui.weeks.flatten().filterNotNull().first { it.date == LocalDate.of(2026, 10, day) }
+
+    @Test
+    fun theDetailCarriesTheStreaksTheRateAndHowLongItHasRun() {
+        // starts 24 Oct (a Saturday); done Sat, Sun, Mon, Tue; today is Wednesday and not done yet
+        val h = storedHabit("a")
+        val e = entries("a" to mapOf(WED.minusDays(4) to 1, WED.minusDays(3) to 1, WED.minusDays(2) to 1, WED.minusDays(1) to 1))
+        val ui = presenter.present(h, e, emptySet(), WED, oct)
+        assertEquals(4, ui.currentStreak)
+        assertEquals(4, ui.bestStreak)
+        assertEquals("days", ui.streakUnit)
+        assertEquals(100, ui.completionRate) // 4 done of the 4 days that have passed; today is not counted missed
+        assertEquals("Since 24 Oct 2026 (5 days)", ui.sinceLong)
+        assertEquals(4, ui.allTimeDays)
+    }
+
+    @Test
+    fun aHabitDoneOnHalfItsDaysHasAHalfRateAndAStreakOfOneAfterAGap() {
+        val h = storedHabit("a")
+        val e = entries("a" to mapOf(WED.minusDays(4) to 1, WED.minusDays(1) to 1))
+        val ui = presenter.present(h, e, emptySet(), WED, oct)
+        assertEquals(50, ui.completionRate)
+        assertEquals(1, ui.currentStreak)
+        assertEquals(1, ui.bestStreak)
+    }
+
+    @Test
+    fun aTimesAWeekHabitStreaksInWeeks() {
+        val h = storedHabit("a", schedule = HabitSchedule.TimesPerWeek(2))
+        assertEquals("weeks", presenter.present(h, emptyMap(), emptySet(), WED, oct).streakUnit)
+    }
+
+    @Test
+    fun aHabitStartedTodayHasNoRateYet() {
+        val h = storedHabit("a") // started 24 Oct
+        val ui = presenter.present(h, emptyMap(), emptySet(), WED.minusDays(4), oct) // looking from its first day
+        assertNull(ui.completionRate)
+        assertEquals("Since 24 Oct 2026 (1 day)", ui.sinceLong)
+    }
+
+    @Test
+    fun theHistoryGridHas26WeeksOfSevenDaysEndingWithThisWeek() {
+        val h = storedHabit("a") // starts 24 Oct
+        val e = entries("a" to mapOf(WED to 1, WED.minusDays(1) to 1))
+        val map = presenter.present(h, e, emptySet(), WED, oct).heatmap
+        assertEquals(26, map.columns.size)
+        assertTrue(map.columns.all { it.size == 7 })
+        assertEquals(LocalDate.of(2026, 10, 26), map.columns.last().first().date) // this Monday
+        assertEquals(LocalDate.of(2026, 5, 4), map.columns.first().first().date) // 25 weeks before
+        val last = map.columns.last()
+        assertEquals(listOf(DayState.DONE, DayState.DONE), last.take(3).drop(1).map { it.state }) // Tue, Wed done
+        assertNull(last[3].state) // Thursday has not happened
+        assertTrue(last[2].isToday)
+        // before the habit started nothing shows
+        assertNull(map.columns[map.columns.size - 2].first().state)
+        // a habit started on the Saturday: Saturday and Sunday of the week before show as open
+        assertEquals(DayState.OPEN, map.columns[map.columns.size - 2][5].state)
+    }
+
+    @Test
+    fun monthNamesSitOverTheWeekThatStartsEachMonth() {
+        val map = presenter.present(storedHabit("a"), emptyMap(), emptySet(), WED, oct).heatmap
+        val names = map.months.map { it.second }
+        assertEquals(names.distinct(), names) // each month once
+        assertTrue("Oct" in names)
+        assertEquals("Oct", map.months.last().second)
+        // the label is over a column whose Monday is within the first week of that month
+        map.months.forEach { (col, _) -> assertTrue(map.columns[col].first().date.dayOfMonth <= 7 || col == 0) }
+    }
 
     @Test
     fun monthGridStartsOnMondayAndPadsTheEnds() {

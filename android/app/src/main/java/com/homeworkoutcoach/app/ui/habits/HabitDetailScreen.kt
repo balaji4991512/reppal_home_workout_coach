@@ -1,6 +1,15 @@
 package com.homeworkoutcoach.app.ui.habits
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -88,7 +97,13 @@ fun HabitDetailScreen(
             }
         }
 
-        H2("This week", top = 24.dp)
+        StreakCards(s, Modifier.padding(top = 20.dp))
+        HistoryCard(s, Modifier.padding(top = 12.dp))
+        s.completionRate?.let { StatCard("Completion rate", "$it%", Modifier.padding(top = 12.dp)) }
+        StatCard("Frequency", s.schedule, Modifier.padding(top = 12.dp))
+        StatCard("Started", s.since, Modifier.padding(top = 12.dp))
+
+        H2("This week", top = 28.dp)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 if (s.weekTarget > 0) "${s.weekDone} of ${s.weekTarget}" else "Nothing scheduled",
@@ -143,10 +158,106 @@ fun HabitDetailScreen(
 
         H2("Totals", top = 28.dp)
         LineRow(left = { Body("This month") }, right = { Body("${days(s.monthDays)}", strong = true) })
-        LineRow(left = { Body("All time") }, right = { Body("${days(s.allTimeDays)}", strong = true) })
-        LineRow(left = { Body("Started") }, right = { Body(s.since, strong = true) }, divider = false)
+        LineRow(left = { Body("All time") }, right = { Body("${days(s.allTimeDays)}", strong = true) }, divider = false)
 
         PrimaryButton("Edit habit", onEdit, alt = true)
+    }
+}
+
+/** Current and best streak, side by side. A streak that is not running is said plainly, not marked as lost. */
+@Composable
+private fun StreakCards(s: HabitDetailUi, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft).padding(vertical = 16.dp)) {
+        StreakHalf("Current streak", s.currentStreak, s.streakUnit, Modifier.weight(1f))
+        Box(Modifier.width(1.dp).height(64.dp).background(c.bd).align(Alignment.CenterVertically))
+        StreakHalf("Best streak", s.bestStreak, s.streakUnit, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StreakHalf(label: String, n: Int, unit: String, modifier: Modifier) {
+    val c = AppTheme.colors
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = c.fg, style = AppTheme.type.label)
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("$n", color = c.fg, style = AppTheme.type.tabular(AppTheme.type.h1.copy(fontSize = 38.sp, lineHeight = 42.sp)))
+            if (n > 0) Text("🔥", fontSize = 28.sp)
+        }
+        Small(if (n == 1) unit.removeSuffix("s") else unit)
+    }
+}
+
+/** Total completions and the history grid: a square a day, the last half year, greener the better the day went. */
+@Composable
+private fun HistoryCard(s: HabitDetailUi, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft).padding(16.dp)) {
+        Text("Total completions", color = c.fg, style = AppTheme.type.h2)
+        Small(s.sinceLong)
+        Text("${s.allTimeDays}", Modifier.padding(top = 10.dp), color = c.fg, style = AppTheme.type.tabular(AppTheme.type.h1))
+        Heatmap(s.heatmap, Modifier.padding(top = 14.dp))
+    }
+}
+
+/** M to S down the side, month names across the top, one square per day. The columns share the width equally. */
+@Composable
+private fun Heatmap(map: HeatmapUi, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    val gap = 3.dp
+    val labelW = 18.dp
+    Column(modifier.fillMaxWidth()) {
+        // month names, each over the first column of its month
+        Row(Modifier.padding(start = labelW).fillMaxWidth().height(16.dp), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            val at = map.months.toMap()
+            map.columns.indices.forEach { i ->
+                Box(Modifier.weight(1f)) {
+                    at[i]?.let {
+                        Text(
+                            it, Modifier.wrapContentWidth(Alignment.Start, unbounded = true), color = c.mut,
+                            style = AppTheme.type.small.copy(fontSize = 11.sp, lineHeight = 14.sp), maxLines = 1, softWrap = false,
+                        )
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Column(Modifier.width(labelW).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                listOf("M", "T", "W", "T", "F", "S", "S").forEach {
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        Text(it, color = c.mut, style = AppTheme.type.small.copy(fontSize = 9.sp, lineHeight = 10.sp))
+                    }
+                }
+            }
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                map.columns.forEach { col ->
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
+                        col.forEach { day ->
+                            val color = when (day.state) {
+                                DayState.DONE -> c.ok
+                                DayState.PARTIAL -> c.ok.copy(alpha = 0.35f + 0.4f * day.fraction)
+                                DayState.OPEN -> c.bd
+                                DayState.NOT_DUE -> c.bd.copy(alpha = 0.4f)
+                                null -> Color.Transparent
+                            }
+                            Box(
+                                Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(2.5.dp)).background(color)
+                                    .then(if (day.isToday) Modifier.border(1.dp, c.fg.copy(alpha = 0.6f), RoundedCornerShape(2.5.dp)) else Modifier),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft).padding(16.dp)) {
+        Text(title, color = c.fg, style = AppTheme.type.h2)
+        Small(value)
     }
 }
 
