@@ -8,6 +8,7 @@ import com.homeworkoutcoach.app.ui.planner.PlannerFormat
 import com.homeworkoutcoach.app.ui.planner.PlannerUi
 import com.homeworkoutcoach.app.ui.routines.RoutineRowUi
 import com.homeworkoutcoach.app.ui.routines.RoutinesUi
+import com.homeworkoutcoach.app.ui.week.HeroKind
 import com.homeworkoutcoach.app.ui.week.WeekUi
 import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.DayPart
@@ -30,11 +31,12 @@ sealed interface WorkoutCardUi {
     /** A workout was finished today. */
     data class Done(val title: String) : WorkoutCardUi
 
-    /** Not a training day. [nextTitle] is the workout that is up next, [nextDay] the day it is planned for ("Fri"). */
+    /** Not a training day. [nextTitle] is the workout that is up next, [nextDay] the day it is planned for ("Fri", or "" if none is left this week). */
     data class Rest(val nextTitle: String, val nextDay: String, val canStart: Boolean) : WorkoutCardUi
 }
 
 object WorkoutCardPresenter {
+    /** Today's own workout, whether it is done, or a rest day. Another day's workout is never offered. */
     fun present(
         settings: UserSettings,
         swaps: Map<String, String>,
@@ -49,13 +51,15 @@ object WorkoutCardPresenter {
         workouts.lastOrNull { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() == today }
             ?.let { return WorkoutCardUi.Done(planner.dayName(it.label)) }
         val hero = week.hero
-        val trainingDays = planner.weekdays(settings.planSettings(swaps)).sorted()
-        val todayIndex = today.dayOfWeek.value - 1
-        if (todayIndex in trainingDays) {
-            return WorkoutCardUi.Next(hero.title, hero.summary, "${hero.done} of ${hero.total} this week", hero.canStart)
+        return when (hero.kind) {
+            HeroKind.DONE_TODAY -> {
+                val title = workouts.lastOrNull { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() == today }
+                    ?.let { planner.dayName(it.label) } ?: hero.summary
+                WorkoutCardUi.Done(title)
+            }
+            HeroKind.TODAY -> WorkoutCardUi.Next(hero.title, hero.summary, "${hero.done} of ${hero.total} this week", hero.canStart)
+            HeroKind.REST -> WorkoutCardUi.Rest(hero.nextTitle ?: "No more workouts this week", hero.nextDay.orEmpty(), canStart = false)
         }
-        val next = trainingDays.firstOrNull { it > todayIndex } ?: trainingDays.first()
-        return WorkoutCardUi.Rest(hero.title, lib.dayNames[next].take(3), hero.canStart)
     }
 }
 

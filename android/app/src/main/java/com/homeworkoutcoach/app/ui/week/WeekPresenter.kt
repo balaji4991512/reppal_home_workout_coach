@@ -9,8 +9,15 @@ import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 import com.homeworkoutcoach.engine.Progression
+import com.homeworkoutcoach.engine.Schedule
+import com.homeworkoutcoach.engine.SessionStatus
 import com.homeworkoutcoach.engine.SetCountStatus
 import com.homeworkoutcoach.engine.Volume
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlin.math.roundToLong
 
 data class WeekUi(
@@ -23,15 +30,34 @@ data class WeekUi(
     val statesToStore: Map<String, ExerciseState>,
 )
 
+/** What the top of the week says about today. */
+enum class HeroKind {
+    /** Today is a training day and the workout is not done yet. */
+    TODAY,
+
+    /** Today's workout is done. */
+    DONE_TODAY,
+
+    /** Today is not a training day. */
+    REST,
+}
+
 data class HeroUi(
-    /** "Week 2, Wednesday" */
+    /** "Wednesday 28 October" */
     val when_: String,
+    /** Today's workout, "Workout done", or "Rest day". */
     val title: String,
-    /** "5 exercises, about 45 min" */
+    /** "5 exercises, about 45 min", or what is next on a rest day. */
     val summary: String,
+    /** Workouts planned this week (not counting days before the plan began), and how many are done. */
     val total: Int,
     val done: Int,
+    /** True only when today's own workout can be started. */
     val canStart: Boolean,
+    val kind: HeroKind = HeroKind.TODAY,
+    /** The next workout after today: its name and weekday ("Fri"), or null when none is left this week. */
+    val nextTitle: String? = null,
+    val nextDay: String? = null,
 )
 
 sealed interface WeekdayUi {
@@ -43,6 +69,7 @@ sealed interface WeekdayUi {
         override val abbr: String,
         /** Position in the week sequence. */
         val index: Int,
+        val date: LocalDate,
         val name: String,
         val exerciseCount: Int,
         val status: DayStatus,
@@ -53,7 +80,8 @@ sealed interface WeekdayUi {
     ) : WeekdayUi
 }
 
-enum class DayStatus { DONE, NEXT, UPCOMING }
+/** A training day against the calendar: done, skipped (its day passed without one), today, or still to come. */
+enum class DayStatus { DONE, SKIPPED, TODAY, UPCOMING }
 
 data class ExerciseRowUi(
     val id: String,
@@ -94,13 +122,17 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
         stored: Map<String, ExerciseState>,
         swaps: Map<String, String>,
         workouts: List<Workout>,
+        today: LocalDate = LocalDate.now(),
+        zone: ZoneId = ZoneId.systemDefault(),
     ): WeekUi {
         val ps = settings.planSettings(swaps)
         val seq = planner.weekSequence(ps)
         val week: List<Day> = seq.map { planner.buildDay(it, ps) }
         val weekdays = planner.weekdays(ps)
-        val k = settings.sessionIndex % seq.size
-        val weekNumber = settings.sessionIndex / seq.size + 1
+
+        // Each session sits on its own weekday of this calendar week: done, skipped, today or still to come.
+        val doneDates = workouts.map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
+        val schedule = Schedule.week(weekdays, today, doneDates, settings.planStartEpochDay?.let(LocalDate::ofEpochDay))
 
         val states = week.flatMap { d -> d.items.map { it.exerciseId } }.distinct().associateWith { id ->
             Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)
@@ -111,32 +143,55 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
             (states[id] ?: Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)).atLeast(minSets[id] ?: 0)
         }
 
-        val next = week[k]
-        val hero = HeroUi(
-            when_ = "Week $weekNumber, ${lib.dayNames[weekdays[k]]}",
-            title = planner.dayName(next.label),
-            summary = "${Copy.count(next.items.size, "exercise")}, about ${planner.estimateMinutes(next, state)} min",
-            total = seq.size,
-            done = k,
-            canStart = next.items.isNotEmpty(),
-        )
+        val counted = schedule.count { it.status != SessionStatus.BEFORE_PLAN }
+        val done = schedule.count { it.status == SessionStatus.DONE }
+        val todaySession = Schedule.today(schedule)
+        val doneToday = schedule.firstOrNull { it.date == today && it.status == SessionStatus.DONE }
+        val upcoming = Schedule.next(schedule)
+        val nextTitle = upcoming?.let { planner.dayName(week[it.index].label) }
+        val nextDay = upcoming?.let { lib.dayNames[it.weekday].take(3) }
+        val whenText = "${today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)}"
+        val hero = when {
+            todaySession != null -> {
+                val day = week[todaySession.index]
+                HeroUi(
+                    whenText, planner.dayName(day.label),
+                    "${Copy.count(day.items.size, "exercise")}, about ${planner.estimateMinutes(day, state)} min",
+                    counted, done, canStart = day.items.isNotEmpty(), kind = HeroKind.TODAY, nextTitle = nextTitle, nextDay = nextDay,
+                )
+            }
+            doneToday != null -> HeroUi(
+                whenText, "Workout done", planner.dayName(week[doneToday.index].label),
+                counted, done, canStart = false, kind = HeroKind.DONE_TODAY, nextTitle = nextTitle, nextDay = nextDay,
+            )
+            else -> HeroUi(
+                whenText, "Rest day",
+                if (nextTitle != null) "Next: $nextDay, $nextTitle" else "No more workouts this week",
+                counted, done, canStart = false, kind = HeroKind.REST, nextTitle = nextTitle, nextDay = nextDay,
+            )
+        }
 
         val days = lib.dayNames.mapIndexed { di, dayName ->
             val abbr = dayName.take(3)
             val j = weekdays.indexOf(di)
             if (j < 0) return@mapIndexed WeekdayUi.Rest(abbr)
+            val slot = schedule[j]
+            // A day before the plan began was never due, so it looks like a rest day.
+            if (slot.status == SessionStatus.BEFORE_PLAN) return@mapIndexed WeekdayUi.Rest(abbr)
             val day = week[j]
-            val status = when {
-                j < k -> DayStatus.DONE
-                j == k -> DayStatus.NEXT
+            val status = when (slot.status) {
+                SessionStatus.DONE -> DayStatus.DONE
+                SessionStatus.SKIPPED -> DayStatus.SKIPPED
+                SessionStatus.TODAY -> DayStatus.TODAY
                 else -> DayStatus.UPCOMING
             }
             val history = if (status == DayStatus.DONE) {
-                workouts.getOrNull(settings.weekBase + (weekNumber - 1) * seq.size + j)
+                workouts.lastOrNull { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() == slot.date }
             } else null
             WeekdayUi.Training(
                 abbr = abbr,
                 index = j,
+                date = slot.date,
                 name = planner.dayName(day.label),
                 exerciseCount = day.items.size,
                 status = status,

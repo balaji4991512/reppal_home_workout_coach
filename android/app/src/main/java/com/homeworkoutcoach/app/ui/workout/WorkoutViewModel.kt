@@ -18,6 +18,11 @@ import com.homeworkoutcoach.engine.SetParser
 import com.homeworkoutcoach.engine.SetRecord
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.homeworkoutcoach.engine.Schedule
+import com.homeworkoutcoach.engine.SessionStatus
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -49,6 +54,9 @@ sealed interface WorkoutState {
     /** Nothing to train today (no exercises for this day). */
     data object Empty : WorkoutState
 
+    /** There is no workout to start today: a rest day, or today's is already done. [title] and [note] say which. */
+    data class NotToday(val title: String, val note: String) : WorkoutState
+
     data class Logging(val session: WorkoutSession, val input: SetInput, val note: String?) : WorkoutState
 
     /** Saving the finished workout. */
@@ -64,6 +72,7 @@ class WorkoutViewModel(
     private val training: TrainingRepository,
     private val actions: PlanActions,
     private val parser: SetParser,
+    private val zone: ZoneId = ZoneId.systemDefault(),
     private val now: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val _state = MutableStateFlow<WorkoutState>(WorkoutState.Loading)
@@ -73,13 +82,28 @@ class WorkoutViewModel(
         viewModelScope.launch { _state.value = startToday() }
     }
 
-    /** Today's day of the plan with the current prescriptions [start]. */
+    /**
+     * Today's own workout, with the current prescriptions [start]. A workout belongs to its weekday, so on a rest day,
+     * or once today's is done, there is nothing to start.
+     */
     private suspend fun startToday(): WorkoutState {
         val s = settings.settings.first()
         val ps = s.planSettings(training.swaps().first())
         val stored = training.exerciseStates().first()
         val seq = planner.weekSequence(ps)
-        val day = planner.buildDay(seq[s.sessionIndex % seq.size], ps)
+        val today = Instant.ofEpochMilli(now()).atZone(zone).toLocalDate()
+        val doneDates = training.workouts().first().map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
+        val schedule = Schedule.week(planner.weekdays(ps), today, doneDates, s.planStartEpochDay?.let(LocalDate::ofEpochDay))
+        val slot = Schedule.today(schedule) ?: run {
+            val next = Schedule.next(schedule)
+            val nextText = next?.let { "Next: ${lib.dayNames[it.weekday].take(3)}, ${planner.dayName(seq[it.index])}." } ?: "No more workouts this week."
+            return if (schedule.any { it.date == today && it.status == SessionStatus.DONE }) {
+                WorkoutState.NotToday("Workout done", "Today’s workout is done. $nextText")
+            } else {
+                WorkoutState.NotToday("Rest day", "There is no workout today. $nextText")
+            }
+        }
+        val day = planner.buildDay(seq[slot.index], ps)
         if (day.items.isEmpty()) return WorkoutState.Empty
         val session = WorkoutSession.start(lib, ps.equipment, day) { id ->
             Progression.resolveState(lib.exercise(id), stored[id], ps.equipment, ps.level)

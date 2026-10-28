@@ -131,11 +131,16 @@ class WeekViewModel(
     training: TrainingRepository,
     presenter: WeekPresenter,
     private val actions: PlanActions,
+    clock: () -> java.time.LocalDate = { java.time.LocalDate.now() },
 ) : ViewModel() {
+    init {
+        viewModelScope.launch { actions.ensurePlanStart() }
+    }
+
     val ui: StateFlow<WeekUi?> = combine(
-        settings.settings, training.exerciseStates(), training.swaps(), training.workouts(),
-    ) { s, states, swaps, workouts ->
-        if (s.started) presenter.present(s, states, swaps, workouts) else null
+        settings.settings, training.exerciseStates(), training.swaps(), training.workouts(), com.homeworkoutcoach.app.ui.habits.todayFlow(clock),
+    ) { s, states, swaps, workouts, today ->
+        if (s.started) presenter.present(s, states, swaps, workouts, today) else null
     }
         .flowOn(Dispatchers.Default)
         // Keep starting weights fixed once first shown, as the prototype does.

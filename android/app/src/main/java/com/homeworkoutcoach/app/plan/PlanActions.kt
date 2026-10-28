@@ -62,6 +62,7 @@ class PlanActions(
     private val goals: GoalRepository? = null,
     private val focus: FocusRepository? = null,
     private val reflections: ReflectionRepository? = null,
+    private val today: () -> java.time.LocalDate = { java.time.LocalDate.now() },
 ) {
     /**
      * Save the setup and start a new week [buildPlan]. The first build forgets any exercise states so starting
@@ -91,8 +92,15 @@ class PlanActions(
                 },
                 sessionIndex = 0,
                 weekBase = saved,
+                // The first plan starts today; later edits keep the day it first started.
+                planStartEpochDay = if (first) today().toEpochDay() else s.planStartEpochDay ?: today().toEpochDay(),
             )
         }
+    }
+
+    /** An install from before plans had a start day gets today as it, so nothing earlier is marked skipped. */
+    suspend fun ensurePlanStart() {
+        settings.update { s -> if (s.started && s.planStartEpochDay == null) s.copy(planStartEpochDay = today().toEpochDay()) else s }
     }
 
     /** Swap [baseId] for [chosenId] in every session; choosing the base again removes the swap. */
@@ -134,7 +142,8 @@ class PlanActions(
      */
     suspend fun arrangeWeek(weekdays: List<Int>?) {
         val saved = training.workouts().first().size
-        settings.update { it.copy(sessionWeekdays = weekdays, sessionIndex = 0, weekBase = saved) }
+        // A new arrangement puts the sessions on new days, so it starts counting from today.
+        settings.update { it.copy(sessionWeekdays = weekdays, sessionIndex = 0, weekBase = saved, planStartEpochDay = today().toEpochDay()) }
     }
 
     /** Use the app without an account; everything stays on this phone. */

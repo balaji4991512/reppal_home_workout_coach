@@ -45,10 +45,15 @@ data class UserSettings(
     /** Exercises removed after a pain report. Kept when the concern text changes. */
     val painExcluded: List<String> = emptyList(),
     val theme: ThemeMode = ThemeMode.LIGHT,
-    /** Workouts done since the plan was last built; picks the next day of the week. */
+    /** No longer used to pick a workout (each session belongs to its weekday); kept so old saved settings still load. */
     val sessionIndex: Int = 0,
-    /** Number of saved workouts when the plan was last built, to find this week's sessions in history. */
+    /** No longer used; kept so old saved settings still load. */
     val weekBase: Int = 0,
+    /**
+     * The day the plan (or its weekday arrangement) was made, as an epoch day. Days before it were never due, so they
+     * are not shown as skipped. Null until set (an older install), which counts as today.
+     */
+    val planStartEpochDay: Long? = null,
     /** For BMI on the Body screen. */
     val heightCm: Int? = null,
     /** The user's Bluetooth scale, remembered after the first weigh-in so neighbours' scales are ignored. */

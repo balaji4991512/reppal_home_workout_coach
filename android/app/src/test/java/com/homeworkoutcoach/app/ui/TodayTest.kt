@@ -33,11 +33,16 @@ private val WED = LocalDate.of(2026, 10, 28) // a Wednesday; a 3-day plan trains
 class WorkoutCardTest {
     private val lib = Library.default
     private val planner = Planner(lib)
-    private val settings = UserSettings(started = true, bench = Bench.FLAT, dumbbellsKg = listOf(5.0, 8.0), daysPerWeek = 3)
-    private val week = WeekPresenter(lib).present(settings, emptyMap(), emptyMap(), emptyList())
+    private val settings = UserSettings(
+        started = true, bench = Bench.FLAT, dumbbellsKg = listOf(5.0, 8.0), daysPerWeek = 3,
+        planStartEpochDay = WED.minusDays(30).toEpochDay(),
+    )
+
+    private fun weekOn(day: LocalDate, workouts: List<Workout>) =
+        WeekPresenter(lib).present(settings, emptyMap(), emptyMap(), workouts, day, ZoneOffset.UTC)
 
     private fun card(day: LocalDate, s: UserSettings = settings, workouts: List<Workout> = emptyList()) =
-        WorkoutCardPresenter.present(s, emptyMap(), if (s.started) week else null, workouts, lib, planner, day, ZoneOffset.UTC)
+        WorkoutCardPresenter.present(s, emptyMap(), if (s.started) weekOn(day, workouts) else null, workouts, lib, planner, day, ZoneOffset.UTC)
 
     @Test
     fun noPlanYet() {
@@ -45,27 +50,32 @@ class WorkoutCardTest {
     }
 
     @Test
-    fun onATrainingDayTheNextWorkoutIsOffered() {
+    fun onATrainingDayTodaysOwnWorkoutIsOffered() {
+        // Wednesday is the second session of the week: Full body B, not "the next one in line"
         val c = card(WED) as WorkoutCardUi.Next
-        assertEquals("Full body A", c.title)
-        assertEquals(week.hero.summary, c.detail)
-        assertEquals("0 of 3 this week", c.week)
+        assertEquals("Full body B", c.title)
+        assertEquals(weekOn(WED, emptyList()).hero.summary, c.detail)
+        assertEquals("0 of 3 this week", c.week) // Monday was not done; it stays skipped
         assertTrue(c.canStart)
+        assertEquals("Full body A", (card(WED.minusDays(2)) as WorkoutCardUi.Next).title) // Monday
+        assertEquals("Full body A", (card(WED.plusDays(2)) as WorkoutCardUi.Next).title) // Friday
     }
 
     @Test
-    fun onARestDayItSaysWhenTheNextOneIs() {
-        assertEquals(WorkoutCardUi.Rest("Full body A", "Wed", true), card(WED.minusDays(1))) // Tuesday
+    fun onARestDayItSaysWhenTheNextOneIsAndOffersNothingToStart() {
+        assertEquals(WorkoutCardUi.Rest("Full body B", "Wed", false), card(WED.minusDays(1))) // Tuesday
         assertEquals("Fri", (card(WED.plusDays(1)) as WorkoutCardUi.Rest).nextDay) // Thursday
-        assertEquals("Mon", (card(WED.plusDays(3)) as WorkoutCardUi.Rest).nextDay) // Saturday wraps to Monday
-        assertEquals("Mon", (card(WED.plusDays(4)) as WorkoutCardUi.Rest).nextDay) // Sunday
+        // Saturday and Sunday: nothing is left this week, and no other day's workout is offered
+        val saturday = card(WED.plusDays(3)) as WorkoutCardUi.Rest
+        assertEquals("", saturday.nextDay)
+        assertFalse(saturday.canStart)
+        assertEquals("", (card(WED.plusDays(4)) as WorkoutCardUi.Rest).nextDay)
     }
 
     @Test
-    fun aWorkoutFinishedTodayShowsAsDoneEvenOnARestDay() {
+    fun aWorkoutFinishedTodayShowsAsDone() {
         fun at(day: LocalDate) = Workout(dateMillis = day.atTime(9, 0).toInstant(ZoneOffset.UTC).toEpochMilli(), label = "B", plan = emptyList(), sets = emptyMap())
         assertEquals(WorkoutCardUi.Done("Full body B"), card(WED, workouts = listOf(at(WED.minusDays(2)), at(WED))))
-        assertEquals(WorkoutCardUi.Done("Full body B"), card(WED.plusDays(1), workouts = listOf(at(WED.plusDays(1)))))
         // yesterday's workout does not make today done
         assertTrue(card(WED, workouts = listOf(at(WED.minusDays(1)))) is WorkoutCardUi.Next)
     }

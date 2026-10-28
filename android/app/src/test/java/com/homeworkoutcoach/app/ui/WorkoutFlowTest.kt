@@ -1,6 +1,7 @@
 package com.homeworkoutcoach.app.ui
 
 import com.homeworkoutcoach.app.data.UserSettings
+import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.app.data.memory.InMemorySettingsRepository
 import com.homeworkoutcoach.app.data.memory.InMemoryTrainingRepository
 import com.homeworkoutcoach.app.plan.PlanActions
@@ -156,8 +157,27 @@ class WorkoutViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = WorkoutViewModel(lib, Planner(lib), settings, training, actions, KeywordSetParser) { 1_000 }
+    /** Monday 26 Oct 2026, 09:00 UTC: a 1-day plan trains on Mondays. */
+    private val monday = java.time.LocalDate.of(2026, 10, 26).atTime(9, 0).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+    private fun vm(at: Long = monday) = WorkoutViewModel(lib, Planner(lib), settings, training, actions, KeywordSetParser, java.time.ZoneOffset.UTC) { at }
     private fun WorkoutViewModel.logging() = state.value as WorkoutState.Logging
+
+    @Test
+    fun onADayWithNoWorkoutNothingCanBeStarted() {
+        // Tuesday: the 1-day plan only trains on Monday
+        val tuesday = monday + 24 * 3_600_000L
+        val s = vm(tuesday).state.value as WorkoutState.NotToday
+        assertEquals("Rest day", s.title)
+        assertEquals("There is no workout today. No more workouts this week.", s.note)
+    }
+
+    @Test
+    fun aWorkoutAlreadyDoneTodayIsNotOfferedAgain() = kotlinx.coroutines.test.runTest {
+        training.saveWorkout(Workout(dateMillis = monday, label = "F", plan = emptyList(), sets = emptyMap()), emptyMap())
+        val s = vm().state.value as WorkoutState.NotToday
+        assertEquals("Workout done", s.title)
+        assertTrue(s.note.startsWith("Today’s workout is done."))
+    }
 
     @Test
     fun chipsTextAndErrors() {
@@ -266,7 +286,7 @@ class WorkoutViewModelTest {
         assertTrue(vm.state.value is WorkoutState.Done)
         val saved = training.workouts().first().single()
         assertEquals("F", saved.label)
-        assertEquals(1_000L, saved.dateMillis)
+        assertEquals(monday, saved.dateMillis)
         val s = settings.settings.first()
         assertEquals(1, s.sessionIndex)
         val pained = saved.painIds.single()

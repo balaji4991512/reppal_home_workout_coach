@@ -250,8 +250,7 @@ private fun WorkoutCard(card: WorkoutCardUi, onStart: () -> Unit, onSetup: () ->
             }
             is WorkoutCardUi.Rest -> {
                 Body("Rest day", strong = true)
-                Small("Next up: ${card.nextTitle} on ${card.nextDay}")
-                if (card.canStart) Chip("Start it anyway", false, onStart, Modifier.padding(top = 8.dp), small = true)
+                Small(if (card.nextDay.isEmpty()) card.nextTitle else "Next up: ${card.nextTitle} on ${card.nextDay}")
             }
         }
     }

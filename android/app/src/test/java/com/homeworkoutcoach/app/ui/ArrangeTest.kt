@@ -66,10 +66,11 @@ class ArrangeTest {
     @Test
     fun savedLayoutDrivesTheWeekAndSurvivesUnchangedSetup() = runTest {
         val settings = InMemorySettingsRepository(bodyPart)
-        val actions = PlanActions(settings, InMemoryTrainingRepository(), KeywordConcernMapper(lib))
+        val monday = java.time.LocalDate.of(2026, 10, 26)
+        val actions = PlanActions(settings, InMemoryTrainingRepository(), KeywordConcernMapper(lib), today = { monday })
         actions.arrangeWeek(listOf(3, 1, 0, 4))
         val s = settings.settings.first()
-        val week = WeekPresenter(lib, Planner(lib)).present(s, emptyMap(), emptyMap(), emptyList())
+        val week = WeekPresenter(lib, Planner(lib)).present(s, emptyMap(), emptyMap(), emptyList(), monday, java.time.ZoneOffset.UTC)
         assertEquals("Legs", (week.days[0] as WeekdayUi.Training).name)
 
         // Rebuilding the same plan keeps the layout; changing the days a week drops it.

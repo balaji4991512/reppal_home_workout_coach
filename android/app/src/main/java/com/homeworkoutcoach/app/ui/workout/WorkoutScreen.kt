@@ -102,6 +102,7 @@ fun WorkoutScreen(
     when (val s = state) {
         WorkoutState.Loading, WorkoutState.Saving -> Unit
         WorkoutState.Empty -> LaunchedEffect(Unit) { onWeek() }
+        is WorkoutState.NotToday -> NotTodayContent(s.title, s.note, onWeek)
         is WorkoutState.Logging -> LoggingContent(
             s,
             onText = vm::onText,
@@ -113,6 +114,29 @@ fun WorkoutScreen(
             voice = VoiceHandlers(vm::onVoiceListening, vm::onVoicePartial, vm::onVoiceResult, vm::onVoiceError),
         )
         is WorkoutState.Done -> DoneContent(s.ui, onWeek)
+    }
+}
+
+/** Rest day, or today's workout already done: nothing to start, and where to look instead. */
+@Composable
+private fun NotTodayContent(title: String, note: String, onWeek: () -> Unit) {
+    val c = AppTheme.colors
+    val rest = title == "Rest day"
+    Page {
+        Box(
+            Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(30.dp))
+                .background(Brush.linearGradient(listOf(if (rest) c.accentSoft else c.tintMint, c.tintPeach), start = Offset.Zero, end = Offset(900f, 700f))),
+        ) {
+            Column(Modifier.padding(24.dp)) {
+                Box(Modifier.size(48.dp).clip(CircleShape).background(c.bg.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
+                    Icon(if (rest) AppIcons.Moon else AppIcons.Check, null, Modifier.size(26.dp), tint = if (rest) c.accent else c.ok)
+                }
+                H1(title, Modifier.padding(top = 14.dp))
+                Body(note, Modifier.padding(top = 6.dp))
+                Small("Each workout is done on its own day.", Modifier.padding(top = 10.dp), color = c.mut)
+            }
+        }
+        AccentButton("See your week", onWeek, Modifier.padding(top = 18.dp))
     }
 }
 

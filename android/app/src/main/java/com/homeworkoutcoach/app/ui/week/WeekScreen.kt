@@ -82,8 +82,10 @@ fun WeekContent(
 ) {
     // Days the user opened; the next workout starts open.
     var open by rememberSaveable { mutableStateOf<List<Int>?>(null) }
-    val nextIndex = ui.hero.done
-    val opened = open ?: listOf(nextIndex)
+    // Today's workout starts open; on a rest day, the next one.
+    val startOpen = ui.days.filterIsInstance<WeekdayUi.Training>()
+        .firstOrNull { it.status == DayStatus.TODAY } ?: ui.days.filterIsInstance<WeekdayUi.Training>().firstOrNull { it.status == DayStatus.UPCOMING }
+    val opened = open ?: listOfNotNull(startOpen?.index)
     // "day:item" whose swap list is showing.
     var swapKey by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -142,8 +144,19 @@ private fun Hero(h: HeroUi, onStart: () -> Unit) {
                 "${h.done} of ${h.total} workouts done this week", Modifier.padding(top = 12.dp),
                 color = c.mut,
             )
-            if (h.canStart) AccentButton("Start workout", onStart, Modifier.padding(top = 14.dp), icon = AppIcons.Dumbbell)
-            else Muted("Nothing to train on this day yet. Add muscles or equipment under Plan settings.")
+            when (h.kind) {
+                HeroKind.TODAY ->
+                    if (h.canStart) AccentButton("Start workout", onStart, Modifier.padding(top = 14.dp), icon = AppIcons.Dumbbell)
+                    else Muted("Nothing to train on this day yet. Add muscles or equipment under Plan settings.")
+                HeroKind.DONE_TODAY -> Text(
+                    "Done for today. " + (h.nextTitle?.let { "Next: ${h.nextDay}, $it." } ?: "That is the week."),
+                    Modifier.padding(top = 12.dp), color = c.ok, style = AppTheme.type.bodyStrong,
+                )
+                HeroKind.REST -> Small(
+                    "Each workout is done on its own day, so there is nothing to start today.",
+                    Modifier.padding(top = 10.dp), color = c.mut,
+                )
+            }
         }
     }
 }
@@ -161,7 +174,8 @@ private fun WeekStrip(days: List<WeekdayUi>, modifier: Modifier = Modifier) {
                         .background(
                             when (status) {
                                 DayStatus.DONE -> c.ok
-                                DayStatus.NEXT -> c.accent
+                                DayStatus.TODAY -> c.accent
+                                DayStatus.SKIPPED -> c.tintRose
                                 else -> Color.Transparent
                             },
                         )
@@ -170,7 +184,8 @@ private fun WeekStrip(days: List<WeekdayUi>, modifier: Modifier = Modifier) {
                 ) {
                     when (status) {
                         DayStatus.DONE -> Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.bg)
-                        DayStatus.NEXT -> Icon(AppIcons.Dumbbell, null, Modifier.size(20.dp), tint = c.onAccent)
+                        DayStatus.TODAY -> Icon(AppIcons.Dumbbell, null, Modifier.size(20.dp), tint = c.onAccent)
+                        DayStatus.SKIPPED -> Icon(AppIcons.Close, null, Modifier.size(18.dp), tint = c.coral)
                         DayStatus.UPCOMING -> Icon(AppIcons.Dumbbell, null, Modifier.size(18.dp), tint = c.accent)
                         null -> Text("–", color = c.mut.copy(alpha = 0.6f), style = AppTheme.type.small)
                     }
@@ -215,7 +230,8 @@ private fun TrainingDay(
     val c = AppTheme.colors
     val disc = when (day.status) {
         DayStatus.DONE -> c.tintMint
-        DayStatus.NEXT -> c.accentSoft
+        DayStatus.TODAY -> c.accentSoft
+        DayStatus.SKIPPED -> c.tintRose
         DayStatus.UPCOMING -> c.tintPeach
     }
     Column(Modifier.fadeLiftIn(index * 50).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(c.soft)) {
@@ -236,7 +252,8 @@ private fun TrainingDay(
             }
             when (day.status) {
                 DayStatus.DONE -> Pill("Done", c.oks, c.ok)
-                DayStatus.NEXT -> Pill("Next up", c.accent, c.onAccent)
+                DayStatus.TODAY -> Pill("Today", c.accent, c.onAccent)
+                DayStatus.SKIPPED -> Pill("Skipped", c.tintRose, c.coral)
                 DayStatus.UPCOMING -> Unit
             }
             Chevron(expanded)
@@ -245,6 +262,8 @@ private fun TrainingDay(
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
                 if (day.status == DayStatus.DONE) {
                     day.session?.let { SessionCard(it) }
+                } else if (day.status == DayStatus.SKIPPED) {
+                    Muted("This workout was not done on ${day.abbr}. Each workout belongs to its own day, so it stays marked as skipped.")
                 } else {
                     day.exercises.forEachIndexed { i, ex ->
                         val key = "${day.index}:$i"

@@ -71,7 +71,7 @@ class TodayViewModel(
     /** Null until loaded. */
     val ui: StateFlow<TodayUi?> = combine(plan, habitData, routineData, tasks.tasks(), nowFlow(clock)) { p, h, r, t, now ->
         val today = now.toLocalDate()
-        val week = if (p.settings.started) weekPresenter.present(p.settings, p.states, p.swaps, p.workouts) else null
+        val week = if (p.settings.started) weekPresenter.present(p.settings, p.states, p.swaps, p.workouts, today, zone) else null
         val ui = TodayPresenter.present(
             name = p.settings.name,
             now = now,
@@ -90,6 +90,11 @@ class TodayViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private fun today(): LocalDate = clock().toLocalDate()
+
+    init {
+        // An install from before plans had a start day gets one, so no earlier day is shown as skipped.
+        viewModelScope.launch { actions.ensurePlanStart() }
+    }
 
     fun recordHabit(row: HabitRowUi, amount: Int) {
         viewModelScope.launch { HabitWrites.record(habits, row.id, today(), amount, row.auto) }
