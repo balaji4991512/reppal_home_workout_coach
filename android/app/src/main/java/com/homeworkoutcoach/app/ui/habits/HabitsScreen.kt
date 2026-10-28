@@ -1,5 +1,6 @@
 package com.homeworkoutcoach.app.ui.habits
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -91,6 +92,7 @@ fun HabitsScreen(
             if (!s.isToday) TextLink("Back to today", vm::goToToday)
             if (s.isFuture) Small("This day has not happened yet, so nothing can be ticked.", Modifier.padding(top = 6.dp))
         }
+        if (s.isToday && s.today.isNotEmpty() && s.today.none { it.done }) TickHint(Modifier.padding(top = 14.dp))
         if (s.today.isNotEmpty()) rows(s.today, dueToday = true)
         if (s.other.isNotEmpty()) {
             H2(if (s.isToday) "Not due today" else "Not due this day", top = 28.dp)
@@ -138,22 +140,23 @@ internal fun HabitRow(
     } else Modifier.fillMaxWidth()
     Column(outer) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 68.dp).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp),
+            Modifier.fillMaxWidth().heightIn(min = 68.dp).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp, horizontal = 0.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
         ) {
-            Box(
-                Modifier.size(48.dp)
-                    .clickable(role = Role.Button, onClick = onBadge)
-                    .semantics {
-                        contentDescription = if (row.kind == HabitKind.DONE) {
-                            if (row.done) "Mark ${row.name} not done" else "Mark ${row.name} done"
-                        } else "Change today's amount for ${row.name}"
-                    },
-                contentAlignment = Alignment.Center,
-            ) { HabitBadge(row.icon, row.color, row.fraction, row.done) }
+            // The circle on the left is what marks it done. The emoji is only a picture; the rest of the card opens the habit.
+            HabitTick(
+                done = row.done,
+                partial = if (row.kind == HabitKind.DONE) 0f else row.fraction,
+                amountHabit = row.kind != HabitKind.DONE,
+                label = if (row.kind == HabitKind.DONE) {
+                    if (row.done) "Mark ${row.name} not done" else "Mark ${row.name} done"
+                } else "Change today's amount for ${row.name}",
+                onClick = onBadge,
+            )
+            HabitBadge(row.icon, row.color, row.fraction, row.done, size = 44.dp)
             Column(Modifier.weight(1f)) {
-                Body(row.name, strong = true)
+                Body(row.name, strong = true, color = if (row.done) AppTheme.colors.mut else AppTheme.colors.fg)
                 Small(sub)
             }
             Icon(AppIcons.Forward, null, Modifier.size(20.dp), tint = c.mut)
@@ -162,5 +165,31 @@ internal fun HabitRow(
             AmountPanel(row.kind, row.target, row.amount, onSet, Modifier.padding(bottom = 10.dp))
         }
         if (!card) Hairline()
+    }
+}
+
+/**
+ * A one-time note that says where to tap, until it is dismissed or a habit gets ticked: the circle on the left marks a
+ * habit done, and the rest of the card opens it.
+ */
+@Composable
+fun TickHint(modifier: Modifier = Modifier, vm: TickHintViewModel = viewModel(factory = Factories.TickHint)) {
+    val seen by vm.seen.collectAsStateWithLifecycle()
+    if (seen != false) return
+    val c = AppTheme.colors
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.accentSoft).padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+    ) {
+        // a picture of the circle being talked about
+        Box(Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.bg), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(20.dp).border(2.dp, c.mut, androidx.compose.foundation.shape.CircleShape))
+        }
+        Column(Modifier.weight(1f)) {
+            Body("Tap the circle to mark a habit done", strong = true)
+            Small("Tap the rest of the card to see its history.", color = c.fg)
+        }
+        TextLink("Got it", vm::dismiss)
     }
 }

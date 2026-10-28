@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -199,5 +200,15 @@ class HabitEditViewModel(
             habits.delete(habitId)
             onDone()
         }
+    }
+}
+
+/** The one-time "tap the circle" hint: whether it has been dismissed (null until known), and dismissing it. */
+class TickHintViewModel(private val settings: com.homeworkoutcoach.app.data.SettingsRepository) : ViewModel() {
+    val seen: StateFlow<Boolean?> = settings.settings.map<com.homeworkoutcoach.app.data.UserSettings, Boolean?> { it.habitTickHintSeen }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun dismiss() {
+        viewModelScope.launch { settings.update { it.copy(habitTickHintSeen = true) } }
     }
 }

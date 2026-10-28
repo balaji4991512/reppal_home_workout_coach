@@ -46,6 +46,7 @@ import com.homeworkoutcoach.app.ui.routines.RoutineRunViewModel
 import com.homeworkoutcoach.app.ui.routines.RoutineRunner
 import com.homeworkoutcoach.app.ui.routines.RoutinesViewModel
 import com.homeworkoutcoach.app.ui.profile.ProfileUi
+import com.homeworkoutcoach.app.ui.habits.TickHintViewModel
 import com.homeworkoutcoach.app.ui.progress.OverviewViewModel
 import com.homeworkoutcoach.app.ui.shell.HubViewModel
 import com.homeworkoutcoach.app.ui.progress.ProgressPresenter
@@ -393,6 +394,9 @@ object Factories {
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }
+    }
+    val TickHint = viewModelFactory {
+        initializer { app(this).let { TickHintViewModel(it.settings) } }
     }
     val Hub = viewModelFactory {
         initializer {

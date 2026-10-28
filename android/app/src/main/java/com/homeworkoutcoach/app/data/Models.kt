@@ -59,6 +59,8 @@ data class UserSettings(
     val activeFocus: ActiveFocus? = null,
     /** The quality chosen for this week on the Character screen, if the person changed the suggestion. */
     val characterFocus: CharacterFocus? = null,
+    /** The "tap the circle to mark it done" hint on the habit lists has been dismissed. */
+    val habitTickHintSeen: Boolean = false,
 ) {
     fun equipment(): Equipment = Equipment(bench, dumbbellsKg.toSet())
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -169,7 +170,7 @@ private fun IconPicker(selected: String, color: String, onPick: (String) -> Unit
                     .clickable(role = Role.RadioButton) { onPick(key) }
                     .semantics { this.selected = on; contentDescription = "Icon $key" },
                 contentAlignment = Alignment.Center,
-            ) { Icon(HabitLook.icon(key), null, Modifier.size(24.dp), tint = if (on) tint else c.mut) }
+            ) { Text(HabitLook.emoji(key), fontSize = 22.sp) }
         }
     }
 }

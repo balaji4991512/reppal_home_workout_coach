@@ -362,7 +362,10 @@ object HabitStyles {
     const val DEFAULT_ICON = "check"
     const val DEFAULT_COLOR = "blue"
 
-    val icons = listOf("check", "drop", "moon", "sun", "book", "pen", "dumbbell", "walk", "lotus", "heart", "star", "list", "bolt")
+    val icons = listOf(
+        "check", "drop", "moon", "sun", "book", "pen", "dumbbell", "walk", "lotus", "heart", "star", "list", "bolt",
+        "shower", "run", "apple", "sleep", "tooth", "pill", "broom", "brain", "money", "music", "plant", "phone",
+    )
     val colors = listOf("blue", "green", "orange", "red", "purple", "teal", "amber", "pink")
 
     private val named = mapOf(

@@ -96,6 +96,19 @@ class HabitsPresenterTest {
     }
 
     @Test
+    fun everyIconKeyHasItsOwnEmojiAndOldKeysAreKept() {
+        val emojis = HabitStyles.icons.map { com.homeworkoutcoach.app.ui.habits.HabitLook.emoji(it) }
+        assertEquals(HabitStyles.icons.size, emojis.toSet().size) // no two icons look the same
+        // the keys saved habits already use
+        listOf("check", "drop", "moon", "sun", "book", "pen", "dumbbell", "walk", "lotus", "heart", "star", "list", "bolt")
+            .forEach { assertTrue("$it is gone", it in HabitStyles.icons) }
+        // a key from a future version still shows something
+        assertEquals("✅", com.homeworkoutcoach.app.ui.habits.HabitLook.emoji("nope"))
+        // the named starting habits point at keys that exist
+        listOf("Workout", "Water", "Reading", "Walking", "Journal").forEach { assertTrue(HabitStyles.forName(it).first in HabitStyles.icons) }
+    }
+
+    @Test
     fun summaryReadsGently() {
         val journal = storedHabit("journal", name = "Journal")
         val water = storedHabit("water", kind = HabitKind.COUNT, target = 8)

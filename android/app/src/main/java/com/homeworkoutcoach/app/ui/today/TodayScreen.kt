@@ -46,6 +46,7 @@ import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
 import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.habits.HabitRow
+import com.homeworkoutcoach.app.ui.habits.TickHint
 import com.homeworkoutcoach.app.ui.components.fadeLiftIn
 import com.homeworkoutcoach.app.ui.planner.CarriedOverCard
 import com.homeworkoutcoach.app.ui.planner.TaskCard
@@ -90,6 +91,7 @@ fun TodayScreen(
 
         if (s.habits.isNotEmpty()) {
             Section("Habits", "All habits", onHabits)
+            if (s.habits.none { it.done }) TickHint(Modifier.padding(top = 10.dp))
             s.habits.forEachIndexed { i, row ->
                 HabitRow(
                     row = row,
