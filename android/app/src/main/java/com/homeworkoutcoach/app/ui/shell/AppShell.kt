@@ -81,6 +81,7 @@ import com.homeworkoutcoach.app.ui.routines.RoutineRunScreen
 import com.homeworkoutcoach.app.ui.routines.RoutinesScreen
 import com.homeworkoutcoach.app.ui.today.TodayScreen
 import com.homeworkoutcoach.app.ui.planner.TaskEditScreen
+import com.homeworkoutcoach.app.ui.planner.TaskNewScreen
 import com.homeworkoutcoach.app.ui.week.ArrangeScreen
 import com.homeworkoutcoach.app.ui.week.WeekScreen
 import com.homeworkoutcoach.app.ui.workout.WorkoutScreen
@@ -98,6 +99,9 @@ private const val HABIT_NEW = "habit-new"
 
 /** Route of a task's edit form, opened from the Planner. */
 private const val TASK = "task/{id}"
+
+/** A new task, from the timeline: the day (epoch day) and a suggested start in minutes, or -1 for none. */
+private const val TASK_NEW = "task-new/{day}/{at}"
 
 /** Routes inside Goals: a goal's form, and the form for a new one. */
 private const val GOAL = "goal/{id}"
@@ -225,7 +229,7 @@ private fun AppNavHost(
         composable(Dest.Habits.route) {
             HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
         }
-        composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }) }
+        composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }, onAdd = { day, at -> nav.navigate("task-new/${day.toEpochDay()}/${at ?: -1}") }) }
         composable(Dest.Journal.route) { JournalScreen() }
         composable(Dest.Focus.route) { FocusScreen() }
         composable(Dest.Character.route) { CharacterScreen() }
@@ -245,6 +249,19 @@ private fun AppNavHost(
         }
         composable(ROUTINE_EDIT) { entry ->
             RoutineEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() }, onGone = { nav.popBackStack() })
+        }
+        composable(
+            TASK_NEW,
+            arguments = listOf(
+                androidx.navigation.navArgument("day") { type = androidx.navigation.NavType.LongType },
+                androidx.navigation.navArgument("at") { type = androidx.navigation.NavType.IntType },
+            ),
+        ) { entry ->
+            val at = entry.arguments?.getInt("at") ?: -1
+            TaskNewScreen(
+                java.time.LocalDate.ofEpochDay(entry.arguments?.getLong("day") ?: 0L), at.takeIf { it >= 0 },
+                onDone = { nav.popBackStack() },
+            )
         }
         composable(TASK) { entry ->
             TaskEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() })

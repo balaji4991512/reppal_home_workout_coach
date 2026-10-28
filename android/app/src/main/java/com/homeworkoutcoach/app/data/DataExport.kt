@@ -36,7 +36,7 @@ import java.time.format.DateTimeFormatter
  */
 object DataExport {
     /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections (older files still restore). */
-    const val FORMAT = 8
+    const val FORMAT = 9
 
     @Serializable
     data class File(
@@ -114,7 +114,7 @@ object DataExport {
     @Serializable
     data class ScheduleDto(val type: String, val days: List<String> = emptyList(), val times: Int = 0)
 
-    /** [date] is a calendar day (2026-10-27); [time] is 24-hour "18:30" or null. */
+    /** [date] is a calendar day (2026-10-27); [time] and [endTime] are 24-hour "18:30" or null (end: format 9 on). */
     @Serializable
     data class TaskDto(
         val id: String,
@@ -124,6 +124,7 @@ object DataExport {
         val note: String = "",
         val done: Boolean = false,
         val createdAt: Long = 0,
+        val endTime: String? = null,
     )
 
     /** [part] is "morning", "afternoon" or "evening"; [done] are the days it was finished (2026-10-27). */
@@ -243,7 +244,7 @@ object DataExport {
                 )
             },
             tasks = tasks.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id })).map {
-                TaskDto(it.id, it.title, it.date.toString(), it.time?.toString(), it.note, it.done, it.createdAt)
+                TaskDto(it.id, it.title, it.date.toString(), it.time?.toString(), it.note, it.done, it.createdAt, it.endTime?.toString())
             },
             routines = routines.sortedWith(compareBy({ it.routine.position }, { it.routine.name })).map { b ->
                 RoutineDto(
@@ -391,6 +392,7 @@ object DataImport {
         note = d.note,
         done = d.done,
         createdAt = d.createdAt,
+        endTime = d.endTime?.let(LocalTime::parse),
     )
 
     /** Throws if anything in the habit is invalid; [read] then reports that nothing was changed. */

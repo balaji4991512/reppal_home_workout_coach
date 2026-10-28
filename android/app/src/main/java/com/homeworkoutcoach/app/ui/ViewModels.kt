@@ -352,6 +352,9 @@ object Factories {
     fun taskEdit(id: String) = viewModelFactory {
         initializer { app(this).let { TaskEditViewModel(id, it.tasks, PlannerActions(it.tasks)) } }
     }
+    fun taskNew(day: java.time.LocalDate, startMinutes: Int?) = viewModelFactory {
+        initializer { app(this).let { TaskEditViewModel(null, it.tasks, PlannerActions(it.tasks), day, startMinutes) } }
+    }
     val RoutineList = viewModelFactory {
         initializer { app(this).let { RoutinesViewModel(it.routines) } }
     }

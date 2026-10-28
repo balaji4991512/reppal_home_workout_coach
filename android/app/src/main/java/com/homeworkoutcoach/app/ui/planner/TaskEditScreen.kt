@@ -44,24 +44,38 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
 
-/** Edit one task: its text, note, day and time, or delete it. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Edit one task: its text, note, day, start and end, or delete it. */
 @Composable
 fun TaskEditScreen(
     id: String,
     onDone: () -> Unit,
     vm: TaskEditViewModel = viewModel(key = "task-$id", factory = Factories.taskEdit(id)),
-) {
+) = TaskForm(isNew = false, vm = vm, onDone = onDone)
+
+/** The form for a new task on [day], with a suggested start from the timeline if there is one. */
+@Composable
+fun TaskNewScreen(
+    day: LocalDate,
+    startMinutes: Int?,
+    onDone: () -> Unit,
+    vm: TaskEditViewModel = viewModel(key = "task-new-$day-$startMinutes", factory = Factories.taskNew(day, startMinutes)),
+) = TaskForm(isNew = true, vm = vm, onDone = onDone)
+
+private enum class Picking { NONE, START, END }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskForm(isNew: Boolean, vm: TaskEditViewModel, onDone: () -> Unit) {
     val st by vm.state.collectAsStateWithLifecycle()
     val s = st ?: return
     val c = AppTheme.colors
     val today = LocalDate.now()
     var pickDate by rememberSaveable { mutableStateOf(false) }
-    var pickTime by rememberSaveable { mutableStateOf(false) }
+    var picking by rememberSaveable { mutableStateOf(Picking.NONE) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Page {
-        H1("Edit task")
+        H1(if (isNew) "New task" else "Edit task")
 
         Label("What do you need to do?")
         Field(
@@ -83,18 +97,43 @@ fun TaskEditScreen(
             Chip(if (other) PlannerFormat.dayShort(s.date, today) else "Pick a day", other, { pickDate = true })
         }
 
-        Label("Time")
+        Label("Starts")
         Chips {
-            Chip("No time", s.time == null, { vm.edit { it.copy(time = null) } })
-            Chip(s.time?.let(PlannerFormat::time) ?: "Set a time", s.time != null, { pickTime = true })
+            Chip("No start", s.time == null, { vm.edit { it.copy(time = null) } })
+            Chip(s.time?.let(PlannerFormat::time) ?: "Set a start", s.time != null, { picking = Picking.START })
+        }
+
+        Label("Ends")
+        Chips {
+            Chip("No end", s.endTime == null, { vm.edit { it.copy(endTime = null) } })
+            Chip(s.endTime?.let(PlannerFormat::time) ?: "Set an end", s.endTime != null, { picking = Picking.END })
+        }
+        if (s.time != null) {
+            Chips {
+                listOf(30 to "30 min", 60 to "1 hour", 120 to "2 hours").forEach { (minutes, label) ->
+                    val end = s.time.plusMinutes(minutes.toLong())
+                    // not past midnight: a block stays within its day
+                    if (end > s.time) Chip(label, s.endTime == end, { vm.edit { it.copy(endTime = end) } }, small = true)
+                }
+            }
+        }
+        Small(
+            if (s.time == null) "An end on its own is a deadline: finish by then."
+            else "A start and an end make a block, like deep work from 3 to 5 pm.",
+            Modifier.padding(top = 4.dp),
+        )
+        if (s.time != null && s.endTime != null && s.endTime <= s.time) {
+            Text(s.problem.orEmpty(), Modifier.padding(top = 10.dp), color = c.bad, style = AppTheme.type.small)
         }
 
         if (s.showProblem) s.problem?.let { Text(it, Modifier.padding(top = 14.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
 
-        PrimaryButton("Save", { vm.save(onDone) })
+        PrimaryButton(if (isNew) "Add task" else "Save", { vm.save(onDone) })
         TextLink("Cancel", onDone)
 
-        if (confirmDelete) {
+        if (isNew) {
+            // nothing to delete yet
+        } else if (confirmDelete) {
             Column(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp)) {
                 Text("Delete this task? This can’t be undone.", color = c.fg, style = AppTheme.type.bodyStrong)
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -124,18 +163,20 @@ fun TaskEditScreen(
         ) { DatePicker(state) }
     }
 
-    if (pickTime) {
-        val start = s.time ?: LocalTime.of(9, 0)
+    if (picking != Picking.NONE) {
+        val ending = picking == Picking.END
+        val start = (if (ending) s.endTime ?: s.time?.plusHours(1)?.takeIf { it > s.time } ?: LocalTime.of(17, 0) else s.time) ?: LocalTime.of(9, 0)
         val state = rememberTimePickerState(initialHour = start.hour, initialMinute = start.minute, is24Hour = false)
         AlertDialog(
-            onDismissRequest = { pickTime = false },
+            onDismissRequest = { picking = Picking.NONE },
             confirmButton = {
                 TextButton({
-                    vm.edit { it.copy(time = LocalTime.of(state.hour, state.minute)) }
-                    pickTime = false
+                    val chosen = LocalTime.of(state.hour, state.minute)
+                    vm.edit { if (ending) it.copy(endTime = chosen) else it.copy(time = chosen) }
+                    picking = Picking.NONE
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton({ pickTime = false }) { Text("Cancel") } },
+            dismissButton = { TextButton({ picking = Picking.NONE }) { Text("Cancel") } },
             text = { TimePicker(state) },
         )
     }

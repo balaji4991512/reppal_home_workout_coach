@@ -28,7 +28,8 @@ internal fun task(
     note: String = "",
     done: Boolean = false,
     createdAt: Long = 1,
-) = Task(id, title, date, time, note, done, createdAt)
+    endTime: LocalTime? = null,
+) = Task(id, title, date, time, note, done, createdAt, endTime)
 
 /** Behaviour every [TaskRepository] must have. Runs against Room and the in-memory fake. */
 abstract class TaskRepositoryContract {
@@ -62,6 +63,18 @@ abstract class TaskRepositoryContract {
         assertEquals(LocalTime.of(0, 5), byId.getValue("early").time)
         assertEquals(LocalTime.of(23, 59), byId.getValue("late").time)
         assertNull(byId.getValue("none").time)
+    }
+
+    @Test
+    fun theEndTimeComesBackForBlocksAndDeadlines() = runTest {
+        repo.save(task("block", time = LocalTime.of(15, 0), endTime = LocalTime.of(17, 0)))
+        repo.save(task("deadline", endTime = LocalTime.of(23, 59)))
+        repo.save(task("point", time = LocalTime.of(9, 0)))
+        val byId = repo.tasks().first().associateBy { it.id }
+        assertEquals(LocalTime.of(17, 0), byId.getValue("block").endTime)
+        assertNull(byId.getValue("deadline").time)
+        assertEquals(LocalTime.of(23, 59), byId.getValue("deadline").endTime)
+        assertNull(byId.getValue("point").endTime)
     }
 
     @Test

@@ -205,4 +205,87 @@ class TasksTest {
     fun aTaskWithoutATitleCannotExist() {
         assertThrows(IllegalArgumentException::class.java) { Task("a", " ", today) }
     }
+
+    // ---- Blocks and deadlines ----
+
+    @Test
+    fun aTaskIsAnytimeAPointABlockOrADeadline() {
+        assertEquals(TaskKind.ANYTIME, Task("a", "A", today).kind)
+        assertEquals(TaskKind.POINT, Task("a", "A", today, at(9)).kind)
+        assertEquals(TaskKind.BLOCK, Task("a", "A", today, at(15), endTime = at(17)).kind)
+        assertEquals(TaskKind.DEADLINE, Task("a", "A", today, null, endTime = at(18)).kind)
+    }
+
+    @Test
+    fun aTaskMustEndAfterItStarts() {
+        assertThrows(IllegalArgumentException::class.java) { Task("a", "A", today, at(15), endTime = at(15)) }
+        assertThrows(IllegalArgumentException::class.java) { Task("a", "A", today, at(15), endTime = at(14, 59)) }
+        assertEquals("The end has to be after the start.", Tasks.problem("A", "", at(15), at(14)))
+        assertNull(Tasks.problem("A", "", at(15), at(17)))
+        assertNull(Tasks.problem("A", "", null, at(8))) // a deadline needs no start
+    }
+
+    @Test
+    fun aDeadlineSitsOnTheTimelineAtItsEnd() {
+        val all = listOf(
+            Task("anytime", "x", today, createdAt = 1),
+            Task("deadline", "x", today, endTime = at(10), createdAt = 2),
+            Task("block", "x", today, at(9), endTime = at(11), createdAt = 3),
+            Task("point", "x", today, at(12), createdAt = 4),
+        )
+        assertEquals(listOf("block", "deadline", "point", "anytime"), ids(all.sortedWith(Tasks.order)))
+        assertEquals(at(10), all[1].timelineTime)
+        assertEquals(at(9), all[2].timelineTime)
+        assertNull(all[0].timelineTime)
+    }
+
+    @Test
+    fun aBlockFillsAsTheTimePasses() {
+        val d = at(15) to at(17) // 3 pm to 5 pm
+        fun clock(now: Int, date: LocalDate = today) = Tasks.clock(date, d.first, d.second, today, now)
+        assertEquals(TaskClock(ClockState.UPCOMING, 0.0, null, 60), clock(14 * 60))
+        val start = clock(15 * 60)!!
+        assertEquals(ClockState.RUNNING, start.state)
+        assertEquals(0.0, start.fraction, 1e-9)
+        assertEquals(120, start.minutesLeft)
+        val half = clock(16 * 60)!!
+        assertEquals(0.5, half.fraction, 1e-9)
+        assertEquals(60, half.minutesLeft)
+        assertEquals(TaskClock(ClockState.OVER, 1.0, null, null), clock(17 * 60)) // the end itself counts as over
+        assertEquals(TaskClock(ClockState.OVER, 1.0, null, null), clock(20 * 60))
+    }
+
+    @Test
+    fun aDeadlineCountsDownAndThenIsOver() {
+        fun clock(now: Int) = Tasks.clock(today, null, at(18), today, now)
+        assertEquals(TaskClock(ClockState.RUNNING, 0.0, 130, null), clock(15 * 60 + 50))
+        assertEquals(TaskClock(ClockState.RUNNING, 0.0, 1, null), clock(17 * 60 + 59))
+        assertEquals(TaskClock(ClockState.OVER, 0.0, null, null), clock(18 * 60))
+    }
+
+    @Test
+    fun otherDaysAreWhollyPastOrToCome() {
+        val past = Tasks.clock(yesterday, at(15), at(17), today, 8 * 60)!!
+        assertEquals(ClockState.OVER, past.state)
+        assertEquals(1.0, past.fraction, 1e-9)
+        val future = Tasks.clock(tomorrow, at(15), at(17), today, 23 * 60)!!
+        assertEquals(ClockState.UPCOMING, future.state)
+        assertEquals(0.0, future.fraction, 1e-9)
+        assertNull(future.minutesUntil) // no countdown to another day
+    }
+
+    @Test
+    fun noEndMeansNoClock() {
+        assertNull(Tasks.clock(today, at(9), null, today, 600))
+        assertNull(Tasks.clock(Task("a", "A", today, at(9)), today, 600))
+    }
+
+    @Test
+    fun createAndEditCarryTheEnd() {
+        val made = Tasks.create("id", " Deep work ", "", today, at(15), 7, endTime = at(17))
+        assertEquals(Task("id", "Deep work", today, at(15), "", false, 7, at(17)), made)
+        val edited = Tasks.edit(made, "Deep work", "", today, at(16), at(18))
+        assertEquals(at(18), edited.endTime)
+        assertNull(Tasks.edit(made, "Deep work", "", today, at(16)).endTime) // clearing the end
+    }
 }

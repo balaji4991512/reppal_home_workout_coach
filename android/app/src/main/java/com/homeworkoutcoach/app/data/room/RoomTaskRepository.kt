@@ -26,6 +26,7 @@ class RoomTaskRepository(private val db: TrainingDatabase) : TaskRepository {
         note = t.note,
         done = t.done,
         createdAt = t.createdAt,
+        endMinuteOfDay = t.endTime?.let { it.hour * 60 + it.minute },
     )
 
     private fun toTask(e: TaskEntity) = Task(
@@ -36,5 +37,6 @@ class RoomTaskRepository(private val db: TrainingDatabase) : TaskRepository {
         note = e.note,
         done = e.done,
         createdAt = e.createdAt,
+        endTime = e.endMinuteOfDay?.let { LocalTime.of(it / 60, it % 60) },
     )
 }

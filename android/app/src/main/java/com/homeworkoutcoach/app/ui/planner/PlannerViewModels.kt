@@ -78,30 +78,41 @@ class PlannerViewModel(
     }
 }
 
+/**
+ * The task form. With an [id] it edits that task; without one it makes a new task on [date], starting at [startMinutes]
+ * if one was suggested (from the timeline).
+ */
 class TaskEditViewModel(
-    private val id: String,
+    private val id: String?,
     private val repo: TaskRepository,
     private val actions: PlannerActions,
+    date: LocalDate = LocalDate.now(),
+    startMinutes: Int? = null,
 ) : ViewModel() {
     data class State(
         val title: String,
         val note: String,
         val date: LocalDate,
         val time: LocalTime?,
+        val endTime: LocalTime? = null,
         /** The first problem is shown only after trying to save. */
         val showProblem: Boolean = false,
     ) {
-        val problem: String? get() = Tasks.problem(title, note)
+        val problem: String? get() = Tasks.problem(title, note, time, endTime)
     }
 
-    private val _state = MutableStateFlow<State?>(null)
+    private val _state = MutableStateFlow<State?>(
+        if (id == null) State("", "", date, startMinutes?.let { LocalTime.of(it / 60, it % 60) }) else null,
+    )
 
     /** Null until loaded, and when the task no longer exists. */
     val state: StateFlow<State?> = _state
 
     init {
-        viewModelScope.launch {
-            repo.tasks().first().firstOrNull { it.id == id }?.let { _state.value = State(it.title, it.note, it.date, it.time) }
+        if (id != null) {
+            viewModelScope.launch {
+                repo.tasks().first().firstOrNull { it.id == id }?.let { _state.value = State(it.title, it.note, it.date, it.time, it.endTime) }
+            }
         }
     }
 
@@ -114,12 +125,14 @@ class TaskEditViewModel(
             return
         }
         viewModelScope.launch {
-            actions.update(id, s.title, s.note, s.date, s.time)
+            if (id == null) actions.create(s.title, s.note, s.date, s.time, s.endTime)
+            else actions.update(id, s.title, s.note, s.date, s.time, s.endTime)
             onDone()
         }
     }
 
     fun delete(onDone: () -> Unit) {
+        val id = id ?: return onDone()
         viewModelScope.launch {
             actions.delete(id)
             onDone()

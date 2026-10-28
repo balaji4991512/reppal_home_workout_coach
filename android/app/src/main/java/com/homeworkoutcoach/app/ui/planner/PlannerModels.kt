@@ -3,6 +3,7 @@ package com.homeworkoutcoach.app.ui.planner
 import com.homeworkoutcoach.app.data.TaskRepository
 import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Task
+import com.homeworkoutcoach.engine.TaskKind
 import com.homeworkoutcoach.engine.Tasks
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -15,13 +16,22 @@ import java.util.UUID
 data class TaskRowUi(
     val id: String,
     val title: String,
-    /** "5:30 pm", or null. */
+    /** The time in words: "5:30 pm", "3:00 pm - 5:00 pm" for a block, "by 6:00 pm" for a deadline, or null. */
     val time: String?,
-    /** Minutes since midnight, for placing the task on the timeline, or null. */
+    /** Start, in minutes since midnight, or null. */
     val minutes: Int?,
     val note: String,
     val done: Boolean,
     val dayLabel: String?,
+    val date: LocalDate = LocalDate.EPOCH,
+    /** End, in minutes since midnight, or null. */
+    val endMinutes: Int? = null,
+    /** Where it sits on the timeline: the start, or the deadline when there is no start. Null for no time. */
+    val sortMinutes: Int? = minutes,
+    val kind: TaskKind = TaskKind.ANYTIME,
+    /** "3:00 pm" and "5:00 pm", for the timeline. */
+    val startText: String? = null,
+    val endText: String? = null,
 )
 
 /** One day in the week strip: its weekday and date number, and how many of its tasks are done. */
@@ -54,11 +64,30 @@ data class PlannerUi(
     val carriedOver: List<TaskRowUi>,
 )
 
+/** Where this row's block or deadline stands at [nowMinutes] on [today]; null when it has no end. */
+fun TaskRowUi.clock(today: LocalDate, nowMinutes: Int): com.homeworkoutcoach.engine.TaskClock? =
+    Tasks.clock(date, minutes?.let { LocalTime.of(it / 60, it % 60) }, endMinutes?.let { LocalTime.of(it / 60, it % 60) }, today, nowMinutes)
+
 object PlannerFormat {
     /** 12-hour with am/pm, as people say it in India: "5:30 pm". */
     fun time(t: LocalTime): String {
         val h = t.hour % 12
         return "${if (h == 0) 12 else h}:${"%02d".format(t.minute)} ${if (t.hour < 12) "am" else "pm"}"
+    }
+
+    /** A task's time in words: "5:30 pm", "3:00 pm - 5:00 pm" (a block), "by 6:00 pm" (a deadline), or null. */
+    fun when_(t: Task): String? = when (t.kind) {
+        TaskKind.ANYTIME -> null
+        TaskKind.POINT -> time(t.time!!)
+        TaskKind.BLOCK -> "${time(t.time!!)} - ${time(t.endTime!!)}"
+        TaskKind.DEADLINE -> "by ${time(t.endTime!!)}"
+    }
+
+    /** A length in minutes in words: "1 h 4 min", "25 min", "2 h". */
+    fun length(minutes: Int): String = when {
+        minutes < 60 -> "$minutes min"
+        minutes % 60 == 0 -> "${minutes / 60} h"
+        else -> "${minutes / 60} h ${minutes % 60} min"
     }
 
     /** "Mon 26 Oct", with the year when it is not this year's. */
@@ -97,11 +126,17 @@ class PlannerPresenter {
         fun row(t: Task, carried: Boolean) = TaskRowUi(
             id = t.id,
             title = t.title,
-            time = t.time?.let(PlannerFormat::time),
-            minutes = t.time?.let { it.hour * 60 + it.minute },
+            time = PlannerFormat.when_(t),
+            minutes = t.time?.let(Timeline::minutesOf),
             note = t.note,
             done = t.done,
             dayLabel = if (carried) PlannerFormat.dayTitle(t.date, today) else null,
+            date = t.date,
+            endMinutes = t.endTime?.let(Timeline::minutesOf),
+            sortMinutes = t.timelineTime?.let(Timeline::minutesOf),
+            kind = t.kind,
+            startText = t.time?.let(PlannerFormat::time),
+            endText = t.endTime?.let(PlannerFormat::time),
         )
         val monday = Habits.weekStart(date)
         return PlannerUi(
@@ -166,9 +201,16 @@ class PlannerActions(
     suspend fun delete(id: String) = repo.delete(id)
 
     /** Saves the edit form. Returns what to fix, or null once it is saved. */
-    suspend fun update(id: String, title: String, note: String, date: LocalDate, time: LocalTime?): String? {
-        Tasks.problem(title, note)?.let { return it }
-        find(id)?.let { repo.save(Tasks.edit(it, title, note, date, time)) }
+    suspend fun update(id: String, title: String, note: String, date: LocalDate, time: LocalTime?, endTime: LocalTime? = null): String? {
+        Tasks.problem(title, note, time, endTime)?.let { return it }
+        find(id)?.let { repo.save(Tasks.edit(it, title, note, date, time, endTime)) }
+        return null
+    }
+
+    /** Saves a new task from the form. Returns what to fix, or null once it is saved. */
+    suspend fun create(title: String, note: String, date: LocalDate, time: LocalTime?, endTime: LocalTime?): String? {
+        Tasks.problem(title, note, time, endTime)?.let { return it }
+        repo.save(Tasks.create(newId(), title, note, date, time, now(), endTime))
         return null
     }
 }

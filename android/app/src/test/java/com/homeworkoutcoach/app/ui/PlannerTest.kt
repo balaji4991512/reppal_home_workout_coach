@@ -6,6 +6,8 @@ import com.homeworkoutcoach.app.ui.planner.PlannerActions
 import com.homeworkoutcoach.app.ui.planner.PlannerFormat
 import com.homeworkoutcoach.app.ui.planner.PlannerPresenter
 import com.homeworkoutcoach.app.ui.planner.Timeline
+import com.homeworkoutcoach.app.ui.planner.clock
+import com.homeworkoutcoach.engine.TaskKind
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -68,6 +70,47 @@ class PlannerPresenterTest {
         val all = listOf(task("a", time = LocalTime.of(17, 30)), task("b", time = LocalTime.of(0, 5)), task("c"))
         val ui = presenter.present(all, TODAY, TODAY)
         assertEquals(listOf(5, 1050, null), ui.tasks.map { it.minutes })
+    }
+
+    @Test
+    fun blocksAndDeadlinesReadInWordsAndSitOnTheTimeline() {
+        val all = listOf(
+            task("point", time = LocalTime.of(9, 0), createdAt = 1),
+            task("block", time = LocalTime.of(15, 0), endTime = LocalTime.of(17, 0), createdAt = 2),
+            task("deadline", endTime = LocalTime.of(18, 30), createdAt = 3),
+            task("plain", createdAt = 4),
+        )
+        val rows = presenter.present(all, TODAY, TODAY).tasks.associateBy { it.id }
+        assertEquals("9:00 am", rows.getValue("point").time)
+        assertEquals("3:00 pm - 5:00 pm", rows.getValue("block").time)
+        assertEquals("by 6:30 pm", rows.getValue("deadline").time)
+        assertNull(rows.getValue("plain").time)
+        assertEquals(listOf(TaskKind.POINT, TaskKind.BLOCK, TaskKind.DEADLINE, TaskKind.ANYTIME), all.map { rows.getValue(it.id).kind })
+        // a deadline sits at its end, a block at its start; no time means no place
+        assertEquals(listOf(9 * 60, 15 * 60, 18 * 60 + 30, null), all.map { rows.getValue(it.id).sortMinutes })
+        assertEquals(17 * 60, rows.getValue("block").endMinutes)
+        assertEquals("3:00 pm", rows.getValue("block").startText)
+        assertEquals("5:00 pm", rows.getValue("block").endText)
+        assertNull(rows.getValue("deadline").startText)
+    }
+
+    @Test
+    fun aRowKnowsWhereItStandsAgainstTheClock() {
+        val rows = presenter.present(
+            listOf(task("block", time = LocalTime.of(15, 0), endTime = LocalTime.of(17, 0)), task("point", time = LocalTime.of(9, 0))),
+            TODAY, TODAY,
+        ).tasks.associateBy { it.id }
+        val half = rows.getValue("block").clock(TODAY, 16 * 60)!!
+        assertEquals(0.5, half.fraction, 1e-9)
+        assertEquals(60, half.minutesLeft)
+        assertNull(rows.getValue("point").clock(TODAY, 600)) // no end, no clock
+    }
+
+    @Test
+    fun lengthsReadAsHoursAndMinutes() {
+        assertEquals("25 min", PlannerFormat.length(25))
+        assertEquals("2 h", PlannerFormat.length(120))
+        assertEquals("1 h 4 min", PlannerFormat.length(64))
     }
 
     @Test
@@ -185,6 +228,37 @@ class PlannerActionsTest {
         assertEquals("Write what you need to do.", actions.update("a", "", "", TODAY, null))
         assertEquals("Keep the note to 500 characters.", actions.update("a", "x", "n".repeat(501), TODAY, null))
         assertEquals("Old", repo.tasks().first().single().title)
+    }
+
+    @Test
+    fun theFormCreatesABlockAndASetEndIsKeptWhenEditing() = runTest {
+        assertNull(actions.create(" Deep work ", "", TODAY, LocalTime.of(15, 0), LocalTime.of(17, 0)))
+        val made = repo.tasks().first().single()
+        assertEquals("Deep work", made.title)
+        assertEquals(LocalTime.of(17, 0), made.endTime)
+        assertEquals("id0", made.id)
+
+        assertNull(actions.update("id0", "Deep work", "", TODAY, LocalTime.of(16, 0), LocalTime.of(18, 0)))
+        assertEquals(LocalTime.of(18, 0), repo.tasks().first().single().endTime)
+        assertNull(actions.update("id0", "Deep work", "", TODAY, LocalTime.of(16, 0), null)) // the end can be cleared
+        assertNull(repo.tasks().first().single().endTime)
+    }
+
+    @Test
+    fun anEndBeforeTheStartChangesNothing() = runTest {
+        assertEquals("The end has to be after the start.", actions.create("Deep work", "", TODAY, LocalTime.of(17, 0), LocalTime.of(15, 0)))
+        assertTrue(repo.tasks().first().isEmpty())
+        repo.save(task("a", "Old", time = LocalTime.of(9, 0)))
+        assertEquals("The end has to be after the start.", actions.update("a", "Old", "", TODAY, LocalTime.of(9, 0), LocalTime.of(8, 0)))
+        assertNull(repo.tasks().first().single().endTime)
+    }
+
+    @Test
+    fun aDeadlineNeedsNoStart() = runTest {
+        assertNull(actions.create("Send the report", "", TODAY, null, LocalTime.of(18, 0)))
+        val t = repo.tasks().first().single()
+        assertNull(t.time)
+        assertEquals(LocalTime.of(18, 0), t.endTime)
     }
 
     @Test

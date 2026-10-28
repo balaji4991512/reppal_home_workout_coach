@@ -46,21 +46,31 @@ class TaskExportTest {
         tasks.save(task("a", "Call the bank", day, LocalTime.of(17, 30), "ask about the card", createdAt = 5))
         tasks.save(task("b", "Buy milk", day.minusDays(1), null, "", done = true, createdAt = 2))
         tasks.save(task("c", "Book flights", day.plusDays(3), LocalTime.of(9, 0), "", createdAt = 8))
+        tasks.save(task("d", "Deep work", day, LocalTime.of(15, 0), "", createdAt = 9, endTime = LocalTime.of(17, 0)))
+        tasks.save(task("e", "Send the report", day, null, "", createdAt = 10, endTime = LocalTime.of(18, 0)))
     }
 
     @Test
     fun tasksAreExportedReadably() = runTest {
         val p = Phone().also { it.addTasks() }
         val r = exporter(p).export("RepPal", now)
-        assertEquals(3, r.tasks)
+        assertEquals(5, r.tasks)
         val o = Json.parseToJsonElement(r.json).jsonObject
         val tasks = o.getValue("tasks").jsonArray.map { it.jsonObject }
         // oldest day first
-        assertEquals(listOf("Buy milk", "Call the bank", "Book flights"), tasks.map { it.getValue("title").jsonPrimitive.content })
+        assertEquals(
+            listOf("Buy milk", "Call the bank", "Deep work", "Send the report", "Book flights"),
+            tasks.map { it.getValue("title").jsonPrimitive.content },
+        )
         assertEquals("2026-10-27", tasks[0].getValue("date").jsonPrimitive.content)
         assertEquals("17:30", tasks[1].getValue("time").jsonPrimitive.content)
         assertEquals("ask about the card", tasks[1].getValue("note").jsonPrimitive.content)
         assertEquals("true", tasks[0].getValue("done").jsonPrimitive.content)
+        // a block has a start and an end; a deadline only an end
+        assertEquals("15:00", tasks[2].getValue("time").jsonPrimitive.content)
+        assertEquals("17:00", tasks[2].getValue("endTime").jsonPrimitive.content)
+        assertEquals("18:00", tasks[3].getValue("endTime").jsonPrimitive.content)
+        assertEquals(null, tasks[1]["endTime"]?.jsonPrimitive?.content?.takeIf { it != "null" })
     }
 
     @Test
@@ -86,7 +96,7 @@ class TaskExportTest {
         val p = Phone().also { it.addTasks() }
         importer(p).restore(check.restore)
         assertEquals("Old", p.settings.settings.first().name)
-        assertEquals(3, p.tasks.tasks().first().size)
+        assertEquals(5, p.tasks.tasks().first().size)
     }
 
     @Test
@@ -106,6 +116,10 @@ class TaskExportTest {
         assertEquals(bad, DataImport.read(lib, file("""{"id":"a","title":" ","date":"2026-10-28"}""")))
         assertEquals(bad, DataImport.read(lib, file("""{"id":"a","title":"Milk","date":"tomorrow"}""")))
         assertEquals(bad, DataImport.read(lib, file("""{"id":"a","title":"Milk","date":"2026-10-28","time":"half past five"}""")))
+        // an end before the start, or one that is not a time
+        assertEquals(bad, DataImport.read(lib, file("""{"id":"a","title":"Milk","date":"2026-10-28","time":"17:00","endTime":"16:00"}""")))
+        assertEquals(bad, DataImport.read(lib, file("""{"id":"a","title":"Milk","date":"2026-10-28","endTime":"late"}""")))
+        assertTrue(DataImport.read(lib, file("""{"id":"a","title":"Milk","date":"2026-10-28","endTime":"18:00"}""")) is ImportCheck.Ok)
     }
 
     @Test

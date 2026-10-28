@@ -2,6 +2,12 @@ package com.homeworkoutcoach.app.ui.planner
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import com.homeworkoutcoach.engine.ClockState
+import com.homeworkoutcoach.engine.TaskClock
+import com.homeworkoutcoach.engine.TaskKind
+import java.time.LocalDate
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -91,6 +97,7 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 @Composable
 fun PlannerScreen(
     onOpen: (String) -> Unit,
+    onAdd: (LocalDate, Int?) -> Unit,
     vm: PlannerViewModel = viewModel(factory = Factories.Planner),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -143,8 +150,8 @@ fun PlannerScreen(
         }
         problem?.let { Text(it, Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.small) }
 
-        val untimed = s.tasks.filter { it.minutes == null }
-        val timed = s.tasks.filter { it.minutes != null }
+        val untimed = s.tasks.filter { it.sortMinutes == null }
+        val timed = s.tasks.filter { it.sortMinutes != null }
         // "Now" is only drawn on today, and moves along as the minutes pass.
         var nowMinutes by remember { mutableIntStateOf(Timeline.minutesOf(LocalTime.now())) }
         LaunchedEffect(Unit) {
@@ -169,9 +176,15 @@ fun PlannerScreen(
                 }
             }
         }
-        if (timed.isNotEmpty()) {
-            Small("By the clock", Modifier.padding(top = 22.dp), color = c.mut)
-            val nowAt = if (s.isToday) Timeline.nowIndex(timed.map { it.minutes!! }, nowMinutes) else null
+        Small("By the clock", Modifier.padding(top = 22.dp), color = c.mut)
+        if (timed.isEmpty()) {
+            Small("Give a task a start or an end time and it shows here on the clock.", Modifier.padding(top = 2.dp))
+        } else {
+            val today = LocalDate.now()
+            fun clockOf(r: TaskRowUi) = r.clock(today, nowMinutes)
+            // While a block is under way its filling capsule says where you are, so there is no Now marker.
+            val inBlock = s.isToday && timed.any { it.kind == TaskKind.BLOCK && clockOf(it)?.state == ClockState.RUNNING }
+            val nowAt = if (s.isToday && !inBlock) Timeline.nowIndex(timed.map { it.sortMinutes!! }, nowMinutes) else null
             // The timeline's stops in order: each timed task, and the Now marker among them.
             val stops: List<Any> = buildList {
                 timed.forEachIndexed { i, row ->
@@ -185,11 +198,29 @@ fun PlannerScreen(
                 val last = i == stops.lastIndex
                 if (stop is TaskRowUi) {
                     key(stop.id) {
-                        TimelineStop(first, last, stop.done, time = stop.time, enter = i) {
-                            TaskCard(
-                                stop, onTick = { vm.toggle(stop.id) }, onOpen = { onOpen(stop.id) },
-                                onTomorrow = { vm.moveToTomorrow(stop.id) }, showTime = false, enter = i,
+                        val clock = clockOf(stop)
+                        when (stop.kind) {
+                            TaskKind.BLOCK -> BlockStop(
+                                stop, clock, first, last, enter = i,
+                                onTick = { vm.toggle(stop.id) }, onOpen = { onOpen(stop.id) },
                             )
+                            else -> TimelineStop(
+                                first, last, stop.done, time = stop.startText ?: stop.endText, prefix = if (stop.kind == TaskKind.DEADLINE) "by" else "", enter = i,
+                            ) {
+                                val status = when (stop.kind) {
+                                    TaskKind.DEADLINE -> when (clock?.state) {
+                                        ClockState.RUNNING -> "${PlannerFormat.length(clock.minutesLeft ?: 0)} left" to true
+                                        ClockState.OVER -> if (stop.done) null else "Was due ${stop.endText}" to false
+                                        else -> null
+                                    }
+                                    else -> null
+                                }
+                                TaskCard(
+                                    stop, onTick = { vm.toggle(stop.id) }, onOpen = { onOpen(stop.id) },
+                                    onTomorrow = { vm.moveToTomorrow(stop.id) }, showTime = false, enter = i,
+                                    status = status?.first, statusAccent = status?.second ?: false,
+                                )
+                            }
                         }
                     }
                 } else {
@@ -197,6 +228,11 @@ fun PlannerScreen(
                 }
             }
         }
+        // A suggested start for a new task: the next whole hour after the day's last task (or after now, on today).
+        val lastBusy = timed.maxOfOrNull { it.endMinutes ?: it.sortMinutes!! } ?: 0
+        val after = maxOf(lastBusy, if (s.isToday) nowMinutes else 0)
+        val suggested = if (after == 0) 9 * 60 else (((after / 60) + 1) * 60).coerceAtMost(22 * 60)
+        AddTaskPill("Add task at ${PlannerFormat.time(LocalTime.of(suggested / 60, 0))}", Modifier.padding(start = 74.dp, top = 12.dp)) { onAdd(s.date, suggested) }
 
         if (s.carriedOver.isNotEmpty()) {
             Column(Modifier.padding(top = 24.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(c.tintPeach).padding(14.dp)) {
@@ -218,6 +254,80 @@ fun PlannerScreen(
                 }
             }
         }
+    }
+}
+
+/** A time block: start and end times at the sides, a capsule that fills as the time passes, and a tall card. */
+@Composable
+private fun BlockStop(row: TaskRowUi, clock: TaskClock?, first: Boolean, last: Boolean, enter: Int, onTick: () -> Unit, onOpen: () -> Unit) {
+    val c = AppTheme.colors
+    val fraction by animateFloatAsState(clock?.fraction?.toFloat() ?: 0f, tween(900), label = "fill")
+    val minutes = (row.endMinutes ?: 0) - (row.minutes ?: 0)
+    val height = minutes.coerceIn(92, 240).dp
+    fun part(text: String?, i: Int) = text?.split(' ')?.getOrNull(i).orEmpty()
+    Row(Modifier.fadeLiftIn(enter * 70).padding(top = 10.dp).height(IntrinsicSize.Min)) {
+        Column(Modifier.width(52.dp).fillMaxHeight().padding(vertical = 4.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text(part(row.startText, 0), color = c.fg, style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)))
+                Text(part(row.startText, 1), color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, lineHeight = 13.sp))
+            }
+            Column {
+                Text(part(row.endText, 0), color = c.mut, style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 13.sp)))
+                Text(part(row.endText, 1), color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, lineHeight = 13.sp))
+            }
+        }
+        Canvas(Modifier.width(22.dp).fillMaxHeight().padding(vertical = 4.dp)) {
+            val w = 14.dp.toPx()
+            val left = (size.width - w) / 2
+            val r = CornerRadius(w / 2)
+            drawRoundRect(c.accent.copy(alpha = 0.16f), Offset(left, 0f), Size(w, size.height), r)
+            val filled = size.height * fraction.coerceIn(0f, 1f)
+            if (filled > 0f) {
+                drawRoundRect(
+                    Brush.verticalGradient(listOf(c.accent, c.accent.copy(alpha = 0.55f)), startY = 0f, endY = maxOf(filled, 1f)),
+                    Offset(left, 0f), Size(w, maxOf(filled, w)), r,
+                )
+            }
+        }
+        Column(
+            Modifier.weight(1f).heightIn(min = height).clip(RoundedCornerShape(20.dp)).background(c.soft)
+                .clickable(role = Role.Button, onClick = onOpen).padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+        ) {
+            val status = when (clock?.state) {
+                ClockState.RUNNING -> "${PlannerFormat.length(clock.minutesLeft ?: 0)} left" to true
+                ClockState.UPCOMING -> clock.minutesUntil?.let { "Starts in ${PlannerFormat.length(it)}" to false }
+                ClockState.OVER -> "${PlannerFormat.length(minutes)} block" to false
+                null -> null
+            }
+            status?.let { Text(it.first, color = if (it.second) c.accent else c.mut, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold)) }
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f).padding(top = 2.dp)) {
+                    Text(
+                        row.title, color = if (row.done) c.mut else c.fg,
+                        style = AppTheme.type.bodyStrong.copy(textDecoration = if (row.done) TextDecoration.LineThrough else TextDecoration.None),
+                    )
+                    row.note.lineSequence().firstOrNull()?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = c.mut, style = AppTheme.type.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                TickBox(row.done, if (row.done) "Mark ${row.title} not done" else "Mark ${row.title} done", onTick)
+            }
+        }
+    }
+}
+
+/** "+ Add task": opens the new-task form at a suggested time. */
+@Composable
+private fun AddTaskPill(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        modifier.clip(RoundedCornerShape(99.dp)).background(c.accentSoft).clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 44.dp).padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(AppIcons.Plus, null, Modifier.size(18.dp), tint = c.accent)
+        Text(text, color = c.accent, style = AppTheme.type.label.copy(fontWeight = FontWeight.SemiBold))
     }
 }
 
@@ -258,11 +368,13 @@ private fun DayHero(s: PlannerUi, modifier: Modifier = Modifier, onToday: () -> 
  * stops above and below ([first] and [last] stop it short at the ends).
  */
 @Composable
-private fun TimelineStop(first: Boolean, last: Boolean, done: Boolean, time: String?, enter: Int, card: @Composable () -> Unit) {
+private fun TimelineStop(first: Boolean, last: Boolean, done: Boolean, time: String?, enter: Int, prefix: String = "", card: @Composable () -> Unit) {
     val c = AppTheme.colors
     val parts = (time ?: "").split(' ')
     Row(Modifier.height(IntrinsicSize.Min), verticalAlignment = Alignment.Top) {
-        Column(Modifier.width(52.dp).padding(top = 22.dp)) {
+        // a deadline's "by" sits on its own line above the time, which is nudged up so the time still lines up with the node
+        Column(Modifier.width(52.dp).padding(top = if (prefix.isEmpty()) 22.dp else 9.dp)) {
+            if (prefix.isNotEmpty()) Text(prefix, color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, lineHeight = 13.sp))
             Text(parts.firstOrNull().orEmpty(), color = c.fg, style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)))
             Text(parts.getOrNull(1).orEmpty(), color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, lineHeight = 13.sp))
         }
@@ -375,6 +487,8 @@ private fun TaskCard(
     onTomorrow: (() -> Unit)?,
     showTime: Boolean = true,
     enter: Int = 0,
+    status: String? = null,
+    statusAccent: Boolean = false,
     below: @Composable (() -> Unit)? = null,
 ) {
     val c = AppTheme.colors
@@ -382,6 +496,9 @@ private fun TaskCard(
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
             TickBox(row.done, if (row.done) "Mark ${row.title} not done" else "Mark ${row.title} done", onTick)
             Column(Modifier.weight(1f).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp, horizontal = 2.dp)) {
+                status?.let {
+                    Text(it, color = if (statusAccent) c.accent else c.mut, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
+                }
                 Text(
                     row.title,
                     color = if (row.done) c.mut else c.fg,
