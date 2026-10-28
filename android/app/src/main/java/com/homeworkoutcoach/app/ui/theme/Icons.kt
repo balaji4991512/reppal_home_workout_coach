@@ -28,6 +28,7 @@ object AppIcons {
         "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0"
 
     val Menu = icon("menu", "M4 7h16M4 12h16M4 17h16")
+    val Lock = icon("lock", "M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z", "M8 11V8a4 4 0 0 1 8 0v3")
     val Close = icon("close", "M6 6l12 12M18 6L6 18")
     val Calendar = icon("cal", "M6 5h12a2.5 2.5 0 0 1 2.5 2.5v10a2.5 2.5 0 0 1-2.5 2.5H6a2.5 2.5 0 0 1-2.5-2.5v-10A2.5 2.5 0 0 1 6 5z", "M3.5 10h17M8 3v4M16 3v4")
     val Dumbbell = icon("db", "M6.5 8v8M3.5 10v4M17.5 8v8M20.5 10v4M6.5 12h11")
