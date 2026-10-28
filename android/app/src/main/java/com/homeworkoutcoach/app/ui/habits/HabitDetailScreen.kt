@@ -278,7 +278,8 @@ internal fun MonthButton(icon: androidx.compose.ui.graphics.vector.ImageVector, 
 @Composable
 private fun DayCell(day: DayCellUi, color: String, selected: Boolean, onClick: () -> Unit) {
     val c = AppTheme.colors
-    val tint = HabitLook.color(color)
+    // Done is green on every habit page, the same as the tick circle and the history grid.
+    val tint = c.ok
     val done = day.state == DayState.DONE
     val faint = day.future || day.state == DayState.NOT_DUE || !day.editable
     Box(
