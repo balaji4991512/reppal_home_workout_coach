@@ -39,7 +39,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -245,20 +248,20 @@ fun Logo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
     Canvas(modifier.size(size).semantics { contentDescription = "Logo" }) {
         drawRoundRect(c.acc, cornerRadius = CornerRadius(11 * this.size.width / 40f))
-        // The launcher icon's candle (108 grid), with the middle 72 of it filling the square.
+        // The launcher icon's mark (108 grid, middle 72 shown): a W with a flame floating over its middle peak.
         val flame = Path().apply {
-            moveTo(55f, 21f); cubicTo(56f, 28f, 64f, 33f, 64f, 42f); cubicTo(64f, 47.5f, 59.5f, 51.5f, 54f, 51.5f)
-            cubicTo(48.5f, 51.5f, 44f, 47.5f, 44f, 42f); cubicTo(44f, 37f, 47f, 33.5f, 49f, 30.5f)
-            cubicTo(49.5f, 33f, 51f, 34.5f, 52.5f, 34.5f); cubicTo(53.5f, 30f, 52.5f, 25f, 55f, 21f); close()
+            moveTo(54.75f, 20f); cubicTo(55.88f, 26f, 63.75f, 30.5f, 63.75f, 38.75f); cubicTo(63.75f, 43.62f, 59.62f, 47f, 54f, 47f); cubicTo(48.38f, 47f, 44.25f, 43.62f, 44.25f, 38.75f); cubicTo(44.25f, 34.62f, 46.88f, 31.62f, 48.75f, 29f); cubicTo(49.12f, 31.25f, 50.62f, 32.75f, 52.12f, 32.75f); cubicTo(52.88f, 29f, 52.12f, 24.12f, 54.75f, 20f); close()
+        }
+        val w = Path().apply {
+            moveTo(30f, 46f); lineTo(41f, 78f); lineTo(54f, 52f); lineTo(67f, 78f); lineTo(78f, 46f)
         }
         val k = this.size.width / 72f
         withTransform({
             scale(k, k, Offset.Zero)
-            translate(-18f, -18f)
+            translate(-18f, -16f)
         }) {
             drawPath(flame, c.on)
-            drawRect(c.on, Offset(52.8f, 51f), Size(2.4f, 6.5f))
-            drawRoundRect(c.on, Offset(43f, 57f), Size(22f, 27f), CornerRadius(2f))
+            drawPath(w, c.on, style = Stroke(width = 7.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
     }
 }
