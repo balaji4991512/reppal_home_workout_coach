@@ -9,6 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
+import com.homeworkoutcoach.app.ui.components.CalendarStrip
+import com.homeworkoutcoach.app.ui.components.StripDays
+import com.homeworkoutcoach.engine.Habits
+import java.time.LocalDate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,16 +57,19 @@ fun JournalScreen(vm: JournalViewModel = viewModel(factory = Factories.Journal))
     var confirmDelete by rememberSaveable(s.date) { mutableStateOf(false) }
 
     Page {
-        H1("Journal")
-        Row(Modifier.padding(top = 8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MonthButton(AppIcons.ChevronLeft, "Previous day", true, vm::previousDay)
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(s.title, color = c.fg, style = AppTheme.type.h2, textAlign = TextAlign.Center)
-                Small(s.subtitle)
-            }
-            MonthButton(AppIcons.Forward, "Next day", !s.isToday, vm::nextDay)
+        val today = LocalDate.now()
+        CalendarStrip(
+            date = s.date,
+            days = StripDays.week(s.date, today, s.badges, lastSelectable = today),
+            onSelect = vm::select, onPreviousWeek = vm::previousWeek, onNextWeek = vm::nextWeek,
+            canGoNext = Habits.weekStart(s.date).plusWeeks(1) <= today,
+            eyebrow = "Journal",
+        )
+        Column(Modifier.padding(top = 22.dp)) {
+            Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
+            Small(s.subtitle)
+            if (!s.isToday) TextLink("Back to today", vm::goToToday)
         }
-        if (!s.isToday) TextLink("Back to today", vm::goToToday, Modifier.align(Alignment.CenterHorizontally))
         Muted(s.summary, Modifier.padding(top = 4.dp))
 
         Small(Journal.WIN_PROMPT, Modifier.padding(top = 20.dp, bottom = 6.dp))

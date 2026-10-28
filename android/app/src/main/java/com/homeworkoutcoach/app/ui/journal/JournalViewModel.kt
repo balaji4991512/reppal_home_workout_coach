@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.ui.habits.todayFlow
+import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Journal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,8 +40,18 @@ class JournalViewModel(
     /** The day after, but never past today: nothing can be written ahead. */
     fun nextDay() = selected.update { current -> ((current ?: clock()).plusDays(1)).takeIf { it <= clock() } ?: current }
 
+    fun previousWeek() = selected.update { (it ?: clock()).minusWeeks(1) }
+
+    /** A week on, but not into one that has not started: nothing is written ahead. */
+    fun nextWeek() = selected.update { current ->
+        val next = (current ?: clock()).plusWeeks(1)
+        if (Habits.weekStart(next).isAfter(clock())) current else next.takeIf { it <= clock() } ?: clock()
+    }
+
+    /** Shows [date], never one past today. */
     fun select(date: LocalDate) {
-        selected.value = date
+        if (date.isAfter(clock())) return
+        selected.value = date.takeUnless { it == clock() }
     }
 
     fun goToToday() {

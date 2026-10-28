@@ -13,6 +13,12 @@ import androidx.compose.ui.draw.clip
 import com.homeworkoutcoach.app.ui.components.fadeLiftIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
+import com.homeworkoutcoach.app.ui.components.CalendarStrip
+import com.homeworkoutcoach.app.ui.components.StripDays
+import com.homeworkoutcoach.engine.Habits
+import java.time.LocalDate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,31 +60,40 @@ fun HabitsScreen(
     var showArchived by rememberSaveable { mutableStateOf(false) }
 
     @Composable
-    fun rows(list: List<HabitRowUi>, dueToday: Boolean) = list.forEach { row ->
+    fun rows(list: List<HabitRowUi>, dueToday: Boolean) = list.forEachIndexed { i, row ->
         HabitRow(
             row = row,
             dueToday = dueToday,
-            expanded = open == row.id,
+            expanded = open == row.id && !s.isFuture,
             onBadge = {
                 if (row.kind == HabitKind.DONE) vm.record(row, if (row.done) 0 else 1)
                 else open = if (open == row.id) null else row.id
             },
             onOpen = { onOpen(row.id) },
             onSet = { vm.record(row, it) },
+            card = true,
+            enter = i,
         )
     }
 
+    val today = LocalDate.now()
     Page {
-        H1("Habits")
-        Muted(s.summary)
-        if (s.today.isNotEmpty()) {
-            H2("Today", top = 24.dp)
-            Hairline(Modifier.padding(top = 4.dp))
-            rows(s.today, dueToday = true)
+        CalendarStrip(
+            date = s.date,
+            days = StripDays.week(s.date, today, s.badges, lastSelectable = today),
+            onSelect = vm::select, onPreviousWeek = vm::previousWeek, onNextWeek = vm::nextWeek,
+            canGoNext = Habits.weekStart(s.date).plusWeeks(1) <= today,
+            eyebrow = "Habits",
+        )
+        Column(Modifier.padding(top = 22.dp)) {
+            Text(s.title, color = AppTheme.colors.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
+            Small(s.summary)
+            if (!s.isToday) TextLink("Back to today", vm::goToToday)
+            if (s.isFuture) Small("This day has not happened yet, so nothing can be ticked.", Modifier.padding(top = 6.dp))
         }
+        if (s.today.isNotEmpty()) rows(s.today, dueToday = true)
         if (s.other.isNotEmpty()) {
-            H2("Not due today", top = 28.dp)
-            Hairline(Modifier.padding(top = 4.dp))
+            H2(if (s.isToday) "Not due today" else "Not due this day", top = 28.dp)
             rows(s.other, dueToday = false)
         }
         PrimaryButton("Add habit", onAdd)

@@ -29,7 +29,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import com.homeworkoutcoach.app.ui.components.CalendarStrip
+import com.homeworkoutcoach.app.ui.components.DayBadge
 import com.homeworkoutcoach.app.ui.components.FlameArt
+import com.homeworkoutcoach.app.ui.components.StripDay
 import com.homeworkoutcoach.app.ui.components.ProgressRing
 import com.homeworkoutcoach.app.ui.components.fadeLiftIn
 import kotlinx.coroutines.delay
@@ -113,22 +116,16 @@ fun PlannerScreen(
     }
 
     Page {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                buildAnnotatedString {
-                    append(s.month)
-                    append(" ")
-                    withStyle(SpanStyle(color = c.accent)) { append(s.year) }
-                },
-                Modifier.weight(1f), color = c.fg, style = AppTheme.type.h1,
-            )
-            MonthButton(AppIcons.ChevronLeft, "Previous week", true, vm::previousWeek)
-            MonthButton(AppIcons.Forward, "Next week", true, vm::nextWeek)
-        }
-
-        Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            s.week.forEach { d -> DayCell(d, Modifier.weight(1f)) { vm.select(d.date) } }
-        }
+        CalendarStrip(
+            date = s.date,
+            days = s.week.map { d ->
+                StripDay(
+                    d.date, d.label, d.number, d.selected, d.isToday,
+                    badge = if (d.total > 0) DayBadge("${d.done}/${d.total}", complete = d.done == d.total) else null,
+                )
+            },
+            onSelect = vm::select, onPreviousWeek = vm::previousWeek, onNextWeek = vm::nextWeek,
+        )
 
         DayHero(s, Modifier.padding(top = 18.dp), onToday = vm::goToToday)
 
@@ -425,39 +422,6 @@ private fun TickBox(done: Boolean, label: String, onTick: () -> Unit) {
 }
 
 private val NODE_Y = 36.dp
-
-/** A day in the strip: weekday, date in a circle (filled when shown, ringed for today), and its done/total. */
-@Composable
-private fun DayCell(d: WeekDayUi, modifier: Modifier, onClick: () -> Unit) {
-    val c = AppTheme.colors
-    val fillColor by animateColorAsState(if (d.selected) c.accent else Color.Transparent, tween(250), label = "day")
-    Column(
-        modifier.clip(RoundedCornerShape(16.dp)).selectable(selected = d.selected, role = Role.Tab, onClick = onClick).padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(d.label, color = c.mut, style = AppTheme.type.small.copy(fontSize = 12.sp))
-        Box(
-            Modifier.padding(top = 6.dp).size(40.dp).clip(CircleShape)
-                .background(fillColor)
-                .then(if (d.isToday && !d.selected) Modifier.border(1.5.dp, c.accent, CircleShape) else Modifier),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "${d.number}", color = if (d.selected) c.onAccent else c.fg,
-                style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 16.sp, fontWeight = if (d.selected || d.isToday) FontWeight.Bold else FontWeight.Medium)),
-            )
-        }
-        if (d.total > 0) {
-            val all = d.done == d.total
-            Text(
-                "${d.done}/${d.total}", Modifier.padding(top = 6.dp).clip(RoundedCornerShape(99.dp)).background(if (all) c.tintMint else c.accentSoft).padding(horizontal = 6.dp, vertical = 2.dp),
-                color = if (all) c.ok else c.accent, style = AppTheme.type.tabular(AppTheme.type.small.copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold)),
-            )
-        } else {
-            Spacer(Modifier.padding(top = 6.dp).height(16.dp))
-        }
-    }
-}
 
 /** A task as a soft card: a round tick, the title, its time as an indigo pill and the first line of its note. */
 @Composable

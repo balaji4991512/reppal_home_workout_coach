@@ -1,6 +1,14 @@
 package com.homeworkoutcoach.app.ui.routines
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.sp
+import com.homeworkoutcoach.app.ui.components.CalendarStrip
+import com.homeworkoutcoach.app.ui.components.StripDays
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import com.homeworkoutcoach.engine.Habits
+import java.time.LocalDate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,41 +59,77 @@ fun RoutinesScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val s = ui ?: return
     val c = AppTheme.colors
+    val today = LocalDate.now()
     Page {
-        H1("Routines")
-        Muted(s.summary)
-        if (s.routines.isNotEmpty()) {
-            Hairline(Modifier.padding(top = 16.dp))
-            s.routines.forEach { r ->
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 72.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Column(
-                        Modifier.weight(1f).clickable(enabled = r.canRun, role = Role.Button) { onRun(r.id) }.padding(vertical = 10.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Body(r.name, strong = true)
-                            if (r.isNow && !r.doneToday) Pill("Now", c.accs, c.fg)
-                        }
-                        Small(if (r.canRun) "${r.part} · ${r.steps}" else "${r.part} · add steps to run it")
-                    }
-                    if (r.doneToday) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(AppIcons.Check, null, Modifier.size(18.dp), tint = c.ok)
-                            Text("Done", color = c.ok, style = AppTheme.type.label)
-                        }
-                    } else if (r.canRun) {
-                        Chip("Start", false, { onRun(r.id) }, small = true)
-                    }
-                    Chip("Edit", false, { onEdit(r.id) }, small = true)
+        CalendarStrip(
+            date = s.date,
+            days = StripDays.week(s.date, today, s.badges, lastSelectable = today),
+            onSelect = vm::select, onPreviousWeek = vm::previousWeek, onNextWeek = vm::nextWeek,
+            canGoNext = Habits.weekStart(s.date).plusWeeks(1) <= today,
+            eyebrow = "Routines",
+        )
+        Column(Modifier.padding(top = 22.dp)) {
+            Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
+            Small(s.summary)
+            if (!s.isToday) TextLink("Back to today", vm::goToToday)
+            if (s.isFuture) Small("This day has not happened yet, so nothing can be marked.", Modifier.padding(top = 6.dp))
+        }
+        s.routines.forEachIndexed { i, r ->
+            Row(
+                Modifier.fadeLiftIn(i * 60).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft)
+                    .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(Modifier.size(44.dp).clip(CircleShape).background(if (r.doneToday) c.tintMint else c.accentSoft), contentAlignment = Alignment.Center) {
+                    Icon(if (r.doneToday) AppIcons.Check else AppIcons.Routine, null, Modifier.size(22.dp), tint = if (r.doneToday) c.ok else c.accent)
                 }
-                Hairline()
+                Column(
+                    Modifier.weight(1f).clickable(enabled = s.isToday && r.canRun, role = Role.Button) { onRun(r.id) }.padding(vertical = 6.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Body(r.name, strong = true)
+                        if (r.isNow && !r.doneToday) Pill("Now", c.accentSoft, c.accent)
+                    }
+                    Small(if (r.canRun) "${r.part} · ${r.steps}" else "${r.part} · add steps to run it")
+                }
+                when {
+                    s.isToday && r.doneToday -> DonePill()
+                    s.isToday && r.canRun -> StartPill { onRun(r.id) }
+                    // another day: done can be set or taken back; a day ahead has nothing to mark
+                    !s.isToday && !s.isFuture -> {
+                        if (r.doneToday) DonePill(Modifier.clickable(role = Role.Button) { vm.setDone(r.id, false) })
+                        else Chip("Mark done", false, { vm.setDone(r.id, true) }, small = true)
+                    }
+                }
+                Chip("Edit", false, { onEdit(r.id) }, small = true)
             }
         }
         PrimaryButton("Add routine", onAdd)
     }
+}
+
+@Composable
+private fun DonePill(modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
+    Row(
+        modifier.clip(RoundedCornerShape(99.dp)).background(c.tintMint).heightIn(min = 36.dp).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(AppIcons.Check, null, Modifier.size(16.dp), tint = c.ok)
+        Text("Done", color = c.ok, style = AppTheme.type.label)
+    }
+}
+
+@Composable
+private fun StartPill(onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Text(
+        "Start", color = c.onAccent, style = AppTheme.type.label,
+        modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.accent).clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 36.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 /** A routine to run through: tick the steps in any order, then finish. */

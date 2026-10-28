@@ -5,6 +5,10 @@ import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.StoredHabit
 import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.Habit
+import com.homeworkoutcoach.app.ui.components.DayBadge
+import com.homeworkoutcoach.app.ui.planner.PlannerFormat
+import com.homeworkoutcoach.app.ui.Copy
+import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Routine
 import com.homeworkoutcoach.engine.RoutineDone
 import com.homeworkoutcoach.engine.RoutineItem
@@ -37,15 +41,27 @@ data class RoutineRowUi(
 
 data class RoutinesUi(
     val routines: List<RoutineRowUi>,
-    /** "1 of 2 done today", or what routines are when there are none. */
+    /** "1 of 2 done today" (for another day, "1 of 2 done"), or what routines are when there are none. */
     val summary: String,
     /** The starting routines not already added. */
     val suggestions: List<Routines.Suggestion>,
+    /** The day shown; [RoutineRowUi.doneToday] means done on it. */
+    val date: LocalDate = LocalDate.EPOCH,
+    /** "Today", "Yesterday", "Fri 23 Oct". */
+    val title: String = "Today",
+    val isToday: Boolean = true,
+    /** A day that has not happened: nothing can be marked on it yet. */
+    val isFuture: Boolean = false,
+    /** Routines done of all, for each day of the week shown that has happened. */
+    val badges: Map<LocalDate, DayBadge> = emptyMap(),
 )
 
 class RoutinesPresenter {
-    fun present(routines: List<Routine>, done: Set<RoutineDone>, today: LocalDate, now: LocalTime): RoutinesUi {
+    /** [shown] is the day to look at (today by default). Only today's routines can be "now". */
+    fun present(routines: List<Routine>, done: Set<RoutineDone>, today: LocalDate, now: LocalTime, shown: LocalDate = today): RoutinesUi {
         val part = Routines.partOf(now)
+        val isToday = shown == today
+        val future = shown.isAfter(today)
         val rows = Routines.sorted(routines).map { r ->
             RoutineRowUi(
                 id = r.id,
@@ -53,20 +69,35 @@ class RoutinesPresenter {
                 part = RoutineFormat.part(r.part),
                 partKey = r.part,
                 steps = RoutineFormat.steps(r.items.size),
-                doneToday = RoutineDone(r.id, today) in done,
+                doneToday = RoutineDone(r.id, shown) in done,
                 canRun = r.items.isNotEmpty(),
-                isNow = r.part == part,
+                isNow = isToday && r.part == part,
             )
         }
         val doneCount = rows.count { it.doneToday }
+        // The week's little numbers: how many of the routines were finished on each day that has happened.
+        val badges = buildMap {
+            if (routines.isNotEmpty()) {
+                (0L..6L).map { Habits.weekStart(shown).plusDays(it) }.filter { !it.isAfter(today) }.forEach { d ->
+                    val n = routines.count { RoutineDone(it.id, d) in done }
+                    put(d, DayBadge("$n/${routines.size}", complete = n == routines.size))
+                }
+            }
+        }
         return RoutinesUi(
             routines = rows,
             summary = when {
                 rows.isEmpty() -> "A routine is a checklist you run through, like a morning routine."
-                doneCount == rows.size -> "All done today."
-                else -> "$doneCount of ${rows.size} done today"
+                future -> Copy.count(rows.size, "routine") + " planned"
+                doneCount == rows.size -> if (isToday) "All done today." else "All done."
+                else -> if (isToday) "$doneCount of ${rows.size} done today" else "$doneCount of ${rows.size} done"
             },
             suggestions = Routines.suggestions.filter { s -> routines.none { it.name.equals(s.name, ignoreCase = true) } },
+            date = shown,
+            title = PlannerFormat.dayTitle(shown, today),
+            isToday = isToday,
+            isFuture = future,
+            badges = badges,
         )
     }
 }

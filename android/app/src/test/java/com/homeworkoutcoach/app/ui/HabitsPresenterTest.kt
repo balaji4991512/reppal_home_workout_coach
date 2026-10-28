@@ -52,6 +52,50 @@ class HabitsPresenterTest {
     }
 
     @Test
+    fun anotherDayShowsWhatWasDueAndDoneThenAndTheWeeksNumbers() {
+        val journal = storedHabit("j", name = "Journal", position = 0)
+        val water = storedHabit("w", name = "Water", kind = HabitKind.COUNT, target = 8, position = 1)
+        val mon = WED.minusDays(2)
+        val tue = WED.minusDays(1)
+        val e = entries("j" to mapOf(mon to 1, tue to 1), "w" to mapOf(mon to 8, tue to 3))
+
+        val monday = presenter.present(listOf(journal, water), e, emptySet(), WED, shown = mon)
+        assertEquals("Mon 26 Oct", monday.title)
+        assertFalse(monday.isToday)
+        assertEquals("All done.", monday.summary)
+        assertEquals(listOf(true, true), monday.today.map { it.done })
+
+        val tuesday = presenter.present(listOf(journal, water), e, emptySet(), WED, shown = tue)
+        assertEquals("Yesterday", tuesday.title)
+        assertEquals("1 of 2 done", tuesday.summary)
+        assertEquals(listOf(true, false), tuesday.today.map { it.done })
+
+        // the week's numbers: past days and today, not the days ahead
+        assertEquals(mapOf(mon to "2/2", tue to "1/2", WED to "0/2"), tuesday.badges.mapValues { it.value.text })
+        assertTrue(tuesday.badges.getValue(mon).complete)
+        assertFalse(tuesday.badges.getValue(tue).complete)
+    }
+
+    @Test
+    fun aDayThatHasNotHappenedSaysWhatIsDueAndIsMarkedFuture() {
+        val journal = storedHabit("j", name = "Journal")
+        val ui = presenter.present(listOf(journal), emptyMap(), emptySet(), WED, shown = WED.plusDays(1))
+        assertTrue(ui.isFuture)
+        assertEquals("1 due", ui.summary)
+        assertEquals("Tomorrow", ui.title)
+        assertTrue(ui.badges.keys.none { it.isAfter(WED) })
+    }
+
+    @Test
+    fun aHabitIsNotDueBeforeItStarted() {
+        val habit = storedHabit("h") // starts on Saturday 24 October
+        val ui = presenter.present(listOf(habit), emptyMap(), emptySet(), WED, shown = WED.minusDays(5)) // the Friday before
+        assertTrue(ui.today.isEmpty())
+        assertEquals("Nothing was due.", ui.summary)
+        assertTrue(ui.badges.keys.all { it >= WED.minusDays(4) }) // no numbers for days before it started
+    }
+
+    @Test
     fun summaryReadsGently() {
         val journal = storedHabit("journal", name = "Journal")
         val water = storedHabit("water", kind = HabitKind.COUNT, target = 8)

@@ -3,6 +3,8 @@ package com.homeworkoutcoach.app.ui.habits
 import com.homeworkoutcoach.app.data.HabitLogs
 import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.StoredHabit
+import com.homeworkoutcoach.app.ui.components.DayBadge
+import com.homeworkoutcoach.app.ui.planner.PlannerFormat
 import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.DayState
 import com.homeworkoutcoach.engine.Habit
@@ -45,8 +47,17 @@ data class HabitsUi(
     val today: List<HabitRowUi>,
     val other: List<HabitRowUi>,
     val archived: List<HabitRowUi>,
-    /** "3 of 6 done today". */
+    /** "3 of 6 done today"; for another day, "3 of 6 done". */
     val summary: String,
+    /** The day shown. [today] and [other] are what is due, and not due, on it. */
+    val date: LocalDate = LocalDate.EPOCH,
+    /** "Today", "Yesterday", "Fri 23 Oct". */
+    val title: String = "Today",
+    val isToday: Boolean = true,
+    /** A day that has not happened: nothing can be recorded on it yet. */
+    val isFuture: Boolean = false,
+    /** done/due for each day of the week shown that has happened and had something due. */
+    val badges: Map<LocalDate, DayBadge> = emptyMap(),
 )
 
 object HabitFormat {
@@ -115,27 +126,44 @@ object HabitRows {
 
 /** The Habits list: what is due today first, then the rest, then archived habits. */
 class HabitsPresenter {
+    /** [shown] is the day to look at (today by default); [today] is what the date is now. */
     fun present(
         habits: List<StoredHabit>,
         entries: Map<String, Map<LocalDate, Int>>,
         workoutDays: Set<LocalDate>,
         today: LocalDate,
         sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        shown: LocalDate = today,
     ): HabitsUi {
-        val rows = habits.map { HabitRows.row(it, entries, workoutDays, today, sourceDays) }
+        val rows = habits.map { HabitRows.row(it, entries, workoutDays, shown, sourceDays) }
         val live = rows.filterNot { it.archived }
         val due = live.filter { it.due }
         val done = due.count { it.done }
+        val isToday = shown == today
+        val future = shown.isAfter(today)
+        // The week's little numbers: how many of what was due on each past day got done.
+        val badges = buildMap {
+            (0L..6L).map { Habits.weekStart(shown).plusDays(it) }.filter { !it.isAfter(today) }.forEach { d ->
+                val day = habits.map { HabitRows.row(it, entries, workoutDays, d, sourceDays) }.filter { !it.archived && it.due }
+                if (day.isNotEmpty()) put(d, DayBadge("${day.count { it.done }}/${day.size}", complete = day.all { it.done }))
+            }
+        }
         return HabitsUi(
             today = due,
             other = live.filterNot { it.due },
             archived = rows.filter { it.archived },
             summary = when {
                 live.isEmpty() -> "Track anything you want to do every day or every week."
-                due.isEmpty() -> "Nothing is due today."
-                done == due.size -> "All done for today."
-                else -> "$done of ${due.size} done today"
+                future -> if (due.isEmpty()) "Nothing is due then." else "${due.size} due"
+                due.isEmpty() -> if (isToday) "Nothing is due today." else "Nothing was due."
+                done == due.size -> if (isToday) "All done for today." else "All done."
+                else -> if (isToday) "$done of ${due.size} done today" else "$done of ${due.size} done"
             },
+            date = shown,
+            title = PlannerFormat.dayTitle(shown, today),
+            isToday = isToday,
+            isFuture = future,
+            badges = badges,
         )
     }
 }

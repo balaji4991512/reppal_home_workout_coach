@@ -54,20 +54,43 @@ class HabitsViewModel(
     private val zone: ZoneId = ZoneId.systemDefault(),
     clock: () -> LocalDate = { LocalDate.now(zone) },
 ) : ViewModel() {
+    /** The day being looked at; null means today, so a screen left open past midnight moves on with the date. */
+    private val selected = MutableStateFlow<LocalDate?>(null)
+
     /** Null until loaded. */
     val ui: StateFlow<HabitsUi?> = combine(
-        habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), todayFlow(clock),
-    ) { list, entries, auto, today ->
-        presenter.present(list, entries, auto.workoutDays, today, auto.sourceDays)
+        habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), todayFlow(clock), selected,
+    ) { list, entries, auto, today, day ->
+        presenter.present(list, entries, auto.workoutDays, today, auto.sourceDays, shown = day ?: today)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val today = clock
+    private val shown get() = selected.value ?: today()
 
-    /** Sets today's amount: a tick (1), an untick (0) or a number. */
+    /** Shows [date]; today is kept as "no choice" so the screen follows the date. */
+    fun select(date: LocalDate) {
+        selected.value = date.takeUnless { it == today() }
+    }
+
+    fun goToToday() {
+        selected.value = null
+    }
+
+    fun previousWeek() = selected.update { (it ?: today()).minusWeeks(1) }
+
+    /** A week on, but not into one that has not started: nothing is recorded ahead. */
+    fun nextWeek() = selected.update { current ->
+        val next = (current ?: today()).plusWeeks(1)
+        if (Habits.weekStart(next).isAfter(today())) current else next.takeIf { it <= today() } ?: today()
+    }
+
+    /** Sets the shown day's amount: a tick (1), an untick (0) or a number. A day that has not happened is left alone. */
     fun record(row: HabitRowUi, amount: Int) {
-        viewModelScope.launch { HabitWrites.record(habits, row.id, today(), amount, row.auto) }
+        val day = shown
+        if (day.isAfter(today())) return
+        viewModelScope.launch { HabitWrites.record(habits, row.id, day, amount, row.auto) }
     }
 }
 

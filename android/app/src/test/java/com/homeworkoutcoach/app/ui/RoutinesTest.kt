@@ -57,6 +57,38 @@ class RoutinesPresenterTest {
     }
 
     @Test
+    fun anotherDayShowsWhatWasDoneThenAndTheWeeksNumbers() {
+        val morning = routine("m", "Morning", DayPart.MORNING, steps = 3, position = 0)
+        val evening = routine("e", "Evening", DayPart.EVENING, steps = 2, position = 1)
+        val mon = TODAY.minusDays(2)
+        val tue = TODAY.minusDays(1)
+        val done = setOf(RoutineDone("m", mon), RoutineDone("e", mon), RoutineDone("m", tue), RoutineDone("m", TODAY))
+
+        val ui = presenter.present(listOf(morning, evening), done, TODAY, morningTime, shown = tue)
+        assertEquals("Yesterday", ui.title)
+        assertFalse(ui.isToday)
+        assertEquals(listOf(true, false), ui.routines.map { it.doneToday })
+        assertEquals("1 of 2 done", ui.summary)
+        assertEquals(listOf(false, false), ui.routines.map { it.isNow }) // "now" is only for today
+        assertEquals(mapOf(mon to "2/2", tue to "1/2", TODAY to "1/2"), ui.badges.mapValues { it.value.text })
+        assertTrue(ui.badges.getValue(mon).complete)
+        assertFalse(ui.badges.getValue(tue).complete)
+    }
+
+    @Test
+    fun aDayAheadIsMarkedFutureAndHasNoNumbers() {
+        val ui = presenter.present(listOf(routine("m", "Morning")), emptySet(), TODAY, morningTime, shown = TODAY.plusDays(2))
+        assertTrue(ui.isFuture)
+        assertEquals("1 routine planned", ui.summary)
+        assertTrue(ui.badges.keys.none { it.isAfter(TODAY) })
+    }
+
+    @Test
+    fun noRoutinesMeansNoNumbers() {
+        assertTrue(presenter.present(emptyList(), emptySet(), TODAY, morningTime, shown = TODAY.minusDays(1)).badges.isEmpty())
+    }
+
+    @Test
     fun aRoutineWithNoStepsCannotBeRun() {
         assertFalse(presenter.present(listOf(routine("m", steps = 0)), emptySet(), TODAY, morningTime).routines.single().canRun)
     }

@@ -2,6 +2,8 @@ package com.homeworkoutcoach.app.ui.journal
 
 import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.ui.planner.PlannerFormat
+import com.homeworkoutcoach.app.ui.components.DayBadge
+import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Journal
 import com.homeworkoutcoach.engine.JournalEntry
 import java.time.LocalDate
@@ -24,6 +26,8 @@ data class JournalUi(
     val summary: String,
     /** Every other day with an entry, newest first. */
     val past: List<PastEntryUi>,
+    /** A tick under each day of the week shown that has an entry. */
+    val badges: Map<LocalDate, DayBadge> = emptyMap(),
 )
 
 class JournalPresenter {
@@ -42,6 +46,9 @@ class JournalPresenter {
             summary = if (written == 0) "Two lines a day is plenty." else "Written on $written of the last 7 days.",
             past = Journal.newestFirst(entries).filter { it.date != date }
                 .map { PastEntryUi(it.date, PlannerFormat.dayTitle(it.date, today), it.win, it.improve) },
+            badges = (0L..6L).map { Habits.weekStart(date).plusDays(it) }
+                .filter { d -> !d.isAfter(today) && Journal.forDay(entries, d) != null }
+                .associateWith { DayBadge("✓", complete = true) },
         )
     }
 }

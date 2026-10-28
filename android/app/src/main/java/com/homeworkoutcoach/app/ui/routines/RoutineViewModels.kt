@@ -6,6 +6,7 @@ import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.StoredHabit
 import com.homeworkoutcoach.app.ui.habits.todayFlow
+import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Routine
 import com.homeworkoutcoach.engine.Routines
 import kotlinx.coroutines.Dispatchers
@@ -35,16 +36,45 @@ internal fun nowFlow(clock: () -> LocalDateTime): Flow<LocalDateTime> = flow {
 }.distinctUntilChanged { a, b -> a.toLocalDate() == b.toLocalDate() && Routines.partOf(a.toLocalTime()) == Routines.partOf(b.toLocalTime()) }
 
 class RoutinesViewModel(
-    routines: RoutineRepository,
+    private val routines: RoutineRepository,
     presenter: RoutinesPresenter = RoutinesPresenter(),
-    clock: () -> LocalDateTime = { LocalDateTime.now() },
+    private val clock: () -> LocalDateTime = { LocalDateTime.now() },
 ) : ViewModel() {
+    /** The day being looked at; null means today, so a screen left open past midnight moves on with the date. */
+    private val selected = MutableStateFlow<LocalDate?>(null)
+
     /** Null until loaded. */
-    val ui: StateFlow<RoutinesUi?> = combine(routines.routines(), routines.done(), nowFlow(clock)) { list, done, now ->
-        presenter.present(list, done, now.toLocalDate(), now.toLocalTime())
+    val ui: StateFlow<RoutinesUi?> = combine(routines.routines(), routines.done(), nowFlow(clock), selected) { list, done, now, day ->
+        presenter.present(list, done, now.toLocalDate(), now.toLocalTime(), shown = day ?: now.toLocalDate())
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val today get() = clock().toLocalDate()
+    private val shown get() = selected.value ?: today
+
+    fun select(date: LocalDate) {
+        selected.value = date.takeUnless { it == today }
+    }
+
+    fun goToToday() {
+        selected.value = null
+    }
+
+    fun previousWeek() = selected.update { (it ?: today).minusWeeks(1) }
+
+    /** A week on, but not into one that has not started. */
+    fun nextWeek() = selected.update { current ->
+        val next = (current ?: today).plusWeeks(1)
+        if (Habits.weekStart(next).isAfter(today)) current else next.takeIf { it <= today } ?: today
+    }
+
+    /** Marks a routine finished on the day shown, or takes that back. A day that has not happened is left alone. */
+    fun setDone(id: String, done: Boolean) {
+        val day = shown
+        if (day.isAfter(today)) return
+        viewModelScope.launch { routines.setDone(id, day, done) }
+    }
 }
 
 class RoutineRunViewModel(

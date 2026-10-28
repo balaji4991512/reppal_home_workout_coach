@@ -6,6 +6,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import com.homeworkoutcoach.app.ui.components.CalendarStrip
+import com.homeworkoutcoach.app.ui.components.TextLink
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import com.homeworkoutcoach.app.ui.components.StripDays
+import com.homeworkoutcoach.engine.Habits
+import java.time.LocalDate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -228,22 +234,35 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                 StatCard("THIS WEEK", s.weekValue, null, c.tintPeach, Modifier.weight(1f))
             }
 
-            if (s.recent.isNotEmpty()) {
-                H2("Recent", top = 28.dp)
-                val tints = listOf(c.tintMint, c.tintPeach, c.tintRose, c.accentSoft)
-                s.recent.forEachIndexed { i, r ->
-                    Row(
-                        Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        Box(Modifier.size(40.dp).clip(CircleShape).background(tints[i % tints.size]), contentAlignment = Alignment.Center) {
-                            Icon(AppIcons.Timer, null, Modifier.size(20.dp), tint = c.fg)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Body(r.lengthText, strong = true)
-                            Small(listOfNotNull(r.whenText, r.note).joinToString(" · "))
-                        }
+            val today = LocalDate.now()
+            CalendarStrip(
+                date = s.date,
+                days = StripDays.week(s.date, today, s.badges, lastSelectable = today),
+                onSelect = vm::select, onPreviousWeek = vm::previousWeek, onNextWeek = vm::nextWeek,
+                canGoNext = Habits.weekStart(s.date).plusWeeks(1) <= today,
+                modifier = Modifier.padding(top = 30.dp),
+                eyebrow = "History",
+            )
+            Row(Modifier.padding(top = 18.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(s.title, Modifier.weight(1f), color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
+                if (!s.isToday) TextLink("Back to today", vm::goToToday)
+            }
+            if (s.sessions.isEmpty()) {
+                Small(if (s.isToday) "No sessions yet today." else "No sessions on this day.", Modifier.padding(top = 4.dp))
+            }
+            val tints = listOf(c.tintMint, c.tintPeach, c.tintRose, c.accentSoft)
+            s.sessions.forEachIndexed { i, r ->
+                Row(
+                    Modifier.fadeLiftIn(i * 60).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(tints[i % tints.size]), contentAlignment = Alignment.Center) {
+                        Icon(AppIcons.Timer, null, Modifier.size(20.dp), tint = c.fg)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Body(r.lengthText, strong = true)
+                        Small(listOfNotNull(r.whenText, r.note).joinToString(" · "))
                     }
                 }
             }

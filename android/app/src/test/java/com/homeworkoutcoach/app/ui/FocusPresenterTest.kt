@@ -5,6 +5,7 @@ import com.homeworkoutcoach.app.data.focusSession
 import com.homeworkoutcoach.app.data.task
 import com.homeworkoutcoach.app.ui.focus.FocusPresenter
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,7 +29,7 @@ class FocusPresenterTest {
         assertEquals("0 min", ui.todayValue)
         assertEquals("No sessions yet", ui.todayNote)
         assertEquals("0 min", ui.weekValue)
-        assertTrue(ui.recent.isEmpty() && ui.taskChoices.isEmpty())
+        assertTrue(ui.sessions.isEmpty() && ui.taskChoices.isEmpty())
         assertEquals(listOf(15, 25, 45, 60), ui.presets)
     }
 
@@ -46,10 +47,20 @@ class FocusPresenterTest {
         assertEquals("45 min", ui.todayValue)
         assertEquals("2 sessions", ui.todayNote)
         assertEquals("1 h 45 min", ui.weekValue)
-        assertEquals(listOf("Today 2:00 pm", "Today 9:30 am", "Yesterday 4:00 pm", "Sun 25 Oct 10:00 am"), ui.recent.map { it.whenText })
-        assertEquals(listOf("20 of 45 min", "25 min", "1 h", "30 min"), ui.recent.map { it.lengthText })
-        assertEquals("Write the report", ui.recent.first().note)
-        assertEquals(listOf(false, true, true, true), ui.recent.map { it.completed })
+        // today's sessions, newest first, by their time
+        assertEquals("Today", ui.title)
+        assertEquals(listOf("2:00 pm", "9:30 am"), ui.sessions.map { it.whenText })
+        assertEquals(listOf("20 of 45 min", "25 min"), ui.sessions.map { it.lengthText })
+        assertEquals("Write the report", ui.sessions.first().note)
+        assertEquals(listOf(false, true), ui.sessions.map { it.completed })
+        // another day shows that day's
+        val yesterday = presenter.present(null, sessions, emptyList(), TODAY, ZONE, shown = TODAY.minusDays(1))
+        assertEquals("Yesterday", yesterday.title)
+        assertFalse(yesterday.isToday)
+        assertEquals(listOf("4:00 pm"), yesterday.sessions.map { it.whenText })
+        assertEquals(listOf("1 h"), yesterday.sessions.map { it.lengthText })
+        // the strip's numbers: minutes on each day of this week so far (the Sunday before is last week's)
+        assertEquals(mapOf(TODAY to "45m", TODAY.minusDays(1) to "1h"), ui.badges.mapValues { it.value.text })
     }
 
     @Test

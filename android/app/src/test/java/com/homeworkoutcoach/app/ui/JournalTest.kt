@@ -19,6 +19,21 @@ class JournalPresenterTest {
     private val presenter = JournalPresenter()
 
     @Test
+    fun theWeekShowsATickOnEveryDayWrittenAndNothingAhead() {
+        val all = listOf(
+            JournalEntry(TODAY, "Finished the report", ""),
+            JournalEntry(TODAY.minusDays(2), "", "Less phone"), // Monday
+            JournalEntry(TODAY.minusDays(9), "Last week", ""), // another week
+            JournalEntry(TODAY.plusDays(1), "Not yet", ""), // cannot be, but it must not show
+        )
+        val ui = presenter.present(all, TODAY.minusDays(1), TODAY)
+        assertEquals(setOf(TODAY.minusDays(2), TODAY), ui.badges.keys)
+        assertTrue(ui.badges.values.all { it.text == "✓" && it.complete })
+        // looking at last week shows last week's ticks
+        assertEquals(setOf(TODAY.minusDays(9)), presenter.present(all, TODAY.minusDays(7), TODAY).badges.keys)
+    }
+
+    @Test
     fun theDayShownCarriesItsEntryAndTheOthersAreListed() {
         val all = listOf(
             JournalEntry(TODAY, "Finished the report", "Start earlier"),
