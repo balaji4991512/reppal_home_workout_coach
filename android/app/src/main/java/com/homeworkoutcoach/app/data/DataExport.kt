@@ -4,6 +4,7 @@ import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.FocusSession
 import com.homeworkoutcoach.engine.Goal
 import com.homeworkoutcoach.engine.GoalKind
 import com.homeworkoutcoach.engine.Habit
@@ -33,8 +34,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals (older files still restore). */
-    const val FORMAT = 6
+    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions (older files still restore). */
+    const val FORMAT = 7
 
     @Serializable
     data class File(
@@ -57,6 +58,8 @@ object DataExport {
         val journal: List<JournalDto>? = null,
         /** Null in files from before goals existed; restoring such a file leaves the phone's goals alone. */
         val goals: List<GoalDto>? = null,
+        /** Null in files from before the focus timer existed; restoring such a file leaves the phone's sessions alone. */
+        val focus: List<FocusDto>? = null,
     )
 
     @Serializable
@@ -151,6 +154,17 @@ object DataExport {
         val startWeightKg: Double? = null,
     )
 
+    /** A finished focus session; [start] is when it began (ISO date and time with the offset). */
+    @Serializable
+    data class FocusDto(
+        val id: String,
+        val start: String,
+        val plannedMinutes: Int,
+        val actualMinutes: Int,
+        val completed: Boolean,
+        val task: String? = null,
+    )
+
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
@@ -172,6 +186,7 @@ object DataExport {
         routines: List<RoutineBundle> = emptyList(),
         journal: List<JournalEntry> = emptyList(),
         goals: List<Goal> = emptyList(),
+        focus: List<FocusSession> = emptyList(),
     ): String {
         val planner = Planner(lib)
         fun iso(ms: Long) = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -232,6 +247,9 @@ object DataExport {
                 )
             },
             journal = journal.sortedBy { it.date }.map { JournalDto(it.date.toString(), it.win, it.improve) },
+            focus = focus.sortedBy { it.startMillis }.map {
+                FocusDto(it.id, iso(it.startMillis), it.plannedMinutes, it.actualMinutes, it.completed, it.taskTitle)
+            },
             goals = goals.sortedWith(compareBy({ it.endDate }, { it.startDate }, { it.id })).map {
                 GoalDto(it.id, it.title, it.kind.name.lowercase(), it.target, it.startDate.toString(), it.endDate.toString(), it.habitId, it.startWeightKg)
             },
@@ -261,6 +279,8 @@ data class Restore(
     val journal: List<JournalEntry>?,
     /** Null when the file predates goals: the phone's goals stay as they are. */
     val goals: List<Goal>?,
+    /** Null when the file predates the focus timer: the phone's sessions stay as they are. */
+    val focus: List<FocusSession>?,
     val exportedAt: Long,
 )
 
@@ -318,6 +338,7 @@ object DataImport {
                     tasks = file.tasks?.map(::task),
                     routines = file.routines?.map(::routine),
                     journal = file.journal?.map { JournalEntry(LocalDate.parse(it.date), it.win, it.improve) },
+                    focus = file.focus?.map { f -> FocusSession(f.id, millis(f.start), f.plannedMinutes, f.actualMinutes, f.completed, f.task) },
                     goals = file.goals?.map { g ->
                         Goal(
                             id = g.id,
@@ -395,6 +416,7 @@ class DataImporter(
     private val routines: RoutineRepository? = null,
     private val journal: JournalRepository? = null,
     private val goals: GoalRepository? = null,
+    private val focus: FocusRepository? = null,
 ) {
     suspend fun restore(r: Restore) {
         training.wipe()
@@ -436,8 +458,13 @@ class DataImporter(
             goals.wipe()
             r.goals.forEach { goals.save(it) }
         }
+        // And for a file from before the focus timer.
+        if (r.focus != null && focus != null) {
+            focus.wipe()
+            r.focus.forEach { focus.save(it) }
+        }
         // Keep how the user is signed in on this phone; everything else comes from the file.
-        settings.update { now -> r.settings.copy(guest = now.guest) }
+        settings.update { now -> r.settings.copy(guest = now.guest, activeFocus = now.activeFocus) }
     }
 }
 
@@ -454,6 +481,7 @@ class DataExporter(
     private val routines: RoutineRepository? = null,
     private val journal: JournalRepository? = null,
     private val goals: GoalRepository? = null,
+    private val focus: FocusRepository? = null,
 ) {
     data class Result(
         val json: String,
@@ -464,6 +492,7 @@ class DataExporter(
         val routines: Int = 0,
         val journal: Int = 0,
         val goals: Int = 0,
+        val focus: Int = 0,
     )
 
     suspend fun export(appName: String, nowMillis: Long = System.currentTimeMillis()): Result {
@@ -480,10 +509,11 @@ class DataExporter(
         }.orEmpty()
         val journalList = journal?.entries()?.first().orEmpty()
         val goalList = goals?.goals()?.first().orEmpty()
+        val focusList = focus?.sessions()?.first().orEmpty()
         val text = DataExport.build(
             lib, appName, settings.settings.first(), training.exerciseStates().first(), training.swaps().first(),
-            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData, journalList, goalList,
+            workouts, weights, auth.account.value, nowMillis, zone, habitData, taskList, routineData, journalList, goalList, focusList,
         )
-        return Result(text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size, journalList.size, goalList.size)
+        return Result(text, workouts.size, weights.size, habitData.size, taskList.size, routineData.size, journalList.size, goalList.size, focusList.size)
     }
 }

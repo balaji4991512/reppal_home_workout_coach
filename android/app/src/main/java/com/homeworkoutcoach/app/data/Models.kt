@@ -12,6 +12,12 @@ import kotlinx.serialization.Serializable
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 
+/** A focus session that is running. The settings keep it, so it survives the app being closed. */
+@Serializable
+data class ActiveFocus(val startMillis: Long, val plannedMinutes: Int, val taskTitle: String? = null) {
+    fun toRun() = com.homeworkoutcoach.engine.FocusRun(startMillis, plannedMinutes, taskTitle)
+}
+
 /** Everything set up on the "Plan settings" screen, plus app state that is not history. */
 @Serializable
 data class UserSettings(
@@ -45,6 +51,8 @@ data class UserSettings(
     val scaleId: String? = null,
     /** Rearranged week: weekday (0 = Monday) for each session of the plan's default order. Null = default days. */
     val sessionWeekdays: List<Int>? = null,
+    /** The focus timer, while one is running. */
+    val activeFocus: ActiveFocus? = null,
 ) {
     fun equipment(): Equipment = Equipment(bench, dumbbellsKg.toSet())
 

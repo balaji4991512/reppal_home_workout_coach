@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- The focus timer tells you when a session is finished (Android 13+ asks first, when you start one). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Voice input for set notes. Asked for only when the Mic button is first tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
@@ -39,5 +42,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver android:name=".focus.FocusAlarmReceiver" android:exported="false" />
     </application>
 </manifest>

@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.homeworkoutcoach.app.data.room.RoomBodyRepository
+import com.homeworkoutcoach.app.data.room.RoomFocusRepository
 import com.homeworkoutcoach.app.data.room.RoomGoalRepository
 import com.homeworkoutcoach.app.data.room.RoomHabitRepository
 import com.homeworkoutcoach.app.data.room.RoomJournalRepository
@@ -91,7 +92,32 @@ class MigrationTest {
         assertEquals(1, RoomJournalRepository(db).entries().first().size)
         RoomGoalRepository(db).save(goal("g"))
         assertEquals(1, RoomGoalRepository(db).goals().first().size)
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        RoomFocusRepository(db).save(focusSession("f"))
+        assertEquals(1, RoomFocusRepository(db).sessions().first().size)
+        assertEquals(8, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test
+    fun version7DataSurvivesAndFocusSessionsWork() = runTest {
+        val file = tmp.newFile("training.db").also { it.delete() }
+        create(file, 7) { db ->
+            insertWorkoutAndState(db)
+            db.execSQL(
+                "INSERT INTO goal (id, title, kind, target, startEpochDay, endEpochDay, habitId, startWeightKg) " +
+                    "VALUES ('g', 'Twelve workouts', 'workouts', 12.0, 20000, 20029, NULL, NULL)",
+            )
+        }
+
+        val db = open(file)
+        assertEquals("Twelve workouts", RoomGoalRepository(db).goals().first().single().title)
+        assertEquals("A", RoomTrainingRepository(db).workouts().first().single().label)
+
+        val focus = RoomFocusRepository(db)
+        assertEquals(emptyList<com.homeworkoutcoach.engine.FocusSession>(), focus.sessions().first())
+        focus.save(focusSession("f"))
+        assertEquals(listOf("f"), focus.sessions().first().map { it.id })
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -111,7 +137,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Goal>(), goals.goals().first())
         goals.save(goal("g"))
         assertEquals(listOf("g"), goals.goals().first().map { it.id })
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -135,7 +161,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.JournalEntry>(), journal.entries().first())
         journal.save(com.homeworkoutcoach.engine.JournalEntry(java.time.LocalDate.of(2026, 10, 28), "a win", "do better"))
         assertEquals("a win", journal.entries().first().single().win)
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -160,7 +186,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Routine>(), routines.routines().first())
         routines.save(routine("r", linkedTo = "h"))
         assertEquals("h", routines.routines().first().single().items.first().habitId)
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -187,7 +213,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Task>(), tasks.tasks().first())
         tasks.save(task("t"))
         assertEquals(listOf("t"), tasks.tasks().first().map { it.id })
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -208,7 +234,7 @@ class MigrationTest {
         habits.save(storedHabit("water"))
         habits.setAmount("water", java.time.LocalDate.of(2026, 10, 27), 1)
         assertEquals(1, habits.entries().first().getValue("water").size)
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 }
