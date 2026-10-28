@@ -141,6 +141,22 @@ data class JournalEntity(
     val improve: String,
 )
 
+/**
+ * A goal. [kind] is a stored key ("workouts", "habit", "weight"); keep them stable. [habitId] is not a foreign key:
+ * a goal keeps its record if its habit is deleted.
+ */
+@Entity(tableName = "goal")
+data class GoalEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val kind: String,
+    val target: Double,
+    val startEpochDay: Long,
+    val endEpochDay: Long,
+    val habitId: String?,
+    val startWeightKg: Double?,
+)
+
 @Dao
 interface ExerciseStateDao {
     @Query("SELECT * FROM exercise_state")
@@ -285,6 +301,21 @@ abstract class RoutineDao {
 }
 
 @Dao
+interface GoalDao {
+    @Query("SELECT * FROM goal ORDER BY endEpochDay, startEpochDay, id")
+    fun observeAll(): Flow<List<GoalEntity>>
+
+    @Upsert
+    suspend fun upsert(goal: GoalEntity)
+
+    @Query("DELETE FROM goal WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("DELETE FROM goal")
+    suspend fun clear()
+}
+
+@Dao
 interface JournalDao {
     @Query("SELECT * FROM journal_entry ORDER BY epochDay DESC")
     fun observeAll(): Flow<List<JournalEntity>>
@@ -303,15 +334,16 @@ interface JournalDao {
     entities = [
         ExerciseStateEntity::class, SwapEntity::class, WorkoutEntity::class, BodyWeightEntity::class,
         HabitEntity::class, HabitEntryEntity::class, TaskEntity::class,
-        RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class,
+        RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class, GoalEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added.
+    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 6, to = 7),
     ],
 )
 abstract class TrainingDatabase : RoomDatabase() {
@@ -323,6 +355,7 @@ abstract class TrainingDatabase : RoomDatabase() {
     abstract fun tasks(): TaskDao
     abstract fun routines(): RoutineDao
     abstract fun journal(): JournalDao
+    abstract fun goals(): GoalDao
 
     companion object {
         fun create(context: Context): TrainingDatabase =

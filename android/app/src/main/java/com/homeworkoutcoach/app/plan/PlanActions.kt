@@ -3,6 +3,7 @@ package com.homeworkoutcoach.app.plan
 import com.homeworkoutcoach.app.data.Account
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.HabitRepository
+import com.homeworkoutcoach.app.data.GoalRepository
 import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
@@ -56,6 +57,7 @@ class PlanActions(
     private val tasks: TaskRepository? = null,
     private val routines: RoutineRepository? = null,
     private val journal: JournalRepository? = null,
+    private val goals: GoalRepository? = null,
 ) {
     /**
      * Save the setup and start a new week [buildPlan]. The first build forgets any exercise states so starting
@@ -108,7 +110,7 @@ class PlanActions(
         }
     }
 
-    /** Erase everything on this device: history, plan states, swaps, weigh-ins, habits, tasks, routines, journal and settings. */
+    /** Erase everything on this device: history, plan states, swaps, weigh-ins, habits, tasks, routines, journal, goals and settings. */
     suspend fun wipeAll() {
         training.wipe()
         body?.wipe()
@@ -116,6 +118,7 @@ class PlanActions(
         tasks?.wipe()
         routines?.wipe()
         journal?.wipe()
+        goals?.wipe()
         settings.reset()
     }
 

@@ -6,6 +6,7 @@ import com.homeworkoutcoach.app.data.AuthRepository
 import com.homeworkoutcoach.app.data.BodyRepository
 import com.homeworkoutcoach.app.data.BodyWeight
 import com.homeworkoutcoach.app.data.DeleteResult
+import com.homeworkoutcoach.app.data.GoalRepository
 import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
@@ -17,6 +18,7 @@ import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.app.data.UserSettings
 import com.homeworkoutcoach.app.data.Workout
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.Goal
 import com.homeworkoutcoach.engine.JournalEntry
 import com.homeworkoutcoach.engine.Routine
 import com.homeworkoutcoach.engine.RoutineDone
@@ -208,6 +210,22 @@ class InMemoryJournalRepository : JournalRepository {
     }
 
     override suspend fun delete(date: LocalDate) = state.update { list -> list.filterNot { it.date == date } }
+
+    override suspend fun wipe() {
+        state.value = emptyList()
+    }
+}
+
+class InMemoryGoalRepository : GoalRepository {
+    private val state = MutableStateFlow<List<Goal>>(emptyList())
+
+    override fun goals(): Flow<List<Goal>> = state
+
+    override suspend fun save(goal: Goal) = state.update { list ->
+        (list.filterNot { it.id == goal.id } + goal).sortedWith(compareBy({ it.endDate }, { it.startDate }, { it.id }))
+    }
+
+    override suspend fun delete(id: String) = state.update { list -> list.filterNot { it.id == id } }
 
     override suspend fun wipe() {
         state.value = emptyList()
