@@ -3,16 +3,19 @@ package com.homeworkoutcoach.app.ui.today
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,8 +46,10 @@ import com.homeworkoutcoach.app.ui.components.PrimaryButton
 import com.homeworkoutcoach.app.ui.components.Small
 import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.habits.HabitRow
-import com.homeworkoutcoach.app.ui.planner.CarriedOver
-import com.homeworkoutcoach.app.ui.planner.TaskRow
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
+import com.homeworkoutcoach.app.ui.planner.CarriedOverCard
+import com.homeworkoutcoach.app.ui.planner.TaskCard
+import com.homeworkoutcoach.app.ui.routines.RoutineRowUi
 import com.homeworkoutcoach.app.ui.theme.AppIcons
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.HabitKind
@@ -80,34 +85,12 @@ fun TodayScreen(
 
         if (s.routines.isNotEmpty()) {
             Section("Routines", "All routines", onRoutines)
-            Hairline()
-            s.routines.forEach { r ->
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 64.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Column(Modifier.weight(1f).clickable(enabled = r.canRun, role = Role.Button) { onRunRoutine(r.id) }.padding(vertical = 10.dp)) {
-                        Body(r.name, strong = true)
-                        Small(if (r.canRun) r.steps else "Add steps to run it")
-                    }
-                    if (r.doneToday) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(AppIcons.Check, null, Modifier.size(18.dp), tint = c.ok)
-                            Text("Done", color = c.ok, style = AppTheme.type.label)
-                        }
-                    } else if (r.canRun) {
-                        Chip("Start", false, { onRunRoutine(r.id) }, small = true)
-                    }
-                }
-                Hairline()
-            }
+            s.routines.forEachIndexed { i, r -> RoutineCard(r, i) { onRunRoutine(r.id) } }
         }
 
         if (s.habits.isNotEmpty()) {
             Section("Habits", "All habits", onHabits)
-            Hairline()
-            s.habits.forEach { row ->
+            s.habits.forEachIndexed { i, row ->
                 HabitRow(
                     row = row,
                     dueToday = true,
@@ -118,6 +101,8 @@ fun TodayScreen(
                     },
                     onOpen = { onOpenHabit(row.id) },
                     onSet = { vm.recordHabit(row, it) },
+                    card = true,
+                    enter = i,
                 )
             }
         } else if (!s.hasHabits) {
@@ -131,12 +116,10 @@ fun TodayScreen(
             Muted("Nothing planned for today.")
             TextLink("Add a task", onPlanner)
         } else {
-            Hairline()
-            s.tasks.tasks.forEach { row ->
-                TaskRow(row, onTick = { vm.toggleTask(row.id) }, onOpen = { onOpenTask(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) })
-                Hairline()
+            s.tasks.tasks.forEachIndexed { i, row ->
+                key(row.id) { TaskCard(row, onTick = { vm.toggleTask(row.id) }, onOpen = { onOpenTask(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) }, enter = i) }
             }
-            CarriedOver(
+            CarriedOverCard(
                 s.tasks.carriedOver,
                 onTick = vm::toggleTask, onOpen = onOpenTask, onToday = vm::moveToToday, onTomorrow = vm::moveToTomorrow, onDelete = vm::deleteTask,
             )
@@ -144,18 +127,50 @@ fun TodayScreen(
 
         Section("Journal", null, {})
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onJournal),
+            Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft)
+                .clickable(role = Role.Button, onClick = onJournal).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (s.journalWritten) {
-                Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.ok)
-                Body("Written today", Modifier.weight(1f))
-                Small("Edit")
-            } else {
-                Body("Write two lines about today", Modifier.weight(1f))
-                Icon(AppIcons.Forward, null, Modifier.size(20.dp), tint = c.mut)
+            Box(Modifier.size(44.dp).clip(CircleShape).background(if (s.journalWritten) c.tintMint else c.tintRose), contentAlignment = Alignment.Center) {
+                Icon(if (s.journalWritten) AppIcons.Check else AppIcons.Pen, null, Modifier.size(22.dp), tint = if (s.journalWritten) c.ok else c.fg)
             }
+            Column(Modifier.weight(1f)) {
+                Body(if (s.journalWritten) "Written today" else "Write two lines about today", strong = true)
+                Small(if (s.journalWritten) "Tap to read or change it." else "One win, and one thing to do better.")
+            }
+            Icon(AppIcons.Forward, null, Modifier.size(18.dp), tint = c.mut)
+        }
+    }
+}
+
+/** A routine for now as a card: a tinted icon, its steps, and Done or Start. */
+@Composable
+private fun RoutineCard(r: RoutineRowUi, index: Int, onRun: () -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        Modifier.fadeLiftIn(index * 60).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft)
+            .clickable(enabled = r.canRun, role = Role.Button, onClick = onRun).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(if (r.doneToday) c.tintMint else c.accentSoft), contentAlignment = Alignment.Center) {
+            Icon(if (r.doneToday) AppIcons.Check else AppIcons.Routine, null, Modifier.size(22.dp), tint = if (r.doneToday) c.ok else c.accent)
+        }
+        Column(Modifier.weight(1f)) {
+            Body(r.name, strong = true)
+            Small(if (r.canRun) r.steps else "Add steps to run it")
+        }
+        if (r.doneToday) {
+            Text(
+                "Done", color = c.ok, style = AppTheme.type.label,
+                modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.tintMint).padding(horizontal = 14.dp, vertical = 6.dp),
+            )
+        } else if (r.canRun) {
+            Text(
+                "Start", color = c.onAccent, style = AppTheme.type.label,
+                modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.accent).padding(horizontal = 16.dp, vertical = 8.dp),
+            )
         }
     }
 }

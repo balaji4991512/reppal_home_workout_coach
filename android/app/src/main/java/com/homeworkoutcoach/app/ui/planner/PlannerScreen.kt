@@ -234,26 +234,7 @@ fun PlannerScreen(
         val suggested = if (after == 0) 9 * 60 else (((after / 60) + 1) * 60).coerceAtMost(22 * 60)
         AddTaskPill("Add task at ${PlannerFormat.time(LocalTime.of(suggested / 60, 0))}", Modifier.padding(start = 74.dp, top = 12.dp)) { onAdd(s.date, suggested) }
 
-        if (s.carriedOver.isNotEmpty()) {
-            Column(Modifier.padding(top = 24.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(c.tintPeach).padding(14.dp)) {
-                H2("Carried over", top = 4.dp)
-                Small("Left from earlier days. Nothing is lost; move it, finish it or delete it.", Modifier.padding(bottom = 4.dp))
-                var confirm by rememberSaveable { mutableStateOf<String?>(null) }
-                s.carriedOver.forEach { row ->
-                    TaskCard(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = null) {
-                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Chip("Today", false, { vm.moveToToday(row.id) }, small = true)
-                            Chip("Tomorrow", false, { vm.moveToTomorrow(row.id) }, small = true)
-                            Chip(
-                                if (confirm == row.id) "Sure? Delete" else "Delete", confirm == row.id,
-                                { if (confirm == row.id) { confirm = null; vm.delete(row.id) } else confirm = row.id },
-                                small = true,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        CarriedOverCard(s.carriedOver, vm::toggle, onOpen, vm::moveToToday, vm::moveToTomorrow, vm::delete)
     }
 }
 
@@ -480,7 +461,7 @@ private fun DayCell(d: WeekDayUi, modifier: Modifier, onClick: () -> Unit) {
 
 /** A task as a soft card: a round tick, the title, its time as an indigo pill and the first line of its note. */
 @Composable
-private fun TaskCard(
+internal fun TaskCard(
     row: TaskRowUi,
     onTick: () -> Unit,
     onOpen: () -> Unit,
@@ -531,11 +512,11 @@ private fun TaskCard(
 }
 
 /**
- * What was left from earlier days: tick it, move it to today or tomorrow, or delete it (a second tap confirms).
- * Shows nothing when [rows] is empty.
+ * What was left from earlier days, in a peach card: tick it, move it to today or tomorrow, or delete it (a second tap
+ * confirms). Shows nothing when [rows] is empty. Shared by the Planner and Today.
  */
 @Composable
-internal fun CarriedOver(
+internal fun CarriedOverCard(
     rows: List<TaskRowUi>,
     onTick: (String) -> Unit,
     onOpen: (String) -> Unit,
@@ -544,64 +525,24 @@ internal fun CarriedOver(
     onDelete: (String) -> Unit,
 ) {
     if (rows.isEmpty()) return
+    val c = AppTheme.colors
     // The task whose Delete was tapped once; a second tap deletes it.
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
-    H2("Carried over", top = 28.dp)
-    Small("Left from earlier days. Nothing is lost; move it, finish it or delete it.", Modifier.padding(bottom = 6.dp))
-    Hairline()
-    rows.forEach { row ->
-        TaskRow(row, onTick = { onTick(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = null) {
-            Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Chip("Move to today", false, { onToday(row.id) }, small = true)
-                Chip("Move to tomorrow", false, { onTomorrow(row.id) }, small = true)
-                Chip(
-                    if (confirm == row.id) "Sure? Delete" else "Delete", confirm == row.id,
-                    { if (confirm == row.id) { confirm = null; onDelete(row.id) } else confirm = row.id },
-                    small = true,
-                )
-            }
-        }
-        Hairline()
-    }
-}
-
-/**
- * A task: tick, title with its time and note, and "Tomorrow" for one with [onTomorrow]. [below] goes under the row
- * (the carried-over actions).
- */
-@Composable
-internal fun TaskRow(
-    row: TaskRowUi,
-    onTick: () -> Unit,
-    onOpen: () -> Unit,
-    onTomorrow: (() -> Unit)?,
-    below: @Composable (() -> Unit)? = null,
-) {
-    val c = AppTheme.colors
-    val sub = listOfNotNull(row.dayLabel?.let { "From ${it.replaceFirstChar(Char::lowercase)}" }, row.time, row.note.lineSequence().firstOrNull()?.takeIf { it.isNotBlank() })
-        .joinToString(" · ")
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Checkbox, onClick = onTick)
-                    .semantics { contentDescription = if (row.done) "Mark ${row.title} not done" else "Mark ${row.title} done" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Canvas(Modifier.size(24.dp)) {
-                    if (row.done) drawCircle(c.fg) else drawCircle(c.mut, style = Stroke(2.dp.toPx()), radius = size.width / 2 - 1.dp.toPx())
+    Column(Modifier.padding(top = 24.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(c.tintPeach).padding(14.dp)) {
+        H2("Carried over", top = 4.dp)
+        Small("Left from earlier days. Nothing is lost; move it, finish it or delete it.", Modifier.padding(bottom = 4.dp))
+        rows.forEach { row ->
+            TaskCard(row, onTick = { onTick(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = null) {
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("Today", false, { onToday(row.id) }, small = true)
+                    Chip("Tomorrow", false, { onTomorrow(row.id) }, small = true)
+                    Chip(
+                        if (confirm == row.id) "Sure? Delete" else "Delete", confirm == row.id,
+                        { if (confirm == row.id) { confirm = null; onDelete(row.id) } else confirm = row.id },
+                        small = true,
+                    )
                 }
-                if (row.done) Icon(AppIcons.Check, null, Modifier.size(16.dp), tint = c.on)
             }
-            Column(Modifier.weight(1f).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp)) {
-                Text(
-                    row.title,
-                    color = if (row.done) c.mut else c.fg,
-                    style = AppTheme.type.body.copy(textDecoration = if (row.done) TextDecoration.LineThrough else TextDecoration.None),
-                )
-                if (sub.isNotEmpty()) Text(sub, color = c.mut, style = AppTheme.type.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (onTomorrow != null && !row.done) Chip("Tomorrow", false, onTomorrow, Modifier.padding(start = 8.dp), small = true)
         }
-        if (below != null && !row.done) Box(Modifier.padding(start = 48.dp)) { below() }
     }
 }

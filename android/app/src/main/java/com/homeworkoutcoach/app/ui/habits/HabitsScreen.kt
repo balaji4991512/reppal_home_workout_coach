@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.homeworkoutcoach.app.ui.components.fadeLiftIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -105,13 +109,19 @@ internal fun HabitRow(
     onBadge: () -> Unit,
     onOpen: () -> Unit,
     onSet: (Int) -> Unit,
+    /** A soft white card with room around it instead of a line below. */
+    card: Boolean = false,
+    enter: Int = 0,
 ) {
     val c = AppTheme.colors
     val sub = when {
         row.kind == HabitKind.DONE -> row.week ?: row.progress
         else -> listOfNotNull(row.progress, row.week).joinToString(" · ")
     }.let { if (!dueToday && row.week == null) "Not due today" else it }
-    Column(Modifier.fillMaxWidth()) {
+    val outer = if (card) {
+        Modifier.fadeLiftIn(enter * 60).padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.soft).padding(horizontal = 12.dp)
+    } else Modifier.fillMaxWidth()
+    Column(outer) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 68.dp).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -136,6 +146,6 @@ internal fun HabitRow(
         if (expanded) {
             AmountPanel(row.kind, row.target, row.amount, onSet, Modifier.padding(bottom = 10.dp))
         }
-        Hairline()
+        if (!card) Hairline()
     }
 }
