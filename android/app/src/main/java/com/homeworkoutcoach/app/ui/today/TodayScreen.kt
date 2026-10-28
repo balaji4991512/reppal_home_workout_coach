@@ -54,6 +54,7 @@ fun TodayScreen(
     onAddHabit: () -> Unit,
     onOpenTask: (String) -> Unit,
     onPlanner: () -> Unit,
+    onJournal: () -> Unit,
     vm: TodayViewModel = viewModel(factory = Factories.Today),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -132,6 +133,22 @@ fun TodayScreen(
                 s.tasks.carriedOver,
                 onTick = vm::toggleTask, onOpen = onOpenTask, onToday = vm::moveToToday, onTomorrow = vm::moveToTomorrow, onDelete = vm::deleteTask,
             )
+        }
+
+        Section("Journal", null, {})
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onJournal),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (s.journalWritten) {
+                Icon(AppIcons.Check, null, Modifier.size(20.dp), tint = c.ok)
+                Body("Written today", Modifier.weight(1f))
+                Small("Edit")
+            } else {
+                Body("Write two lines about today", Modifier.weight(1f))
+                Icon(AppIcons.Forward, null, Modifier.size(20.dp), tint = c.mut)
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.homeworkoutcoach.app.ui.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homeworkoutcoach.app.data.HabitRepository
+import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.TaskRepository
@@ -17,6 +18,7 @@ import com.homeworkoutcoach.app.ui.planner.PlannerPresenter
 import com.homeworkoutcoach.app.ui.routines.RoutinesPresenter
 import com.homeworkoutcoach.app.ui.routines.nowFlow
 import com.homeworkoutcoach.app.ui.week.WeekPresenter
+import com.homeworkoutcoach.engine.Journal
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +40,7 @@ class TodayViewModel(
     private val training: TrainingRepository,
     private val habits: HabitRepository,
     private val routines: RoutineRepository,
+    private val journal: JournalRepository,
     tasks: TaskRepository,
     private val actions: PlanActions,
     private val plannerActions: PlannerActions,
@@ -53,11 +56,17 @@ class TodayViewModel(
 
     private class Plan(val settings: com.homeworkoutcoach.app.data.UserSettings, val states: Map<String, com.homeworkoutcoach.engine.ExerciseState>, val swaps: Map<String, String>, val workouts: List<com.homeworkoutcoach.app.data.Workout>)
     private class HabitData(val habits: List<com.homeworkoutcoach.app.data.StoredHabit>, val entries: Map<String, Map<LocalDate, Int>>, val auto: com.homeworkoutcoach.app.ui.habits.AutoInputs)
-    private class RoutineData(val routines: List<com.homeworkoutcoach.engine.Routine>, val done: Set<com.homeworkoutcoach.engine.RoutineDone>)
+    private class RoutineData(
+        val routines: List<com.homeworkoutcoach.engine.Routine>,
+        val done: Set<com.homeworkoutcoach.engine.RoutineDone>,
+        val journalDays: Set<LocalDate>,
+    )
 
     private val plan = combine(settings.settings, training.exerciseStates(), training.swaps(), training.workouts(), ::Plan)
-    private val habitData = combine(habits.habits(), habits.entries(), autoInputs(training, routines, zone), ::HabitData)
-    private val routineData = combine(routines.routines(), routines.done(), ::RoutineData)
+    private val habitData = combine(habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), ::HabitData)
+    private val routineData = combine(routines.routines(), routines.done(), journal.entries()) { list, done, entries ->
+        RoutineData(list, done, Journal.days(entries))
+    }
 
     /** Null until loaded. */
     val ui: StateFlow<TodayUi?> = combine(plan, habitData, routineData, tasks.tasks(), nowFlow(clock)) { p, h, r, t, now ->
@@ -70,6 +79,7 @@ class TodayViewModel(
             routines = routinesPresenter.present(r.routines, r.done, today, now.toLocalTime()),
             habits = habitsPresenter.present(h.habits, h.entries, h.auto.workoutDays, today, h.auto.sourceDays),
             tasks = tasksPresenter.present(t, today, today),
+            journalWritten = today in r.journalDays,
         )
         ui to week?.statesToStore.orEmpty()
     }

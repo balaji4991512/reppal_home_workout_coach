@@ -183,6 +183,24 @@ class TodayPresenterTest {
     }
 
     @Test
+    fun theJournalLineIsAQuietExtraNotPartOfTheCount() {
+        val habit = storedHabit("j", name = "Journal", auto = AutoSource.JOURNAL)
+        val none = day(at(21), workout = WorkoutCardUi.NoPlan)
+        assertFalse(none.journalWritten)
+        assertEquals("Nothing planned today.", none.summary)
+        val written = TodayPresenter.present(
+            "Asha", at(21), WorkoutCardUi.NoPlan,
+            routinesP.present(emptyList(), emptySet(), WED, LocalTime.of(21, 0)),
+            habitsP.present(listOf(habit), emptyMap(), emptySet(), WED, mapOf(AutoSource.JOURNAL to setOf(WED))),
+            tasksP.present(emptyList(), WED, WED),
+            journalWritten = true,
+        )
+        assertTrue(written.journalWritten)
+        assertTrue(written.habits.single().done) // the Journal habit ticked itself
+        assertEquals("All done for today.", written.summary) // counted once, as the habit
+    }
+
+    @Test
     fun theTasksComeThroughWithWhatWasCarriedOver() {
         val ui = day(at(9), tasks = listOf(task("t"), task("old", date = WED.minusDays(2))))
         assertEquals(listOf("t"), ui.tasks.tasks.map { it.id })

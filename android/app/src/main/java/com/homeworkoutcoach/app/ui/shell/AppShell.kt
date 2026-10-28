@@ -74,6 +74,7 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.habits.HabitDetailScreen
 import com.homeworkoutcoach.app.ui.habits.HabitEditScreen
 import com.homeworkoutcoach.app.ui.habits.HabitsScreen
+import com.homeworkoutcoach.app.ui.journal.JournalScreen
 import com.homeworkoutcoach.app.ui.planner.PlannerScreen
 import com.homeworkoutcoach.app.ui.routines.RoutineEditScreen
 import com.homeworkoutcoach.app.ui.routines.RoutineRunScreen
@@ -110,6 +111,7 @@ enum class Dest(val route: String, val label: String, val icon: ImageVector, val
     Habits("habits", "Habits", AppIcons.List, beforeSetup = true),
     Planner("planner", "Planner", AppIcons.Planner, beforeSetup = true),
     Routines("routines", "Routines", AppIcons.Routine, beforeSetup = true),
+    Journal("journal", "Journal", AppIcons.Pen, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
     Workout("workout", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
@@ -223,6 +225,7 @@ private fun AppNavHost(
             HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
         }
         composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }) }
+        composable(Dest.Journal.route) { JournalScreen() }
         composable(Dest.Routines.route) {
             RoutinesScreen(
                 onRun = { nav.navigate("routine/$it/run") },
@@ -280,6 +283,7 @@ private fun AppNavHost(
                 onAddHabit = { nav.navigate(HABIT_NEW) },
                 onOpenTask = { nav.navigate("task/$it") },
                 onPlanner = { go(Dest.Planner) },
+                onJournal = { go(Dest.Journal) },
             )
         }
         composable(Dest.Workout.route) {

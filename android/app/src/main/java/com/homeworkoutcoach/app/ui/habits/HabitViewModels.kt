@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homeworkoutcoach.app.data.HabitLogs
 import com.homeworkoutcoach.app.data.HabitRepository
+import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.engine.AutoSource
+import com.homeworkoutcoach.engine.Journal
 import com.homeworkoutcoach.engine.Habits
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -38,22 +40,23 @@ internal fun todayFlow(clock: () -> LocalDate): Flow<LocalDate> = flow {
 /** What makes the self-ticking habits tick: the days with a workout, and the days the routines were finished. */
 data class AutoInputs(val workoutDays: Set<LocalDate>, val sourceDays: Map<AutoSource, Set<LocalDate>>)
 
-fun autoInputs(training: TrainingRepository, routines: RoutineRepository, zone: ZoneId): Flow<AutoInputs> =
-    combine(training.workouts(), routines.routines(), routines.done()) { workouts, list, done ->
-        AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.sourceDays(list, done))
+fun autoInputs(training: TrainingRepository, routines: RoutineRepository, journal: JournalRepository, zone: ZoneId): Flow<AutoInputs> =
+    combine(training.workouts(), routines.routines(), routines.done(), journal.entries()) { workouts, list, done, entries ->
+        AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.sourceDays(list, done, Journal.days(entries)))
     }
 
 class HabitsViewModel(
     private val habits: HabitRepository,
     training: TrainingRepository,
     routines: RoutineRepository,
+    journal: JournalRepository,
     presenter: HabitsPresenter = HabitsPresenter(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     clock: () -> LocalDate = { LocalDate.now(zone) },
 ) : ViewModel() {
     /** Null until loaded. */
     val ui: StateFlow<HabitsUi?> = combine(
-        habits.habits(), habits.entries(), autoInputs(training, routines, zone), todayFlow(clock),
+        habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), todayFlow(clock),
     ) { list, entries, auto, today ->
         presenter.present(list, entries, auto.workoutDays, today, auto.sourceDays)
     }
@@ -73,6 +76,7 @@ class HabitDetailViewModel(
     private val habits: HabitRepository,
     training: TrainingRepository,
     routines: RoutineRepository,
+    journal: JournalRepository,
     presenter: HabitDetailPresenter = HabitDetailPresenter(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     clock: () -> LocalDate = { LocalDate.now(zone) },
@@ -81,7 +85,7 @@ class HabitDetailViewModel(
 
     /** Null until loaded, and when the habit no longer exists. */
     val ui: StateFlow<HabitDetailUi?> = combine(
-        habits.habits(), habits.entries(), autoInputs(training, routines, zone), todayFlow(clock), month,
+        habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), todayFlow(clock), month,
     ) { list, entries, auto, today, m ->
         list.firstOrNull { it.habit.id == id }?.let { presenter.present(it, entries, auto.workoutDays, today, m, auto.sourceDays) }
     }

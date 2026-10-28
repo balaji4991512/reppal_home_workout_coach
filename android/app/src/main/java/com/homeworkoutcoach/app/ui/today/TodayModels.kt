@@ -75,6 +75,8 @@ data class TodayUi(
     val hasHabits: Boolean,
     /** Today's tasks, and what was carried over. */
     val tasks: PlannerUi,
+    /** Whether today's journal has something written. Not counted in "x of y done": it is a quiet extra. */
+    val journalWritten: Boolean,
 )
 
 /** Puts the day together: the workout, the routines for now, the habits due and the tasks. */
@@ -86,6 +88,7 @@ object TodayPresenter {
         routines: RoutinesUi,
         habits: HabitsUi,
         tasks: PlannerUi,
+        journalWritten: Boolean = false,
     ): TodayUi {
         val part = Routines.partOf(now.toLocalTime())
         val routinesNow = routines.routines.filter { it.isNow }
@@ -122,6 +125,7 @@ object TodayPresenter {
             habits = habits.today,
             hasHabits = habits.today.isNotEmpty() || habits.other.isNotEmpty(),
             tasks = tasks,
+            journalWritten = journalWritten,
         )
     }
 }

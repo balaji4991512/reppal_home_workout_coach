@@ -30,6 +30,8 @@ import com.homeworkoutcoach.app.ui.body.BodyViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitDetailViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitEditViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitsViewModel
+import com.homeworkoutcoach.app.ui.journal.JournalActions
+import com.homeworkoutcoach.app.ui.journal.JournalViewModel
 import com.homeworkoutcoach.app.ui.planner.PlannerActions
 import com.homeworkoutcoach.app.ui.planner.PlannerViewModel
 import com.homeworkoutcoach.app.ui.planner.TaskEditViewModel
@@ -331,10 +333,10 @@ object Factories {
         }
     }
     val HabitList = viewModelFactory {
-        initializer { app(this).let { HabitsViewModel(it.habits, it.training, it.routines) } }
+        initializer { app(this).let { HabitsViewModel(it.habits, it.training, it.routines, it.journal) } }
     }
     fun habitDetail(id: String) = viewModelFactory {
-        initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training, it.routines) } }
+        initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training, it.routines, it.journal) } }
     }
     fun habitEdit(id: String?) = viewModelFactory {
         initializer { app(this).let { HabitEditViewModel(id, it.habits) } }
@@ -357,9 +359,12 @@ object Factories {
     val Today = viewModelFactory {
         initializer {
             app(this).let {
-                TodayViewModel(it.settings, it.training, it.habits, it.routines, it.tasks, it.actions, PlannerActions(it.tasks), it.library, it.planner)
+                TodayViewModel(it.settings, it.training, it.habits, it.routines, it.journal, it.tasks, it.actions, PlannerActions(it.tasks), it.library, it.planner)
             }
         }
+    }
+    val Journal = viewModelFactory {
+        initializer { app(this).let { JournalViewModel(it.journal, JournalActions(it.journal)) } }
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }
