@@ -74,6 +74,8 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.habits.HabitDetailScreen
 import com.homeworkoutcoach.app.ui.habits.HabitEditScreen
 import com.homeworkoutcoach.app.ui.habits.HabitsScreen
+import com.homeworkoutcoach.app.ui.goals.GoalEditScreen
+import com.homeworkoutcoach.app.ui.goals.GoalsScreen
 import com.homeworkoutcoach.app.ui.journal.JournalScreen
 import com.homeworkoutcoach.app.ui.planner.PlannerScreen
 import com.homeworkoutcoach.app.ui.routines.RoutineEditScreen
@@ -100,6 +102,10 @@ private const val HABIT_NEW = "habit-new"
 /** Route of a task's edit form, opened from the Planner. */
 private const val TASK = "task/{id}"
 
+/** Routes inside Goals: a goal's form, and the form for a new one. */
+private const val GOAL = "goal/{id}"
+private const val GOAL_NEW = "goal-new"
+
 /** Routes inside Routines: running one, its form, and the form for a new one. */
 private const val ROUTINE_RUN = "routine/{id}/run"
 private const val ROUTINE_EDIT = "routine/{id}/edit"
@@ -112,6 +118,7 @@ enum class Dest(val route: String, val label: String, val icon: ImageVector, val
     Planner("planner", "Planner", AppIcons.Planner, beforeSetup = true),
     Routines("routines", "Routines", AppIcons.Routine, beforeSetup = true),
     Journal("journal", "Journal", AppIcons.Pen, beforeSetup = true),
+    Goals("goals", "Goals", AppIcons.Target, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
     Workout("workout", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
@@ -226,6 +233,9 @@ private fun AppNavHost(
         }
         composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }) }
         composable(Dest.Journal.route) { JournalScreen() }
+        composable(Dest.Goals.route) { GoalsScreen(onOpen = { nav.navigate("goal/$it") }, onAdd = { nav.navigate(GOAL_NEW) }) }
+        composable(GOAL_NEW) { GoalEditScreen(id = null, onDone = { nav.popBackStack() }) }
+        composable(GOAL) { entry -> GoalEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() }) }
         composable(Dest.Routines.route) {
             RoutinesScreen(
                 onRun = { nav.navigate("routine/$it/run") },

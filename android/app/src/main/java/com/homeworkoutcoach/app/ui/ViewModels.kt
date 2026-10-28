@@ -30,6 +30,8 @@ import com.homeworkoutcoach.app.ui.body.BodyViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitDetailViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitEditViewModel
 import com.homeworkoutcoach.app.ui.habits.HabitsViewModel
+import com.homeworkoutcoach.app.ui.goals.GoalEditViewModel
+import com.homeworkoutcoach.app.ui.goals.GoalsViewModel
 import com.homeworkoutcoach.app.ui.journal.JournalActions
 import com.homeworkoutcoach.app.ui.journal.JournalViewModel
 import com.homeworkoutcoach.app.ui.planner.PlannerActions
@@ -365,6 +367,12 @@ object Factories {
     }
     val Journal = viewModelFactory {
         initializer { app(this).let { JournalViewModel(it.journal, JournalActions(it.journal)) } }
+    }
+    val GoalList = viewModelFactory {
+        initializer { app(this).let { GoalsViewModel(it.goals, it.habits, it.training, it.routines, it.journal, it.body) } }
+    }
+    fun goalEdit(id: String?) = viewModelFactory {
+        initializer { app(this).let { GoalEditViewModel(id, it.goals, it.habits, it.body) } }
     }
     val Body = viewModelFactory {
         initializer { app(this).let { BodyViewModel(it.body, it.settings, BodyPresenter()) } }
