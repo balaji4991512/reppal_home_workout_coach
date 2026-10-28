@@ -74,6 +74,7 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.habits.HabitDetailScreen
 import com.homeworkoutcoach.app.ui.habits.HabitEditScreen
 import com.homeworkoutcoach.app.ui.habits.HabitsScreen
+import com.homeworkoutcoach.app.ui.character.CharacterScreen
 import com.homeworkoutcoach.app.ui.focus.FocusScreen
 import com.homeworkoutcoach.app.ui.goals.GoalEditScreen
 import com.homeworkoutcoach.app.ui.goals.GoalsScreen
@@ -121,6 +122,7 @@ enum class Dest(val route: String, val label: String, val icon: ImageVector, val
     Journal("journal", "Journal", AppIcons.Pen, beforeSetup = true),
     Goals("goals", "Goals", AppIcons.Target, beforeSetup = true),
     Focus("focus", "Focus", AppIcons.Timer, beforeSetup = true),
+    Character("character", "Character", AppIcons.Star, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
     Workout("workout", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
@@ -236,6 +238,7 @@ private fun AppNavHost(
         composable(Dest.Planner.route) { PlannerScreen(onOpen = { nav.navigate("task/$it") }) }
         composable(Dest.Journal.route) { JournalScreen() }
         composable(Dest.Focus.route) { FocusScreen() }
+        composable(Dest.Character.route) { CharacterScreen() }
         composable(Dest.Goals.route) { GoalsScreen(onOpen = { nav.navigate("goal/$it") }, onAdd = { nav.navigate(GOAL_NEW) }) }
         composable(GOAL_NEW) { GoalEditScreen(id = null, onDone = { nav.popBackStack() }) }
         composable(GOAL) { entry -> GoalEditScreen(entry.arguments?.getString("id").orEmpty(), onDone = { nav.popBackStack() }) }
