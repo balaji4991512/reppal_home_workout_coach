@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.homeworkoutcoach.app.data.ThemeMode
 
-/** Monochrome tokens from the prototype's CSS variables. Ink is the only accent. */
+/** Warm cream and white cards, with ink for controls and one indigo accent for progress. */
 @Immutable
 data class Tokens(
     val bg: Color,
@@ -31,18 +31,23 @@ data class Tokens(
     val bad: Color,
     val soft: Color,
     val scrim: Color,
+    /** The one colour accent: progress rings and bars. */
+    val accent: Color,
+    val accentSoft: Color,
 )
 
 val LightTokens = Tokens(
-    bg = Color(0xFFFFFFFF), fg = Color(0xFF111111), mut = Color(0xFF6B6B68), bd = Color(0xFFE6E6E3),
-    acc = Color(0xFF111111), on = Color(0xFFFFFFFF), accs = Color(0xFFF2F2F0), ok = Color(0xFF157A55),
-    oks = Color(0xFFEAF5EF), bad = Color(0xFFC4372C), soft = Color(0xFFF5F5F3), scrim = Color(0x66000000),
+    bg = Color(0xFFFCF7EE), fg = Color(0xFF16150F), mut = Color(0xFF6E685B), bd = Color(0xFFEBE2D0),
+    acc = Color(0xFF16150F), on = Color(0xFFFFFFFF), accs = Color(0xFFF3ECDC), ok = Color(0xFF157A55),
+    oks = Color(0xFFE6F3EA), bad = Color(0xFFC4372C), soft = Color(0xFFFFFFFF), scrim = Color(0x66000000),
+    accent = Color(0xFF5B50E6), accentSoft = Color(0xFFE9E6FB),
 )
 
 val DarkTokens = Tokens(
     bg = Color(0xFF0F0F10), fg = Color(0xFFF2F2F0), mut = Color(0xFF9A9A96), bd = Color(0xFF2A2A2C),
     acc = Color(0xFFF2F2F0), on = Color(0xFF0F0F10), accs = Color(0xFF1C1C1E), ok = Color(0xFF4CC79A),
     oks = Color(0xFF14291F), bad = Color(0xFFFF8A7D), soft = Color(0xFF1A1A1C), scrim = Color(0x99000000),
+    accent = Color(0xFF9C94FF), accentSoft = Color(0xFF26234D),
 )
 
 /** Type scale from the prototype: h1 30, h2 17, body 16, muted 14. Numbers use tabular figures. */

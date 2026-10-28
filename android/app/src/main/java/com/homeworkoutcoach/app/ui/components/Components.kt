@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -99,7 +100,7 @@ fun Chip(
         modifier
             .heightIn(min = if (small) 38.dp else 44.dp)
             .clip(shape)
-            .background(if (selected) c.acc else c.bg)
+            .background(if (selected) c.acc else c.soft)
             .border(1.dp, if (selected) c.acc else c.bd, shape)
             .selectable(selected = selected, role = Role.Button, onClick = onClick)
             .padding(horizontal = if (small) 11.dp else 14.dp, vertical = 6.dp),
@@ -226,7 +227,7 @@ fun Segments(total: Int, done: Int, modifier: Modifier = Modifier) {
         repeat(total) { i ->
             Box(
                 Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp))
-                    .background(if (i < done) c.fg else c.bd),
+                    .background(if (i < done) c.accent else c.bd),
             )
         }
     }
@@ -263,6 +264,22 @@ fun Logo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
             drawPath(flame, c.on)
             drawPath(w, c.on, style = Stroke(width = 7.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
+    }
+}
+
+/** A round progress meter: [fraction] of the ring is filled, with [content] in the middle. */
+@Composable
+fun ProgressRing(fraction: Float, modifier: Modifier = Modifier, size: Dp = 88.dp, stroke: Dp = 9.dp, content: @Composable () -> Unit) {
+    val c = AppTheme.colors
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = stroke.toPx()
+            val topLeft = Offset(w / 2, w / 2)
+            val arc = Size(this.size.width - w, this.size.height - w)
+            drawArc(c.accentSoft, 0f, 360f, false, topLeft, arc, style = Stroke(w))
+            if (fraction > 0f) drawArc(c.accent, -90f, 360f * fraction.coerceIn(0f, 1f), false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+        }
+        content()
     }
 }
 

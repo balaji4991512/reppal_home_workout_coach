@@ -121,6 +121,7 @@ class TodayPresenterTest {
         val ui = day(at(7, 30), routines = listOf(morning), habits = habits, tasks = tasks)
         // workout 1 + routine 1 + water 1 + two tasks = 5; one task is done
         assertEquals("1 of 5 done", ui.summary)
+        assertEquals(1 to 5, ui.done to ui.total)
         assertEquals(listOf("water", "gym", "mr"), ui.habits.map { it.id }) // all still shown
         assertEquals(listOf("m"), ui.routines.map { it.id })
     }
@@ -151,6 +152,7 @@ class TodayPresenterTest {
 
     @Test
     fun aDayWithNothingInItSaysSo() {
+        assertEquals(0, day(at(9), workout = WorkoutCardUi.NoPlan).total)
         assertEquals("Nothing planned today.", day(at(9), workout = WorkoutCardUi.NoPlan).summary)
         // a rest day is not something to do
         assertEquals("Nothing planned today.", day(at(9), workout = WorkoutCardUi.Rest("A", "Fri", true)).summary)

@@ -66,6 +66,9 @@ data class TodayUi(
     val date: String,
     /** "5 of 9 done". */
     val summary: String,
+    /** What counts towards [summary]: [done] of [total]. */
+    val done: Int,
+    val total: Int,
     val workout: WorkoutCardUi,
     /** The routines for the current part of the day. */
     val routines: List<RoutineRowUi>,
@@ -120,6 +123,8 @@ object TodayPresenter {
                 done == total -> "All done for today."
                 else -> "$done of $total done"
             },
+            done = done,
+            total = total,
             workout = workout,
             routines = routinesNow,
             habits = habits.today,

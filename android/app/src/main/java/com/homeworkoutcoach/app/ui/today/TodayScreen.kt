@@ -22,6 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.homeworkoutcoach.app.ui.components.ProgressRing
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.homeworkoutcoach.app.ui.Factories
@@ -66,7 +73,7 @@ fun TodayScreen(
     Page {
         Small(s.date)
         H1(s.greeting, Modifier.padding(top = 4.dp))
-        Muted(s.summary, Modifier.padding(top = 4.dp))
+        if (s.total > 0) ProgressCard(s.done, s.total) else Muted(s.summary, Modifier.padding(top = 4.dp))
 
         Section("Workout", null, {})
         WorkoutCard(s.workout, onStartWorkout, onSetup)
@@ -148,6 +155,45 @@ fun TodayScreen(
             } else {
                 Body("Write two lines about today", Modifier.weight(1f))
                 Icon(AppIcons.Forward, null, Modifier.size(20.dp), tint = c.mut)
+            }
+        }
+    }
+}
+
+/** How far today is: a ring with the count, the percentage, and a gentle line. */
+@Composable
+private fun ProgressCard(done: Int, total: Int) {
+    val c = AppTheme.colors
+    val percent = done * 100 / total
+    Row(
+        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ProgressRing(done.toFloat() / total) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = c.fg, fontSize = 22.sp, fontWeight = FontWeight.Bold)) { append("$done") }
+                        withStyle(SpanStyle(color = c.mut, fontSize = 15.sp)) { append("/$total") }
+                    },
+                )
+                Text("DONE", color = c.mut, style = AppTheme.type.small.copy(fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 0.08.em))
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            if (done == total) {
+                Text("All done.", color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
+                Small("Nothing left for today.", Modifier.padding(top = 2.dp))
+            } else {
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = c.accent)) { append("$percent%") }
+                        append(" there.")
+                    },
+                    color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp),
+                )
+                Small("${total - done} more to go today.", Modifier.padding(top = 2.dp))
             }
         }
     }
