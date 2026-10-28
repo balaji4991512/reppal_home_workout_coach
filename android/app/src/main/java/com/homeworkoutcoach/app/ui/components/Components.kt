@@ -38,7 +38,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -242,15 +245,24 @@ fun Pill(text: String, background: Color, foreground: Color, modifier: Modifier 
 fun Logo(size: Dp = 36.dp, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
     Canvas(modifier.size(size).semantics { contentDescription = "Logo" }) {
-        val u = this.size.width / 40f
-        drawRoundRect(c.acc, cornerRadius = CornerRadius(11 * u))
-        fun bar(x: Float, y: Float, w: Float, h: Float, r: Float) =
-            drawRoundRect(c.on, Offset(x * u, y * u), Size(w * u, h * u), CornerRadius(r * u))
-        bar(4f, 16f, 3.5f, 8f, 1.5f)
-        bar(8.5f, 13f, 4.5f, 14f, 2f)
-        bar(13f, 18.6f, 14f, 2.8f, 1.4f)
-        bar(27f, 10f, 4.5f, 20f, 2f)
-        bar(32.5f, 7f, 3.5f, 26f, 1.5f)
+        drawRoundRect(c.acc, cornerRadius = CornerRadius(11 * this.size.width / 40f))
+        // The launcher icon's candle (108 grid), with the middle 72 of it filling the square.
+        val flame = Path().apply {
+            fillType = PathFillType.EvenOdd
+            moveTo(54f, 24f); cubicTo(58f, 32f, 66f, 38f, 66f, 50f); cubicTo(66f, 58f, 61f, 64f, 54f, 64f)
+            cubicTo(47f, 64f, 42f, 58f, 42f, 50f); cubicTo(42f, 38f, 50f, 32f, 54f, 24f); close()
+            moveTo(54f, 44f); cubicTo(56f, 48f, 59f, 51f, 59f, 55f); cubicTo(59f, 58.5f, 56.8f, 61f, 54f, 61f)
+            cubicTo(51.2f, 61f, 49f, 58.5f, 49f, 55f); cubicTo(49f, 51f, 52f, 48f, 54f, 44f); close()
+        }
+        val k = this.size.width / 72f
+        withTransform({
+            scale(k, k, Offset.Zero)
+            translate(-18f, -18f)
+        }) {
+            drawPath(flame, c.on)
+            drawRect(c.on, Offset(52.5f, 65f), Size(3f, 7f))
+            drawRoundRect(c.on, Offset(42f, 72f), Size(24f, 14f), CornerRadius(2f))
+        }
     }
 }
 
