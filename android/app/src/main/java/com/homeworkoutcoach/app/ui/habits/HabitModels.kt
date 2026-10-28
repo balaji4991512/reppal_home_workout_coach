@@ -37,6 +37,8 @@ data class HabitRowUi(
     val archived: Boolean,
     /** True if the habit can tick itself (Workout and the routines), so a hand-made 0 must be kept. */
     val auto: Boolean,
+    /** What ticks it, for the habits that tick themselves. */
+    val source: AutoSource = AutoSource.NONE,
 )
 
 data class HabitsUi(
@@ -106,6 +108,7 @@ object HabitRows {
             due = Habits.isDue(h, log, today),
             archived = h.archived,
             auto = h.auto != AutoSource.NONE,
+            source = h.auto,
         )
     }
 }

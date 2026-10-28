@@ -78,6 +78,7 @@ import com.homeworkoutcoach.app.ui.planner.PlannerScreen
 import com.homeworkoutcoach.app.ui.routines.RoutineEditScreen
 import com.homeworkoutcoach.app.ui.routines.RoutineRunScreen
 import com.homeworkoutcoach.app.ui.routines.RoutinesScreen
+import com.homeworkoutcoach.app.ui.today.TodayScreen
 import com.homeworkoutcoach.app.ui.planner.TaskEditScreen
 import com.homeworkoutcoach.app.ui.week.ArrangeScreen
 import com.homeworkoutcoach.app.ui.week.WeekScreen
@@ -105,11 +106,12 @@ private const val ROUTINE_NEW = "routine-new"
 
 /** Screens in the side menu, in the prototype's order. */
 enum class Dest(val route: String, val label: String, val icon: ImageVector, val beforeSetup: Boolean = false) {
+    Today("today", "Today", AppIcons.Sun, beforeSetup = true),
     Habits("habits", "Habits", AppIcons.List, beforeSetup = true),
     Planner("planner", "Planner", AppIcons.Planner, beforeSetup = true),
     Routines("routines", "Routines", AppIcons.Routine, beforeSetup = true),
     Week("week", "Week", AppIcons.Calendar),
-    Today("today", "Workout", AppIcons.Dumbbell),
+    Workout("workout", "Workout", AppIcons.Dumbbell),
     Progress("progress", "Progress", AppIcons.Chart),
     Body("body", "Body", AppIcons.Scale),
     Profile("profile", "Profile", AppIcons.User),
@@ -146,7 +148,7 @@ fun AppShell(
     }
 
     fun go(d: Dest) {
-        if (workoutActive && current == Dest.Today.route && d != Dest.Today) {
+        if (workoutActive && current == Dest.Workout.route && d != Dest.Workout) {
             leaveTo = d
             scope.launch { drawer.open() }
             return
@@ -214,8 +216,8 @@ private fun AppNavHost(
     onWorkoutActive: (Boolean) -> Unit,
     onLeaveRequest: () -> Unit,
 ) {
-    NavHost(nav, startDestination = if (started) Dest.Week.route else Dest.Setup.route) {
-        composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Today) }, onArrange = { nav.navigate(ARRANGE) }) }
+    NavHost(nav, startDestination = if (started) Dest.Today.route else Dest.Setup.route) {
+        composable(Dest.Week.route) { WeekScreen(onStart = { go(Dest.Workout) }, onArrange = { nav.navigate(ARRANGE) }) }
         composable(ARRANGE) { ArrangeScreen(onDone = { nav.popBackStack() }) }
         composable(Dest.Habits.route) {
             HabitsScreen(onOpen = { nav.navigate("habit/$it") }, onAdd = { nav.navigate(HABIT_NEW) })
@@ -258,7 +260,7 @@ private fun AppNavHost(
         }
         composable(Dest.Setup.route) {
             SetupScreen(appName, onBuilt = {
-                nav.navigate(Dest.Week.route) {
+                nav.navigate(Dest.Today.route) {
                     popUpTo(nav.graph.id) { inclusive = true }
                 }
             })
@@ -268,6 +270,19 @@ private fun AppNavHost(
         }
         composable(PRIVACY) { PrivacyScreen(appName, stringResource(R.string.privacy_contact), onBack = { nav.popBackStack() }) }
         composable(Dest.Today.route) {
+            TodayScreen(
+                onStartWorkout = { go(Dest.Workout) },
+                onSetup = { go(Dest.Setup) },
+                onRunRoutine = { nav.navigate("routine/$it/run") },
+                onRoutines = { go(Dest.Routines) },
+                onOpenHabit = { nav.navigate("habit/$it") },
+                onHabits = { go(Dest.Habits) },
+                onAddHabit = { nav.navigate(HABIT_NEW) },
+                onOpenTask = { nav.navigate("task/$it") },
+                onPlanner = { go(Dest.Planner) },
+            )
+        }
+        composable(Dest.Workout.route) {
             WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = { go(Dest.Week) })
         }
         composable(Dest.Progress.route) { ProgressScreen(onOpen = { nav.navigate("exercise/$it") }) }

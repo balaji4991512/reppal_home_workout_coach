@@ -27,7 +27,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /** The time, checked once a minute, but only passed on when the day or the part of the day changes. */
-private fun nowFlow(clock: () -> LocalDateTime): Flow<LocalDateTime> = flow {
+internal fun nowFlow(clock: () -> LocalDateTime): Flow<LocalDateTime> = flow {
     while (true) {
         emit(clock())
         delay(60_000)

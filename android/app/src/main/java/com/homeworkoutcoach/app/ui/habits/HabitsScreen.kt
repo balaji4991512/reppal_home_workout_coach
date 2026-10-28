@@ -98,7 +98,7 @@ fun HabitsScreen(
 }
 
 @Composable
-private fun HabitRow(
+internal fun HabitRow(
     row: HabitRowUi,
     dueToday: Boolean,
     expanded: Boolean,

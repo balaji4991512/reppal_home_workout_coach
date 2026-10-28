@@ -36,9 +36,9 @@ internal fun todayFlow(clock: () -> LocalDate): Flow<LocalDate> = flow {
 }.distinctUntilChanged()
 
 /** What makes the self-ticking habits tick: the days with a workout, and the days the routines were finished. */
-internal data class AutoInputs(val workoutDays: Set<LocalDate>, val routineDays: Map<AutoSource, Set<LocalDate>>)
+data class AutoInputs(val workoutDays: Set<LocalDate>, val routineDays: Map<AutoSource, Set<LocalDate>>)
 
-internal fun autoInputs(training: TrainingRepository, routines: RoutineRepository, zone: ZoneId): Flow<AutoInputs> =
+fun autoInputs(training: TrainingRepository, routines: RoutineRepository, zone: ZoneId): Flow<AutoInputs> =
     combine(training.workouts(), routines.routines(), routines.done()) { workouts, list, done ->
         AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.routineDays(list, done))
     }

@@ -62,8 +62,6 @@ fun PlannerScreen(
     val c = AppTheme.colors
     var text by rememberSaveable { mutableStateOf("") }
     var problem by rememberSaveable { mutableStateOf<String?>(null) }
-    // The carried-over task whose Delete was tapped once; a second tap deletes it.
-    var confirm by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun submit() {
         if (text.isBlank()) return
@@ -111,25 +109,45 @@ fun PlannerScreen(
             }
         }
 
-        if (s.carriedOver.isNotEmpty()) {
-            H2("Carried over", top = 28.dp)
-            Small("Left from earlier days. Nothing is lost; move it, finish it or delete it.", Modifier.padding(bottom = 6.dp))
-            Hairline()
-            s.carriedOver.forEach { row ->
-                TaskRow(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = null) {
-                    Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Chip("Move to today", false, { vm.moveToToday(row.id) }, small = true)
-                        Chip("Move to tomorrow", false, { vm.moveToTomorrow(row.id) }, small = true)
-                        Chip(
-                            if (confirm == row.id) "Sure? Delete" else "Delete", confirm == row.id,
-                            { if (confirm == row.id) { confirm = null; vm.delete(row.id) } else confirm = row.id },
-                            small = true,
-                        )
-                    }
-                }
-                Hairline()
+        CarriedOver(
+            s.carriedOver,
+            onTick = vm::toggle, onOpen = onOpen, onToday = vm::moveToToday, onTomorrow = vm::moveToTomorrow, onDelete = vm::delete,
+        )
+    }
+}
+
+/**
+ * What was left from earlier days: tick it, move it to today or tomorrow, or delete it (a second tap confirms).
+ * Shows nothing when [rows] is empty.
+ */
+@Composable
+internal fun CarriedOver(
+    rows: List<TaskRowUi>,
+    onTick: (String) -> Unit,
+    onOpen: (String) -> Unit,
+    onToday: (String) -> Unit,
+    onTomorrow: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    if (rows.isEmpty()) return
+    // The task whose Delete was tapped once; a second tap deletes it.
+    var confirm by rememberSaveable { mutableStateOf<String?>(null) }
+    H2("Carried over", top = 28.dp)
+    Small("Left from earlier days. Nothing is lost; move it, finish it or delete it.", Modifier.padding(bottom = 6.dp))
+    Hairline()
+    rows.forEach { row ->
+        TaskRow(row, onTick = { onTick(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = null) {
+            Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip("Move to today", false, { onToday(row.id) }, small = true)
+                Chip("Move to tomorrow", false, { onTomorrow(row.id) }, small = true)
+                Chip(
+                    if (confirm == row.id) "Sure? Delete" else "Delete", confirm == row.id,
+                    { if (confirm == row.id) { confirm = null; onDelete(row.id) } else confirm = row.id },
+                    small = true,
+                )
             }
         }
+        Hairline()
     }
 }
 
@@ -138,7 +156,7 @@ fun PlannerScreen(
  * (the carried-over actions).
  */
 @Composable
-private fun TaskRow(
+internal fun TaskRow(
     row: TaskRowUi,
     onTick: () -> Unit,
     onOpen: () -> Unit,
