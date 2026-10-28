@@ -128,7 +128,7 @@ class ProfilePresenterTest {
         assertEquals("Your profile", ui.title)
         assertEquals("0 workouts · 0 weigh-ins", ui.stats)
         // nothing left out: no "Working around" line
-        assertEquals(listOf("Beginner · 3 days a week · Auto plan", "Flat bench · 5 kg"), ui.setup)
+        assertEquals(listOf("Beginner · 3 days a week · Auto plan", "Flat bench · 4.5 kg"), ui.setup)
     }
 
     @Test
@@ -138,7 +138,7 @@ class ProfilePresenterTest {
             UserSettings(bench = Bench.ADJUSTABLE, dumbbellsKg = all, split = Split.BODY_PART, daysPerWeek = 5),
             emptyMap(), emptyList(),
         )
-        assertEquals(listOf("Beginner · 5 days a week · Body-part", "Adjustable bench · 12 pairs, 1–24 kg"), ui.setup)
+        assertEquals(listOf("Beginner · 5 days a week · Body-part", "Adjustable bench · 15 pairs, 2.5–24 kg"), ui.setup)
     }
 }
 

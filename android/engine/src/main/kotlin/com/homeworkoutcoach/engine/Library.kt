@@ -44,6 +44,14 @@ class Library(
         const val EXERCISE_FILE = "exercise_library.json"
         const val TABLES_FILE = "plan_tables.json"
 
+        /** The 15 settings of a 24 kg adjustable dumbbell: 2.5, 3.5, 4.5, 5.5, 6.5, 8, 9, 10, 11.5, 13.5, 16, 18, 20.5, 22.5, 24. */
+        val ADJUSTABLE_DUMBBELL_STEPS_KG: List<Double> =
+            listOf(2.5, 3.5, 4.5, 5.5, 6.5, 8.0, 9.0, 10.0, 11.5, 13.5, 16.0, 18.0, 20.5, 22.5, 24.0)
+
+        /** [kg] moved to the nearest setting of the set (the lighter one when it is halfway), so an old weight still fits. */
+        fun snapToDumbbellSet(kg: Double): Double =
+            ADJUSTABLE_DUMBBELL_STEPS_KG.minWith(compareBy({ kotlin.math.abs(it - kg) }, { it }))
+
         /** The bundled data, read from the classpath. */
         val default: Library by lazy {
             fun read(name: String) = checkNotNull(Library::class.java.classLoader.getResourceAsStream(name)) {
@@ -97,7 +105,8 @@ class Library(
                     val a = v.jsonArray.map { it.jsonPrimitive.int }
                     Level.fromKey(k) to SetRange(a[0], a[1])
                 },
-                dumbbellStepsKg = t.getValue("dumbbellStepsKg").jsonArray.map { it.jsonPrimitive.double },
+                // The weights of an adjustable dumbbell set, not docs/plan_tables.json's older 1 to 24 kg list.
+                dumbbellStepsKg = ADJUSTABLE_DUMBBELL_STEPS_KG,
                 concernKeywords = t.obj("concernKeywordsRegex").mapValues { Regex(it.value.jsonPrimitive.content) },
             )
         }

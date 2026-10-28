@@ -25,6 +25,7 @@ import com.homeworkoutcoach.app.ui.components.Logo
 import com.homeworkoutcoach.app.ui.components.Muted
 import com.homeworkoutcoach.app.ui.components.Page
 import com.homeworkoutcoach.app.ui.components.PrimaryButton
+import com.homeworkoutcoach.app.ui.components.Small
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.Bench
 import com.homeworkoutcoach.engine.Library
@@ -79,6 +80,7 @@ fun SetupContent(
         }
 
         H2("Dumbbells (kg)")
+        Small("The settings of an adjustable dumbbell. Tap each one you can use.")
         Chips {
             lib.dumbbellStepsKg.forEach { w ->
                 val owned = w in draft.dumbbellsKg
@@ -88,8 +90,8 @@ fun SetupContent(
             }
         }
         Chips {
-            Chip("Just one 5 kg pair", false, { onEdit { it.copy(dumbbellsKg = setOf(5.0)) } })
-            Chip("Full 1 to 24 kg range", false, { onEdit { it.copy(dumbbellsKg = lib.dumbbellStepsKg.toSet()) } })
+            Chip("Just one 4.5 kg pair", false, { onEdit { it.copy(dumbbellsKg = setOf(4.5)) } })
+            Chip("Full set, 2.5 to 24 kg", false, { onEdit { it.copy(dumbbellsKg = lib.dumbbellStepsKg.toSet()) } })
         }
 
         H2("Your training so far")

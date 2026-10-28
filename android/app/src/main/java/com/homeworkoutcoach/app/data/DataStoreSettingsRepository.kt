@@ -24,7 +24,7 @@ object UserSettingsSerializer : Serializer<UserSettings> {
     override val defaultValue = UserSettings()
 
     override suspend fun readFrom(input: InputStream): UserSettings = try {
-        json.decodeFromString(UserSettings.serializer(), input.readBytes().decodeToString())
+        json.decodeFromString(UserSettings.serializer(), input.readBytes().decodeToString()).withDumbbellsOnTheSet()
     } catch (e: SerializationException) {
         throw CorruptionException("Unreadable settings", e)
     } catch (e: IllegalArgumentException) {
@@ -36,12 +36,19 @@ object UserSettingsSerializer : Serializer<UserSettings> {
     }
 }
 
+/**
+ * Dumbbells are the settings of an adjustable set (2.5 to 24 kg). Weights saved before that, such as 5 or 12 kg, move to
+ * the nearest setting, so nothing owned is lost and every chip on the Setup screen can show it.
+ */
+internal fun UserSettings.withDumbbellsOnTheSet(): UserSettings =
+    copy(dumbbellsKg = dumbbellsKg.map(com.homeworkoutcoach.engine.Library::snapToDumbbellSet).distinct().sorted())
+
 class DataStoreSettingsRepository(private val store: DataStore<UserSettings>) : SettingsRepository {
 
     override val settings: Flow<UserSettings> = store.data
 
     override suspend fun update(transform: (UserSettings) -> UserSettings) {
-        store.updateData(transform)
+        store.updateData { transform(it).withDumbbellsOnTheSet() }
     }
 
     override suspend fun reset() {

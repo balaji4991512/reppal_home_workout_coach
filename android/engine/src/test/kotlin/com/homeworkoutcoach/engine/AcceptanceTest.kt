@@ -17,6 +17,22 @@ class AcceptanceTest {
         Progression.nextSession(lib.exercise(id), fullKit, plan, sets.map { LoggedSet(it.first, it.second, plan.targetReps) })
 
     @Test
+    fun theDumbbellsAreTheFifteenSettingsOfAnAdjustableSet() {
+        assertEquals(listOf(2.5, 3.5, 4.5, 5.5, 6.5, 8.0, 9.0, 10.0, 11.5, 13.5, 16.0, 18.0, 20.5, 22.5, 24.0), lib.dumbbellStepsKg)
+        assertEquals(15, lib.dumbbellStepsKg.size)
+    }
+
+    @Test
+    fun anOldWeightMovesToTheNearestSettingAndTheLighterOneWhenHalfway() {
+        assertEquals(4.5, Library.snapToDumbbellSet(5.0), 0.0) // 4.5 and 5.5 are equally near: the lighter
+        assertEquals(5.5, Library.snapToDumbbellSet(6.0), 0.0)
+        assertEquals(8.0, Library.snapToDumbbellSet(8.0), 0.0) // already a setting
+        assertEquals(10.0, Library.snapToDumbbellSet(10.4), 0.0)
+        assertEquals(2.5, Library.snapToDumbbellSet(1.0), 0.0)
+        assertEquals(24.0, Library.snapToDumbbellSet(30.0), 0.0)
+    }
+
+    @Test
     fun libraryLoads() {
         assertEquals(56, lib.exercises.size)
         assertEquals(10, lib.muscleLabels.size)
@@ -27,29 +43,31 @@ class AcceptanceTest {
 
     @Test
     fun heavierThanPlannedMovesToNextDumbbell() {
-        val r = next("bench", PlannedExercise("bench", 3, 12, 5.0), 15 to 10.0, 12 to 10.0, 12 to 10.0)
-        assertEquals(390.0, r.actualVolume, 0.0)
-        assertEquals(ExerciseState(12.0, 12, 3), r.next)
+        // planned 4.5 kg, but done at 9 kg: the next dumbbell above 9 on the adjustable set is 10 kg
+        val r = next("bench", PlannedExercise("bench", 3, 12, 4.5), 15 to 9.0, 12 to 9.0, 12 to 9.0)
+        assertEquals(351.0, r.actualVolume, 0.0)
+        assertEquals(ExerciseState(10.0, 12, 3), r.next)
         r as NextSession.Progressed
-        assertEquals(432.0, r.nextVolume, 0.0)
-        assertEquals(11, r.increasePercent)
+        assertEquals(360.0, r.nextVolume, 0.0)
+        assertEquals(3, r.increasePercent)
     }
 
     @Test
     fun exactPlanDoneAddsAboutTenPercent() {
-        val r = next("bench", PlannedExercise("bench", 3, 12, 5.0), 12 to 5.0, 12 to 5.0, 12 to 5.0) as NextSession.Progressed
-        assertEquals(180.0, r.actualVolume, 0.0)
-        assertEquals(ExerciseState(6.0, 11, 3), r.next)
-        assertEquals(198.0, r.nextVolume, 0.0)
-        assertEquals(10, r.increasePercent)
+        // 3 x 12 at 4.5 kg is 162 kg; 5.5 kg for 11 reps is 181.5 kg, about 12% more
+        val r = next("bench", PlannedExercise("bench", 3, 12, 4.5), 12 to 4.5, 12 to 4.5, 12 to 4.5) as NextSession.Progressed
+        assertEquals(162.0, r.actualVolume, 0.0)
+        assertEquals(ExerciseState(5.5, 11, 3), r.next)
+        assertEquals(181.5, r.nextVolume, 0.0)
+        assertEquals(12, r.increasePercent)
     }
 
     @Test
     fun moveUpMidSessionCountsHeaviestWeight() {
-        val r = next("bench", PlannedExercise("bench", 3, 12, 5.0), 12 to 5.0, 11 to 6.0, 12 to 6.0) as NextSession.Progressed
-        assertEquals(198.0, r.actualVolume, 0.0)
-        assertEquals(ExerciseState(6.0, 12, 3), r.next)
-        assertEquals(9, r.increasePercent)
+        val r = next("bench", PlannedExercise("bench", 3, 12, 4.5), 12 to 4.5, 11 to 5.5, 12 to 5.5) as NextSession.Progressed
+        assertEquals(180.5, r.actualVolume, 0.0)
+        assertEquals(ExerciseState(5.5, 12, 3), r.next)
+        assertEquals(10, r.increasePercent)
     }
 
     @Test

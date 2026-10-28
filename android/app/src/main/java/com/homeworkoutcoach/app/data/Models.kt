@@ -31,7 +31,7 @@ data class UserSettings(
     val guest: Boolean = false,
     val name: String = "",
     val bench: Bench = Bench.FLAT,
-    val dumbbellsKg: List<Double> = listOf(5.0),
+    val dumbbellsKg: List<Double> = listOf(4.5),
     val level: Level = Level.BEGINNER,
     /** Index of the "your training so far" option, which sets [level]. */
     val experienceOption: Int = 0,

@@ -32,11 +32,11 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
-    fun defaultsMatchThePrototype() = runTest {
+    fun defaultsMatchThePrototypeExceptTheDumbbellIsOnTheAdjustableSet() = runTest {
         val s = repo.settings.first()
         assertEquals(UserSettings(), s)
         assertEquals(Bench.FLAT, s.bench)
-        assertEquals(listOf(5.0), s.dumbbellsKg)
+        assertEquals(listOf(4.5), s.dumbbellsKg) // the prototype's 5 kg is not a setting of the adjustable set
         assertEquals(3, s.daysPerWeek)
         assertEquals(Split.AUTO, s.split)
         assertEquals(Level.BEGINNER, s.level)
@@ -45,11 +45,11 @@ abstract class SettingsRepositoryContract {
 
     @Test
     fun updateAndReset() = runTest {
-        repo.update { it.copy(name = "Asha", dumbbellsKg = listOf(2.0, 4.0), split = Split.CUSTOM) }
+        repo.update { it.copy(name = "Asha", dumbbellsKg = listOf(2.5, 4.5), split = Split.CUSTOM) }
         repo.update { it.copy(customDays = listOf(listOf(Muscle.CHEST, Muscle.ABS)), theme = ThemeMode.DARK) }
         val s = repo.settings.first()
         assertEquals("Asha", s.name)
-        assertEquals(listOf(2.0, 4.0), s.dumbbellsKg)
+        assertEquals(listOf(2.5, 4.5), s.dumbbellsKg)
         assertEquals(listOf(listOf(Muscle.CHEST, Muscle.ABS)), s.customDays)
         assertEquals(ThemeMode.DARK, s.theme)
         repo.reset()
@@ -59,11 +59,11 @@ abstract class SettingsRepositoryContract {
     @Test
     fun planSettingsCarryEverythingThePlannerNeeds() = runTest {
         repo.update {
-            it.copy(bench = Bench.NONE, dumbbellsKg = listOf(4.0, 8.0), daysPerWeek = 4, excluded = listOf("rdl"))
+            it.copy(bench = Bench.NONE, dumbbellsKg = listOf(4.5, 8.0), daysPerWeek = 4, excluded = listOf("rdl"))
         }
         val p = repo.settings.first().planSettings(mapOf("goblet" to "sumo"))
         assertEquals(Bench.NONE, p.equipment.bench)
-        assertEquals(setOf(4.0, 8.0), p.equipment.dumbbellsKg)
+        assertEquals(setOf(4.5, 8.0), p.equipment.dumbbellsKg)
         assertEquals(4, p.daysPerWeek)
         assertEquals(setOf("rdl"), p.excluded)
         assertEquals(mapOf("goblet" to "sumo"), p.swaps)
@@ -99,6 +99,17 @@ class DataStoreSettingsRepositoryTest : SettingsRepositoryContract() {
         assertEquals(true, reopened.started)
         assertEquals(5, reopened.daysPerWeek)
         assertEquals(listOf("ohp"), reopened.painExcluded)
+    }
+
+    @Test
+    fun dumbbellsSavedBeforeTheAdjustableSetMoveToTheNearestSetting() = runTest {
+        // 5 kg is halfway between 4.5 and 5.5 (the lighter wins); 12 is nearest 11.5; 8 is already a setting
+        tmp.newFile("old.json").writeText("""{"started":true,"dumbbellsKg":[5.0,8.0,12.0,1.0]}""")
+        val store = DataStoreSettingsRepository(DataStoreSettingsRepository.createStore { File(tmp.root, "old.json") })
+        assertEquals(listOf(2.5, 4.5, 8.0, 11.5), store.settings.first().dumbbellsKg)
+        // and weights saved later are kept on the set too
+        store.update { it.copy(dumbbellsKg = listOf(6.0, 6.5, 24.0)) }
+        assertEquals(listOf(5.5, 6.5, 24.0), store.settings.first().dumbbellsKg)
     }
 
     @Test
