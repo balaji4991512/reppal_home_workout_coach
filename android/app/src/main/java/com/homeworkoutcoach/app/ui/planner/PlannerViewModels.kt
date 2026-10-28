@@ -44,6 +44,15 @@ class PlannerViewModel(
         selected.value = null
     }
 
+    /** Shows [date]; today is stored as "no choice", so the screen keeps following the date. */
+    fun select(date: LocalDate) {
+        selected.value = date.takeUnless { it == clock() }
+    }
+
+    fun previousWeek() = selected.update { (it ?: clock()).minusWeeks(1) }
+
+    fun nextWeek() = selected.update { (it ?: clock()).plusWeeks(1) }
+
     /** Adds a task on the day shown. Returns what to fix, or null if it was added. */
     fun add(title: String): String? {
         Tasks.problem(title, "")?.let { return it }

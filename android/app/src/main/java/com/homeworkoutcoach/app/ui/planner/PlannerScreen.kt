@@ -2,6 +2,16 @@ package com.homeworkoutcoach.app.ui.planner
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,18 +80,34 @@ fun PlannerScreen(
     }
 
     Page {
-        H1("Planner")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                buildAnnotatedString {
+                    append(s.month)
+                    append(" ")
+                    withStyle(SpanStyle(color = c.accent)) { append(s.year) }
+                },
+                Modifier.weight(1f), color = c.fg, style = AppTheme.type.h1,
+            )
+            MonthButton(AppIcons.ChevronLeft, "Previous week", true, vm::previousWeek)
+            MonthButton(AppIcons.Forward, "Next week", true, vm::nextWeek)
+        }
 
-        Row(Modifier.padding(top = 8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MonthButton(AppIcons.ChevronLeft, "Previous day", true, vm::previousDay)
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(s.title, color = c.fg, style = AppTheme.type.h2, textAlign = TextAlign.Center)
+        Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            s.week.forEach { d -> DayCell(d, Modifier.weight(1f)) { vm.select(d.date) } }
+        }
+
+        Row(Modifier.padding(top = 22.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(s.title, color = c.fg, style = AppTheme.type.h2.copy(fontSize = 20.sp))
                 Small(s.subtitle)
             }
-            MonthButton(AppIcons.Forward, "Next day", true, vm::nextDay)
+            Text(
+                s.summary, color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.accentSoft).padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
-        if (!s.isToday) TextLink("Back to today", vm::goToToday, Modifier.align(Alignment.CenterHorizontally))
-        Muted(s.summary, Modifier.padding(top = 4.dp))
+        if (!s.isToday) TextLink("Back to today", vm::goToToday)
 
         Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(
@@ -93,26 +119,123 @@ fun PlannerScreen(
                 keyboardActions = KeyboardActions(onDone = { submit() }),
             )
             Box(
-                Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(c.acc)
+                Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(c.accent)
                     .clickable(role = Role.Button) { submit() }
                     .semantics { contentDescription = "Add task" },
                 contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.Plus, null, Modifier.size(24.dp), tint = c.on) }
+            ) { Icon(AppIcons.Plus, null, Modifier.size(24.dp), tint = c.onAccent) }
         }
         problem?.let { Text(it, Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.small) }
 
-        if (s.tasks.isNotEmpty()) {
-            Hairline(Modifier.padding(top = 14.dp))
-            s.tasks.forEach { row ->
-                TaskRow(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) })
-                Hairline()
-            }
+        s.tasks.forEach { row ->
+            TaskCard(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = { vm.moveToTomorrow(row.id) })
         }
 
-        CarriedOver(
-            s.carriedOver,
-            onTick = vm::toggle, onOpen = onOpen, onToday = vm::moveToToday, onTomorrow = vm::moveToTomorrow, onDelete = vm::delete,
-        )
+        if (s.carriedOver.isNotEmpty()) {
+            Column(Modifier.padding(top = 24.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(c.tintPeach).padding(14.dp)) {
+                H2("Carried over", top = 4.dp)
+                Small("Left from earlier days. Nothing is lost; move it, finish it or delete it.", Modifier.padding(bottom = 4.dp))
+                var confirm by rememberSaveable { mutableStateOf<String?>(null) }
+                s.carriedOver.forEach { row ->
+                    TaskCard(row, onTick = { vm.toggle(row.id) }, onOpen = { onOpen(row.id) }, onTomorrow = null) {
+                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Chip("Today", false, { vm.moveToToday(row.id) }, small = true)
+                            Chip("Tomorrow", false, { vm.moveToTomorrow(row.id) }, small = true)
+                            Chip(
+                                if (confirm == row.id) "Sure? Delete" else "Delete", confirm == row.id,
+                                { if (confirm == row.id) { confirm = null; vm.delete(row.id) } else confirm = row.id },
+                                small = true,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A day in the strip: weekday, date in a circle (filled when shown, ringed for today), and its done/total. */
+@Composable
+private fun DayCell(d: WeekDayUi, modifier: Modifier, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Column(
+        modifier.clip(RoundedCornerShape(16.dp)).selectable(selected = d.selected, role = Role.Tab, onClick = onClick).padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(d.label, color = c.mut, style = AppTheme.type.small.copy(fontSize = 12.sp))
+        Box(
+            Modifier.padding(top = 6.dp).size(40.dp).clip(CircleShape)
+                .background(if (d.selected) c.accent else Color.Transparent)
+                .then(if (d.isToday && !d.selected) Modifier.border(1.5.dp, c.accent, CircleShape) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "${d.number}", color = if (d.selected) c.onAccent else c.fg,
+                style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 16.sp, fontWeight = if (d.selected || d.isToday) FontWeight.Bold else FontWeight.Medium)),
+            )
+        }
+        if (d.total > 0) {
+            val all = d.done == d.total
+            Text(
+                "${d.done}/${d.total}", Modifier.padding(top = 6.dp).clip(RoundedCornerShape(99.dp)).background(if (all) c.tintMint else c.accentSoft).padding(horizontal = 6.dp, vertical = 2.dp),
+                color = if (all) c.ok else c.accent, style = AppTheme.type.tabular(AppTheme.type.small.copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold)),
+            )
+        } else {
+            Spacer(Modifier.padding(top = 6.dp).height(16.dp))
+        }
+    }
+}
+
+/** A task as a soft card: a round tick, the title, its time as an indigo pill and the first line of its note. */
+@Composable
+private fun TaskCard(
+    row: TaskRowUi,
+    onTick: () -> Unit,
+    onOpen: () -> Unit,
+    onTomorrow: (() -> Unit)?,
+    below: @Composable (() -> Unit)? = null,
+) {
+    val c = AppTheme.colors
+    Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.soft).padding(horizontal = 6.dp, vertical = 6.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Checkbox, onClick = onTick)
+                    .semantics { contentDescription = if (row.done) "Mark ${row.title} not done" else "Mark ${row.title} done" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.size(26.dp)) {
+                    if (row.done) drawCircle(c.accent) else drawCircle(c.accent.copy(alpha = 0.55f), style = Stroke(2.dp.toPx()), radius = size.width / 2 - 1.dp.toPx())
+                }
+                if (row.done) Icon(AppIcons.Check, null, Modifier.size(16.dp), tint = c.onAccent)
+            }
+            Column(Modifier.weight(1f).clickable(role = Role.Button, onClick = onOpen).padding(vertical = 8.dp, horizontal = 2.dp)) {
+                Text(
+                    row.title,
+                    color = if (row.done) c.mut else c.fg,
+                    style = AppTheme.type.bodyStrong.copy(
+                        fontWeight = FontWeight.Medium,
+                        textDecoration = if (row.done) TextDecoration.LineThrough else TextDecoration.None,
+                    ),
+                )
+                val note = row.note.lineSequence().firstOrNull()?.takeIf { it.isNotBlank() }
+                val from = row.dayLabel?.let { "From ${it.replaceFirstChar(Char::lowercase)}" }
+                if (row.time != null || note != null || from != null) {
+                    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.time?.let {
+                            Text(
+                                it, color = c.accent, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.clip(RoundedCornerShape(99.dp)).background(c.accentSoft).padding(horizontal = 10.dp, vertical = 2.dp),
+                            )
+                        }
+                        listOfNotNull(from, note).joinToString(" · ").takeIf { it.isNotEmpty() }?.let {
+                            Text(it, color = c.mut, style = AppTheme.type.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+            if (onTomorrow != null && !row.done) Chip("Tomorrow", false, onTomorrow, Modifier.padding(start = 8.dp, end = 6.dp), small = true)
+        }
+        if (below != null && !row.done) Box(Modifier.padding(start = 52.dp, end = 8.dp, bottom = 8.dp)) { below() }
     }
 }
 

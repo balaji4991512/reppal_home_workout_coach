@@ -1,6 +1,7 @@
 package com.homeworkoutcoach.app.ui.planner
 
 import com.homeworkoutcoach.app.data.TaskRepository
+import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Task
 import com.homeworkoutcoach.engine.Tasks
 import kotlinx.coroutines.flow.first
@@ -21,8 +22,25 @@ data class TaskRowUi(
     val dayLabel: String?,
 )
 
+/** One day in the week strip: its weekday and date number, and how many of its tasks are done. */
+data class WeekDayUi(
+    val date: LocalDate,
+    /** "Mon". */
+    val label: String,
+    val number: Int,
+    val done: Int,
+    val total: Int,
+    val selected: Boolean,
+    val isToday: Boolean,
+)
+
 data class PlannerUi(
     val date: LocalDate,
+    /** "October", and "2026": the month of the day shown. */
+    val month: String,
+    val year: String,
+    /** Monday to Sunday of the week the day shown is in. */
+    val week: List<WeekDayUi>,
     /** "Today", "Tomorrow", "Yesterday" or "Fri 30 Oct". */
     val title: String,
     /** "Wednesday 28 October". */
@@ -71,8 +89,23 @@ class PlannerPresenter {
             done = t.done,
             dayLabel = if (carried) PlannerFormat.dayTitle(t.date, today) else null,
         )
+        val monday = Habits.weekStart(date)
         return PlannerUi(
             date = date,
+            month = date.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+            year = date.year.toString(),
+            week = (0L..6L).map { monday.plusDays(it) }.map { d ->
+                val tasks = all.filter { it.date == d }
+                WeekDayUi(
+                    date = d,
+                    label = d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
+                    number = d.dayOfMonth,
+                    done = tasks.count { it.done },
+                    total = tasks.size,
+                    selected = d == date,
+                    isToday = d == today,
+                )
+            },
             title = PlannerFormat.dayTitle(date, today),
             subtitle = PlannerFormat.dayLong(date),
             isToday = date == today,

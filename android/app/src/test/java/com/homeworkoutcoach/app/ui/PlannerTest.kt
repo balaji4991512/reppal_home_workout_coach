@@ -36,6 +36,33 @@ class PlannerPresenterTest {
     }
 
     @Test
+    fun theWeekStripRunsMondayToSundayWithEachDaysTasks() {
+        // TODAY is Wednesday 28 October 2026
+        val all = listOf(
+            task("a", "A", date = TODAY, done = true),
+            task("b", "B", date = TODAY),
+            task("c", "C", date = TODAY.plusDays(2), done = true),
+            task("d", "D", date = TODAY.minusDays(7)), // last week: not in the strip
+        )
+        val ui = presenter.present(all, TODAY, TODAY)
+        assertEquals("October", ui.month)
+        assertEquals("2026", ui.year)
+        assertEquals(listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"), ui.week.map { it.label })
+        assertEquals(listOf(26, 27, 28, 29, 30, 31, 1), ui.week.map { it.number })
+        assertEquals(listOf(0, 0, 1, 0, 1, 0, 0), ui.week.map { it.done })
+        assertEquals(listOf(0, 0, 2, 0, 1, 0, 0), ui.week.map { it.total })
+        assertEquals(listOf(false, false, true, false, false, false, false), ui.week.map { it.selected })
+        assertEquals(listOf(false, false, true, false, false, false, false), ui.week.map { it.isToday })
+    }
+
+    @Test
+    fun lookingAtAnotherDayMovesTheSelectionNotToday() {
+        val ui = presenter.present(emptyList(), TODAY.plusDays(2), TODAY)
+        assertEquals(listOf(false, false, false, false, true, false, false), ui.week.map { it.selected })
+        assertEquals(2, ui.week.indexOfFirst { it.isToday })
+    }
+
+    @Test
     fun theDayViewListsRowsInOrderWithTimes() {
         val all = listOf(
             task("milk", "Buy milk", createdAt = 1),
