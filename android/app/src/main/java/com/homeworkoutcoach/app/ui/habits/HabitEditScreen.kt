@@ -253,7 +253,14 @@ fun HabitEditScreen(
         Label("Reminders")
         Chips {
             Chip("None", mode == RemindMode.NONE, { mode = RemindMode.NONE; vm.edit { it.copy(reminders = emptyList()) } }, small = true)
-            Chip("At set times", mode == RemindMode.TIMES, { mode = RemindMode.TIMES }, small = true)
+            Chip("At set times", mode == RemindMode.TIMES, {
+                if (mode != RemindMode.TIMES) {
+                    // always a fresh list, whether it comes from None or from Repeat's generated times; the clock opens for the first one
+                    mode = RemindMode.TIMES
+                    vm.edit { it.copy(reminders = emptyList()) }
+                    pickTime = -1
+                }
+            }, small = true)
             Chip("Repeat", mode == RemindMode.REPEAT, {
                 mode = RemindMode.REPEAT
                 repeat(everyText, everyHours, fromMinute, toMinute)
