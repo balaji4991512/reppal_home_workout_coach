@@ -97,6 +97,7 @@ class HabitRemindersBootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 HabitReminders(context).sync(container.habits.habits().first())
+                TaskReminders(context).sync(container.tasks.tasks().first())
             } finally {
                 pending.finish()
             }

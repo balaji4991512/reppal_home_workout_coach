@@ -1,6 +1,7 @@
 package com.homeworkoutcoach.engine
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 
 /**
@@ -69,6 +70,20 @@ object Tasks {
      * it, so the list stays still under the finger. Ties fall back to the id so the order is always the same.
      */
     val order: Comparator<Task> = compareBy<Task>({ it.timelineTime == null }, { it.timelineTime }, { it.createdAt }, { it.id })
+
+    /**
+     * When a task should ring: its start, or its deadline when it has no start. Null when it has no time, or is done.
+     * Only moments after [after] count, so something that has passed never rings late.
+     */
+    fun reminderAt(task: Task, after: LocalDateTime): LocalDateTime? {
+        if (task.done) return null
+        val at = task.timelineTime?.let { task.date.atTime(it) } ?: return null
+        return at.takeIf { it.isAfter(after) }
+    }
+
+    /** The next [limit] reminders after [after], soonest first (a phone only needs the near ones set). */
+    fun upcomingReminders(all: List<Task>, after: LocalDateTime, limit: Int = 40): List<Pair<Task, LocalDateTime>> =
+        all.mapNotNull { t -> reminderAt(t, after)?.let { t to it } }.sortedBy { it.second }.take(limit)
 
     /** What the day view shows for [date] when today is [today]. Carried-over tasks appear on today only. */
     fun dayPlan(all: List<Task>, date: LocalDate, today: LocalDate): DayPlan = DayPlan(

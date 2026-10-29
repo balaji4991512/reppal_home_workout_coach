@@ -74,6 +74,11 @@ private fun TaskForm(isNew: Boolean, vm: TaskEditViewModel, onDone: () -> Unit) 
     val today = LocalDate.now()
     var pickDate by rememberSaveable { mutableStateOf(false) }
     var picking by rememberSaveable { mutableStateOf(Picking.NONE) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Android 13 and up ask before notifications show; the time is kept either way.
+    val askForNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
 
     Page {
         H1(if (isNew) "New task" else "Edit task")
@@ -108,6 +113,9 @@ private fun TaskForm(isNew: Boolean, vm: TaskEditViewModel, onDone: () -> Unit) 
         Chips {
             Chip("No end", s.endTime == null, { vm.edit { it.copy(endTime = null) } })
             Chip(s.endTime?.let(PlannerFormat::time) ?: "Set an end", s.endTime != null, { picking = Picking.END })
+        }
+        if (s.time != null || s.endTime != null) {
+            Small(if (s.time != null) "You get a reminder when it is time to start." else "You get a reminder at the deadline.", Modifier.padding(top = 8.dp))
         }
         if (s.time != null) {
             Chips {
@@ -162,6 +170,9 @@ private fun TaskForm(isNew: Boolean, vm: TaskEditViewModel, onDone: () -> Unit) 
                     val chosen = LocalTime.of(state.hour, state.minute)
                     vm.edit { if (ending) it.copy(endTime = chosen) else it.copy(time = chosen) }
                     picking = Picking.NONE
+                    if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                        context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) askForNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                 }) { Text("OK") }
             },
             dismissButton = { TextButton({ picking = Picking.NONE }) { Text("Cancel") } },

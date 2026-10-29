@@ -35,6 +35,7 @@ import com.homeworkoutcoach.engine.KeywordConcernMapper
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 import com.homeworkoutcoach.app.reminders.HabitReminders
+import com.homeworkoutcoach.app.reminders.TaskReminders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,6 +74,11 @@ class HomeWorkoutCoachApp : Application() {
         val reminders = HabitReminders(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.habits.habits().collect { reminders.sync(it) }
+        }
+        // The same for tasks that have a time.
+        val taskReminders = TaskReminders(this)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            container.tasks.tasks().collect { taskReminders.sync(it) }
         }
     }
 }

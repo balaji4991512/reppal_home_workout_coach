@@ -288,4 +288,40 @@ class TasksTest {
         assertEquals(at(18), edited.endTime)
         assertNull(Tasks.edit(made, "Deep work", "", today, at(16)).endTime) // clearing the end
     }
+
+    // ---- Reminders ----
+
+    private val nine = today.atTime(9, 0)
+
+    @Test
+    fun aTimedTaskRingsAtItsStart() {
+        assertEquals(today.atTime(10, 0), Tasks.reminderAt(task("a", time = at(10)), nine))
+        assertEquals(today.atTime(15, 0), Tasks.reminderAt(task("b", time = at(15)).copy(endTime = at(17)), nine))
+    }
+
+    @Test
+    fun aDeadlineOnlyTaskRingsAtTheDeadline() {
+        assertEquals(today.atTime(18, 0), Tasks.reminderAt(task("a").copy(endTime = at(18)), nine))
+    }
+
+    @Test
+    fun noTimeDoneOrPastMeansNoReminder() {
+        assertNull(Tasks.reminderAt(task("a"), nine))
+        assertNull(Tasks.reminderAt(task("b", time = at(10), done = true), nine))
+        assertNull(Tasks.reminderAt(task("c", time = at(8)), nine))
+        assertNull(Tasks.reminderAt(task("d", time = at(9)), nine)) // right now has already come
+        assertNull(Tasks.reminderAt(task("e", date = yesterday, time = at(10)), nine))
+    }
+
+    @Test
+    fun aFutureDayRingsOnThatDay() {
+        assertEquals(tomorrow.atTime(7, 30), Tasks.reminderAt(task("a", date = tomorrow, time = at(7, 30)), nine))
+    }
+
+    @Test
+    fun upcomingRemindersAreSoonestFirstAndLimited() {
+        val all = listOf(task("late", time = at(20)), task("none"), task("soon", time = at(10)), task("done", time = at(11), done = true), task("mid", time = at(12)))
+        assertEquals(listOf("soon", "mid", "late"), Tasks.upcomingReminders(all, nine).map { it.first.id })
+        assertEquals(listOf("soon", "mid"), Tasks.upcomingReminders(all, nine, limit = 2).map { it.first.id })
+    }
 }
