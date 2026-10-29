@@ -59,6 +59,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import com.homeworkoutcoach.engine.Habits
+import androidx.compose.foundation.layout.width
 import java.time.DayOfWeek
 import java.time.LocalTime
 import android.Manifest
@@ -92,8 +93,27 @@ fun HabitEditScreen(
     // Which reminder time is being set: its place in the list, or -1 for a new one; null when no clock is open.
     var pickTime by rememberSaveable { mutableStateOf<Int?>(null) }
     var allIcons by rememberSaveable { mutableStateOf(false) }
+    // How the reminders are set: none, at times picked one by one, or repeating through a window of the day.
+    var mode by rememberSaveable { mutableStateOf(if (d.reminders.isEmpty()) RemindMode.NONE else RemindMode.TIMES) }
+    var everyText by rememberSaveable { mutableStateOf("2") }
+    var everyHours by rememberSaveable { mutableStateOf(true) }
+    var fromMinute by rememberSaveable { mutableStateOf(8 * 60) }
+    var toMinute by rememberSaveable { mutableStateOf(20 * 60) }
+    // Which end of the window a clock is open for: 0 start, 1 end.
+    var pickEnd by rememberSaveable { mutableStateOf<Int?>(null) }
     // Android 13 and up ask before notifications show; the reminders are kept either way.
     val askForNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    fun askToNotify() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+    fun repeat(every: String, hours: Boolean, from: Int, to: Int) {
+        val n = every.toIntOrNull()?.takeIf { it >= 1 } ?: return
+        val times = Habits.evenly(LocalTime.of(from / 60, from % 60), LocalTime.of(to / 60, to % 60), n * if (hours) 60 else 1)
+        vm.edit { it.copy(reminders = times) }
+        if (times.isNotEmpty()) askToNotify()
+    }
 
     pickTime?.let { index ->
         val start = d.reminders.getOrNull(index) ?: d.reminders.lastOrNull()?.plusHours(3)?.takeIf { it > d.reminders.last() } ?: LocalTime.of(9, 0)
@@ -108,9 +128,7 @@ fun HabitEditScreen(
                         draft.copy(reminders = Habits.tidyReminders(rest + chosen))
                     }
                     pickTime = null
-                    if (Build.VERSION.SDK_INT >= 33 &&
-                        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                    ) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    askToNotify()
                 }) { Text("OK") }
             },
             dismissButton = {
@@ -122,6 +140,24 @@ fun HabitEditScreen(
                     TextButton({ pickTime = null }) { Text("Cancel") }
                 }
             },
+            text = { TimePicker(state) },
+        )
+    }
+
+    pickEnd?.let { end ->
+        val start = (if (end == 0) fromMinute else toMinute).let { LocalTime.of(it / 60, it % 60) }
+        val state = rememberTimePickerState(initialHour = start.hour, initialMinute = start.minute, is24Hour = false)
+        AlertDialog(
+            onDismissRequest = { pickEnd = null },
+            confirmButton = {
+                TextButton({
+                    val chosen = state.hour * 60 + state.minute
+                    if (end == 0) fromMinute = chosen else toMinute = chosen
+                    pickEnd = null
+                    repeat(everyText, everyHours, if (end == 0) chosen else fromMinute, if (end == 0) toMinute else chosen)
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton({ pickEnd = null }) { Text("Cancel") } },
             text = { TimePicker(state) },
         )
     }
@@ -216,16 +252,53 @@ fun HabitEditScreen(
 
         Label("Reminders")
         Chips {
-            Chip("None", d.reminders.isEmpty(), { vm.edit { it.copy(reminders = emptyList()) } }, small = true)
-            d.reminders.forEachIndexed { i, time -> Chip(HabitFormat.clock(time), true, { pickTime = i }, small = true) }
-            if (d.reminders.size < Habits.MAX_REMINDERS) Chip("+ Add a time", false, { pickTime = -1 }, small = true)
+            Chip("None", mode == RemindMode.NONE, { mode = RemindMode.NONE; vm.edit { it.copy(reminders = emptyList()) } }, small = true)
+            Chip("At set times", mode == RemindMode.TIMES, { mode = RemindMode.TIMES }, small = true)
+            Chip("Repeat", mode == RemindMode.REPEAT, {
+                mode = RemindMode.REPEAT
+                repeat(everyText, everyHours, fromMinute, toMinute)
+            }, small = true)
         }
-        Small("Or fill the day:", Modifier.padding(top = 4.dp))
-        Chips {
-            Chip("Every 2 hours", false, { vm.edit { it.copy(reminders = Habits.evenly(LocalTime.of(8, 0), LocalTime.of(20, 0), 120)) } }, small = true)
-            Chip("Every 3 hours", false, { vm.edit { it.copy(reminders = Habits.evenly(LocalTime.of(8, 0), LocalTime.of(20, 0), 180)) } }, small = true)
+        when (mode) {
+            RemindMode.NONE -> Unit
+            RemindMode.TIMES -> {
+                Small("Pick the times you want, such as 4 AM, 8 AM and 4 PM.")
+                Chips {
+                    d.reminders.forEachIndexed { i, time -> Chip(HabitFormat.clock(time), true, { pickTime = i }, small = true) }
+                    if (d.reminders.size < Habits.MAX_REMINDERS) Chip("+ Add a time", false, { pickTime = -1 }, small = true)
+                }
+            }
+            RemindMode.REPEAT -> {
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Small("Every")
+                    Field(
+                        everyText,
+                        { v -> everyText = v.filter(Char::isDigit).take(3); repeat(everyText, everyHours, fromMinute, toMinute) },
+                        "2", Modifier.width(84.dp), label = "How many", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    Chip("Hours", everyHours, { everyHours = true; repeat(everyText, true, fromMinute, toMinute) }, small = true)
+                    Chip("Minutes", !everyHours, { everyHours = false; repeat(everyText, false, fromMinute, toMinute) }, small = true)
+                }
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Small("From")
+                    Chip(HabitFormat.clock(LocalTime.of(fromMinute / 60, fromMinute % 60)), true, { pickEnd = 0 }, small = true)
+                    Small("to")
+                    Chip(HabitFormat.clock(LocalTime.of(toMinute / 60, toMinute % 60)), true, { pickEnd = 1 }, small = true)
+                }
+                val gap = (everyText.toIntOrNull() ?: 0) * if (everyHours) 60 else 1
+                Small(
+                    when {
+                        gap < 1 -> "Enter how often."
+                        toMinute < fromMinute -> "The end has to be after the start."
+                        (toMinute - fromMinute) / gap + 1 > Habits.MAX_REMINDERS ->
+                            "That is more than ${Habits.MAX_REMINDERS} a day, so only the first ${Habits.MAX_REMINDERS} are kept. Try a longer gap."
+                        else -> "${d.reminders.size} ${if (d.reminders.size == 1) "reminder" else "reminders"}: ${d.reminders.joinToString(", ") { HabitFormat.clock(it) }}"
+                    },
+                    Modifier.padding(top = 10.dp),
+                )
+            }
         }
-        if (d.reminders.isNotEmpty()) Small("You are reminded at each time on days it is due and not done yet. Reminders stop once it is done.")
+        if (d.reminders.isNotEmpty()) Small("You are reminded at each time on days it is due and not done yet. Reminders stop once it is done.", Modifier.padding(top = 6.dp))
 
         if (d.auto == AutoSource.WORKOUT) Muted("This one ticks itself on days you finish a workout. You can still change it by hand.")
 
@@ -249,6 +322,8 @@ fun HabitEditScreen(
 
 @Composable
 private fun Label(text: String) = Small(text, Modifier.padding(top = 20.dp, bottom = 6.dp))
+
+private enum class RemindMode { NONE, TIMES, REPEAT }
 
 @Composable
 private fun IconTile(key: String, on: Boolean, color: String, onClick: () -> Unit) {
