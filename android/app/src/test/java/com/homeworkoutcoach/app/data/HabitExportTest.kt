@@ -81,14 +81,14 @@ class HabitExportTest {
     fun aReminderTimeSurvivesAnExportFile() = runTest {
         val p = Phone().also { it.addHabits() }
         val h = p.habits.habits().first().first()
-        p.habits.save(h.copy(habit = h.habit.copy(reminder = java.time.LocalTime.of(10, 0))))
+        p.habits.save(h.copy(habit = h.habit.copy(reminders = listOf(java.time.LocalTime.of(10, 0), java.time.LocalTime.of(15, 30)))))
         val file = exporter(p).export("RepPal", now).json
-        assertTrue(file.contains("\"reminder\": \"10:00\"") || file.contains("\"reminder\":\"10:00\""))
+        assertTrue(file.contains("\"10:00\"") && file.contains("\"15:30\""))
 
         val fresh = Phone()
         DataImporter(fresh.settings, fresh.training, fresh.body, fresh.habits).restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
-        assertEquals(p.habits.habits().first().map { it.habit.reminder }, fresh.habits.habits().first().map { it.habit.reminder })
-        assertEquals(java.time.LocalTime.of(10, 0), fresh.habits.habits().first().first { it.habit.id == h.habit.id }.habit.reminder)
+        assertEquals(p.habits.habits().first().map { it.habit.reminders }, fresh.habits.habits().first().map { it.habit.reminders })
+        assertEquals(listOf(java.time.LocalTime.of(10, 0), java.time.LocalTime.of(15, 30)), fresh.habits.habits().first().first { it.habit.id == h.habit.id }.habit.reminders)
     }
 
     @Test
@@ -130,6 +130,21 @@ class HabitExportTest {
         DataImporter(p.settings, p.training, p.body, p.habits).restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
         assertTrue(p.habits.habits().first().isEmpty())
         assertTrue(p.habits.entries().first().isEmpty())
+    }
+
+    @Test
+    fun aFileWithTheOldSingleReminderRestoresItAsTheFirstOfMany() {
+        fun file(extra: String) = """{"app":"RepPal","format":11,"exportedAt":"2026-10-27T14:57:36+05:30","account":null,
+            "settings":{},"exerciseStates":{},"swaps":{},"workouts":[],"weighIns":[],"habits":[{"id":"w","name":"W","kind":"count","target":8,
+            "startDate":"2026-10-20","icon":"drop","color":"blue","schedule":{"type":"daily"}$extra}]}"""
+        val one = DataImport.read(lib, file(",\"reminder\":\"10:00\"")) as ImportCheck.Ok
+        assertEquals(listOf(java.time.LocalTime.of(10, 0)), one.restore.habits!!.single().stored.habit.reminders)
+        val none = DataImport.read(lib, file("")) as ImportCheck.Ok
+        assertEquals(emptyList<java.time.LocalTime>(), none.restore.habits!!.single().stored.habit.reminders)
+        // times in any order, repeats dropped
+        val many = DataImport.read(lib, file(",\"reminders\":[\"20:00\",\"08:00\",\"20:00\"]")) as ImportCheck.Ok
+        assertEquals(listOf(java.time.LocalTime.of(8, 0), java.time.LocalTime.of(20, 0)), many.restore.habits!!.single().stored.habit.reminders)
+        assertTrue(DataImport.read(lib, file(",\"reminders\":[\"late\"]")) is ImportCheck.Bad)
     }
 
     @Test

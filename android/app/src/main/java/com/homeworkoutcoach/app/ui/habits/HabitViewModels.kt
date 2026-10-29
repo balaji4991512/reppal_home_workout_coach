@@ -136,13 +136,20 @@ class HabitEditViewModel(
         val draft: HabitDraft,
         /** Names of the other habits, to catch a repeat. */
         val others: List<String>,
-        /** Starting suggestions not already added; only offered for a new habit. */
-        val suggestions: List<Habits.Suggestion>,
+        /** True for a habit being added: only then are suggestions offered. */
+        val isNew: Boolean,
         val nextPosition: Int,
         /** The first problem is shown only after trying to save. */
         val showProblem: Boolean = false,
     ) {
         val problem: String? get() = draft.problem(others)
+
+        /**
+         * Habits to start from, matching what has been typed in the name (the most common ones while it is empty).
+         * Not shown for one already added, or once the name is exactly one of them.
+         */
+        val suggestions: List<Habits.Suggestion>
+            get() = if (!isNew) emptyList() else Habits.suggest(draft.name, others, 6).filter { !it.name.equals(draft.name.trim(), ignoreCase = true) }
     }
 
     private val _state = MutableStateFlow<State?>(null)
@@ -159,7 +166,7 @@ class HabitEditViewModel(
             _state.value = State(
                 draft = existing?.let(HabitDraft::from) ?: HabitDraft(),
                 others = names,
-                suggestions = if (id == null) Habits.suggestions.filter { s -> names.none { it.equals(s.name, ignoreCase = true) } } else emptyList(),
+                isNew = id == null,
                 nextPosition = (all.maxOfOrNull { it.position } ?: -1) + 1,
             )
         }
@@ -168,7 +175,10 @@ class HabitEditViewModel(
     fun edit(transform: (HabitDraft) -> HabitDraft) = _state.update { s -> s?.copy(draft = transform(s.draft)) }
 
     /** Fills the form from a starting suggestion. */
-    fun pick(s: Habits.Suggestion) = _state.update { it?.copy(draft = HabitDraft.from(s), showProblem = false) }
+    fun pick(s: Habits.Suggestion) = _state.update {
+        // what was already chosen for when and how often stays
+        it?.copy(draft = HabitDraft.from(s).copy(scheduleType = it.draft.scheduleType, weekdays = it.draft.weekdays, times = it.draft.times, reminders = it.draft.reminders), showProblem = false)
+    }
 
     fun save(onDone: () -> Unit) {
         val s = _state.value ?: return

@@ -97,7 +97,38 @@ class MigrationTest {
         assertEquals(1, RoomFocusRepository(db).sessions().first().size)
         RoomReflectionRepository(db).save(reflection(java.time.LocalDate.of(2026, 10, 26)))
         assertEquals(1, RoomReflectionRepository(db).reflections().first().size)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test
+    fun version12SingleReminderBecomesTheFirstOfMany() = runTest {
+        val file = tmp.newFile("training.db").also { it.delete() }
+        create(file, 12) { db ->
+            insertWorkoutAndState(db)
+            db.execSQL(
+                "INSERT INTO habit (id, name, kind, target, scheduleType, scheduleValue, startEpochDay, auto, archived, icon, color, position, reminderMinuteOfDay) " +
+                    "VALUES ('h', 'Water', 'count', 8, 'daily', 0, 20000, 'none', 0, 'drop', 'blue', 0, 600)",
+            )
+            db.execSQL(
+                "INSERT INTO habit (id, name, kind, target, scheduleType, scheduleValue, startEpochDay, auto, archived, icon, color, position) " +
+                    "VALUES ('g', 'Read', 'time', 20, 'daily', 0, 20000, 'none', 0, 'book', 'green', 1)",
+            )
+        }
+
+        val db = open(file)
+        val habits = RoomHabitRepository(db)
+        val byId = habits.habits().first().associateBy { it.habit.id }
+        assertEquals(listOf(java.time.LocalTime.of(10, 0)), byId.getValue("h").habit.reminders)
+        assertEquals(emptyList<java.time.LocalTime>(), byId.getValue("g").habit.reminders)
+
+        val water = byId.getValue("h")
+        val times = listOf(java.time.LocalTime.of(9, 0), java.time.LocalTime.of(13, 30), java.time.LocalTime.of(20, 0))
+        habits.save(water.copy(habit = water.habit.copy(reminders = times)))
+        assertEquals(times, habits.habits().first().first { it.habit.id == "h" }.habit.reminders)
+        habits.save(water.copy(habit = water.habit.copy(reminders = emptyList()))) // clearing really clears the old column too
+        assertEquals(emptyList<java.time.LocalTime>(), habits.habits().first().first { it.habit.id == "h" }.habit.reminders)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -116,12 +147,12 @@ class MigrationTest {
         val habits = RoomHabitRepository(db)
         val old = habits.habits().first().single()
         assertEquals("Water", old.habit.name)
-        assertEquals(null, old.habit.reminder) // what was saved before has no reminder
+        assertEquals(emptyList<java.time.LocalTime>(), old.habit.reminders) // what was saved before has no reminder
         assertEquals("A", RoomTrainingRepository(db).workouts().first().single().label)
 
-        habits.save(old.copy(habit = old.habit.copy(reminder = java.time.LocalTime.of(10, 0))))
-        assertEquals(java.time.LocalTime.of(10, 0), habits.habits().first().single().habit.reminder)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        habits.save(old.copy(habit = old.habit.copy(reminders = listOf(java.time.LocalTime.of(10, 0)))))
+        assertEquals(listOf(java.time.LocalTime.of(10, 0)), habits.habits().first().single().habit.reminders)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -137,7 +168,7 @@ class MigrationTest {
         assertEquals(null, old.madeUpForEpochDay) // what was saved before makes nothing up
         repo.saveWorkout(old.copy(id = 0, dateMillis = old.dateMillis + 1, madeUpForEpochDay = 20_000), emptyMap())
         assertEquals(listOf(null, 20_000L), repo.workouts().first().map { it.madeUpForEpochDay })
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -163,7 +194,7 @@ class MigrationTest {
         assertEquals(java.time.LocalTime.of(17, 0), saved.getValue("b").endTime)
         assertEquals(null, saved.getValue("d").time)
         assertEquals(java.time.LocalTime.of(18, 0), saved.getValue("d").endTime)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -183,7 +214,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.WeeklyReflection>(), reflections.reflections().first())
         reflections.save(reflection(java.time.LocalDate.of(2026, 10, 26)))
         assertEquals(1, reflections.reflections().first().size)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -206,7 +237,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.FocusSession>(), focus.sessions().first())
         focus.save(focusSession("f"))
         assertEquals(listOf("f"), focus.sessions().first().map { it.id })
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -226,7 +257,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Goal>(), goals.goals().first())
         goals.save(goal("g"))
         assertEquals(listOf("g"), goals.goals().first().map { it.id })
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -250,7 +281,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.JournalEntry>(), journal.entries().first())
         journal.save(com.homeworkoutcoach.engine.JournalEntry(java.time.LocalDate.of(2026, 10, 28), "a win", "do better"))
         assertEquals("a win", journal.entries().first().single().win)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -275,7 +306,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Routine>(), routines.routines().first())
         routines.save(routine("r", linkedTo = "h"))
         assertEquals("h", routines.routines().first().single().items.first().habitId)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -302,7 +333,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Task>(), tasks.tasks().first())
         tasks.save(task("t"))
         assertEquals(listOf("t"), tasks.tasks().first().map { it.id })
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -323,7 +354,7 @@ class MigrationTest {
         habits.save(storedHabit("water"))
         habits.setAmount("water", java.time.LocalDate.of(2026, 10, 27), 1)
         assertEquals(1, habits.entries().first().getValue("water").size)
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

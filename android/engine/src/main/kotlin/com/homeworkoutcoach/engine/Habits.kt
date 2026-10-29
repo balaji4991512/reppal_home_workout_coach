@@ -42,10 +42,12 @@ data class Habit(
     val startDate: LocalDate,
     val auto: AutoSource = AutoSource.NONE,
     val archived: Boolean = false,
-    /** The time of day to be reminded, on the days the habit is due; null for no reminder. */
-    val reminder: LocalTime? = null,
+    /** The times of day to be reminded, on the days the habit is due; empty for no reminder. Water may want many. */
+    val reminders: List<LocalTime> = emptyList(),
 ) {
     init {
+        require(reminders.size <= Habits.MAX_REMINDERS) { "at most ${Habits.MAX_REMINDERS} reminders" }
+        require(reminders.distinct().size == reminders.size) { "reminder times must differ" }
         require(target >= 1) { "target must be at least 1" }
         require(kind != HabitKind.DONE || target == 1) { "a done/not done habit has target 1" }
         when (schedule) {
@@ -236,11 +238,11 @@ object Habits {
     }
 
     /**
-     * Whether to send the reminder on [today]: the habit has one, is not archived, is due and is not already done. A
+     * Whether to send the reminder on [today]: the habit has a reminder, is not archived, is due and is not already done. A
      * habit done earlier in the day, or not due (a rest day, or a times-a-week habit already met), stays quiet.
      */
     fun shouldRemind(habit: Habit, log: HabitLog, today: LocalDate): Boolean =
-        habit.reminder != null && !habit.archived && isDue(habit, log, today) && !isDone(habit, log, today)
+        habit.reminders.isNotEmpty() && !habit.archived && isDue(habit, log, today) && !isDone(habit, log, today)
 
     /**
      * The next moment to ring a reminder at [time] that is after [after]: today at [time] if that is still ahead,
@@ -249,6 +251,27 @@ object Habits {
     fun nextReminder(time: LocalTime, after: LocalDateTime): LocalDateTime {
         val today = after.toLocalDate().atTime(time)
         return if (today.isAfter(after)) today else today.plusDays(1)
+    }
+
+    const val MAX_REMINDERS = 12
+
+    /** Sorted, with repeats dropped and no more than [MAX_REMINDERS]: the times as they are stored. */
+    fun tidyReminders(times: Collection<LocalTime>): List<LocalTime> = times.toSortedSet().take(MAX_REMINDERS)
+
+    /**
+     * Times from [from] up to and including [to], every [everyMinutes] ("every 2 hours, 8 am to 8 pm"). Stops at the
+     * most reminders a habit can have, and never wraps past midnight.
+     */
+    fun evenly(from: LocalTime, to: LocalTime, everyMinutes: Int): List<LocalTime> {
+        require(everyMinutes >= 1) { "the gap must be at least a minute" }
+        val out = mutableListOf<LocalTime>()
+        var minute = from.hour * 60 + from.minute
+        val last = to.hour * 60 + to.minute
+        while (minute <= last && out.size < MAX_REMINDERS) {
+            out += LocalTime.of(minute / 60, minute % 60)
+            minute += everyMinutes
+        }
+        return out
     }
 
     /** Fixed-schedule due check that ignores what was logged (used for counting past days). */
@@ -260,19 +283,183 @@ object Habits {
 
     // ---- Starting suggestions ----
 
-    data class Suggestion(val name: String, val kind: HabitKind, val target: Int, val auto: AutoSource = AutoSource.NONE)
-
-    /** The starting list (specs/HABITS_PLANNER_SPEC.md); the user picks any, edits them or ignores them all. */
-    val suggestions: List<Suggestion> = listOf(
-        Suggestion("Workout", HabitKind.DONE, 1, AutoSource.WORKOUT),
-        Suggestion("Morning routine", HabitKind.DONE, 1, AutoSource.MORNING_ROUTINE),
-        Suggestion("Night routine", HabitKind.DONE, 1, AutoSource.NIGHT_ROUTINE),
-        Suggestion("Journal", HabitKind.DONE, 1, AutoSource.JOURNAL),
-        Suggestion("Water", HabitKind.COUNT, 8),
-        Suggestion("Sleep", HabitKind.TIME, 7 * 60),
-        Suggestion("Reading", HabitKind.TIME, 20),
-        Suggestion("Meditation", HabitKind.TIME, 10),
-        Suggestion("Yoga", HabitKind.TIME, 20),
-        Suggestion("Walking", HabitKind.TIME, 30),
+    /** A habit to start from. [icon] is a key the app draws (see its icon catalogue). */
+    data class Suggestion(
+        val name: String,
+        val kind: HabitKind,
+        val target: Int,
+        val auto: AutoSource = AutoSource.NONE,
+        val icon: String = "check",
     )
+
+    private fun done(name: String, icon: String, auto: AutoSource = AutoSource.NONE) = Suggestion(name, HabitKind.DONE, 1, auto, icon)
+    private fun count(name: String, icon: String, n: Int) = Suggestion(name, HabitKind.COUNT, n, icon = icon)
+    private fun minutes(name: String, icon: String, n: Int) = Suggestion(name, HabitKind.TIME, n, icon = icon)
+
+    /**
+     * Things people do, most common first (specs/HABITS_PLANNER_SPEC.md; the user picks any, edits it or ignores them
+     * all). Four tick themselves from the app's own data.
+     */
+    val suggestions: List<Suggestion> = listOf(
+        done("Workout", "dumbbell", AutoSource.WORKOUT),
+        done("Morning routine", "sun", AutoSource.MORNING_ROUTINE),
+        done("Night routine", "moon", AutoSource.NIGHT_ROUTINE),
+        done("Journal", "pen", AutoSource.JOURNAL),
+        count("Water", "drop", 8),
+        minutes("Sleep", "sleep", 7 * 60),
+        minutes("Reading", "book", 20),
+        minutes("Meditation", "lotus", 10),
+        minutes("Yoga", "yoga", 20),
+        minutes("Walking", "walk", 30),
+        // body and health
+        done("Take vitamins", "pill"),
+        done("Take medicine", "pill"),
+        done("Brush teeth", "tooth"),
+        done("Floss", "floss"),
+        done("Cold shower", "shower"),
+        done("Skincare routine", "lotion"),
+        done("Wear sunscreen", "lotion"),
+        done("Wash hands", "soap"),
+        done("Check blood pressure", "stethoscope"),
+        done("Track blood sugar", "stethoscope"),
+        done("Stretch", "stretch"),
+        done("Posture check", "posture"),
+        done("Rest your eyes", "eye"),
+        done("Go to bed on time", "bed"),
+        done("Wake up early", "alarm"),
+        done("Make the bed", "bed"),
+        // movement
+        done("Take the stairs", "steps"),
+        minutes("Running", "run", 30),
+        minutes("Cycling", "bike", 30),
+        minutes("Swimming", "swim", 30),
+        count("Push-ups", "pushup", 20),
+        count("Sit-ups", "pushup", 20),
+        count("Squats", "dumbbell", 30),
+        minutes("Plank", "stopwatch", 2),
+        minutes("Hiking", "hike", 60),
+        minutes("Dancing", "dance", 20),
+        minutes("Skipping rope", "stopwatch", 10),
+        minutes("Boxing", "boxing", 30),
+        minutes("Martial arts", "martial", 45),
+        minutes("Climbing", "climb", 60),
+        minutes("Football", "soccer", 60),
+        minutes("Basketball", "basketball", 45),
+        minutes("Tennis", "tennis", 60),
+        minutes("Badminton", "badminton", 45),
+        minutes("Cricket", "cricket", 60),
+        minutes("Golf", "golf", 90),
+        minutes("Rowing", "rowing", 20),
+        minutes("Surfing", "surf", 60),
+        minutes("Skating", "skate", 30),
+        minutes("Take a break and move", "steps", 5),
+        // food and drink
+        done("Eat a healthy breakfast", "meal"),
+        done("Eat a salad", "salad"),
+        count("Fruit or veg", "carrot", 5),
+        done("Eat fruit", "fruit"),
+        done("Cook at home", "cook"),
+        done("Pack lunch", "lunchbox"),
+        done("No sugar", "candy"),
+        done("No soda", "soda"),
+        done("No junk food", "burger"),
+        done("No alcohol", "wine"),
+        count("Cups of tea", "tea", 2),
+        count("Cups of coffee", "coffee", 2),
+        count("Glasses of milk", "milk", 1),
+        done("Eat protein", "egg"),
+        done("Eat slowly", "meal"),
+        done("Intermittent fasting", "fasting"),
+        done("Track calories", "list"),
+        // mind
+        minutes("Breathing exercise", "breath", 5),
+        done("Gratitude", "gratitude"),
+        done("Pray", "pray"),
+        done("Smile", "smile"),
+        minutes("Learn a language", "language", 15),
+        minutes("Study", "graduation", 60),
+        minutes("Practice coding", "code", 30),
+        minutes("Online course", "laptop", 30),
+        done("Review flashcards", "flashcards"),
+        minutes("Puzzles", "puzzle", 15),
+        minutes("Chess", "chess", 20),
+        minutes("Listen to a podcast", "podcast", 20),
+        done("Read the news", "news"),
+        count("Pages read", "books", 10),
+        done("Write ideas", "idea"),
+        done("Brain dump", "brain"),
+        done("Say no to a distraction", "target"),
+        done("Therapy or counselling", "couch"),
+        // creative
+        minutes("Play an instrument", "guitar", 20),
+        minutes("Practice piano", "piano", 20),
+        minutes("Practice singing", "mic", 15),
+        minutes("Draw or sketch", "draw", 15),
+        minutes("Paint", "art", 30),
+        minutes("Write", "pen", 20),
+        done("Take a photo", "camera"),
+        minutes("Listen to music", "music", 20),
+        // home
+        done("Tidy up", "broom"),
+        done("Do the dishes", "sponge"),
+        done("Do laundry", "laundry"),
+        done("Take out the trash", "trash"),
+        done("Water the plants", "plant"),
+        done("Feed the pet", "dog"),
+        minutes("Walk the dog", "dog", 30),
+        done("Clean the litter", "cat"),
+        done("Plan meals", "list"),
+        done("Grocery shopping", "cart"),
+        done("Declutter", "box"),
+        // work and money
+        done("Plan the day", "calendar"),
+        done("Clear your inbox", "inbox"),
+        minutes("Deep work", "dnd", 120),
+        done("Review goals", "target"),
+        done("Track expenses", "receipt"),
+        done("Save money", "money"),
+        done("Invest", "chart"),
+        done("Check the budget", "bank"),
+        done("Pay bills", "card"),
+        done("Learn something new", "idea"),
+        // screens and habits to drop
+        done("No phone before bed", "phone"),
+        done("No social media", "social"),
+        done("No smoking", "nosmoke"),
+        done("Limit TV", "tv"),
+        done("Limit games", "game"),
+        done("No snoozing", "alarm"),
+        // people
+        done("Call family", "call"),
+        done("Message a friend", "letter"),
+        done("Spend time with family", "family"),
+        done("Date night", "couple"),
+        done("Play with the kids", "kid"),
+        done("Do something kind", "kindness"),
+        done("Volunteer", "volunteer"),
+        done("Donate", "donate"),
+        done("Give a compliment", "hug"),
+        // outdoors
+        minutes("Get sunlight", "sunlight", 15),
+        minutes("Time in nature", "tree", 30),
+        minutes("Gardening", "flower", 30),
+        done("Watch the sunrise", "sunrise"),
+        done("Stargaze", "stars"),
+        done("Go fishing", "fishing"),
+        done("Go camping", "camp"),
+        done("Recycle", "recycle"),
+    )
+
+    /**
+     * Suggestions to show while a name is being typed: names that start with [query] first, then names that contain it
+     * (case and spaces around it ignored). Anything in [skip] (names the person already has) is left out. With nothing
+     * typed it gives the first [limit], the most common.
+     */
+    fun suggest(query: String, skip: Collection<String> = emptyList(), limit: Int = 6): List<Suggestion> {
+        val q = query.trim().lowercase()
+        val free = suggestions.filter { s -> skip.none { it.trim().equals(s.name, ignoreCase = true) } }
+        if (q.isEmpty()) return free.take(limit)
+        val (starts, rest) = free.partition { it.name.lowercase().startsWith(q) }
+        return (starts + rest.filter { r -> r.name.lowercase().contains(q) || r.name.lowercase().split(' ').any { it.startsWith(q) } }).take(limit)
+    }
 }

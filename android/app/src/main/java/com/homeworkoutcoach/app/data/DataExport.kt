@@ -11,6 +11,7 @@ import com.homeworkoutcoach.engine.Habit
 import com.homeworkoutcoach.engine.JournalEntry
 import com.homeworkoutcoach.engine.HabitKind
 import com.homeworkoutcoach.engine.HabitSchedule
+import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.LoggedSet
 import com.homeworkoutcoach.engine.Planner
@@ -36,7 +37,7 @@ import java.time.format.DateTimeFormatter
  */
 object DataExport {
     /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections (older files still restore). */
-    const val FORMAT = 11
+    const val FORMAT = 12
 
     @Serializable
     data class File(
@@ -110,8 +111,10 @@ object DataExport {
         val icon: String,
         val color: String,
         val entries: Map<String, Int> = emptyMap(),
-        /** The reminder time, 24-hour "10:00", or absent for none (format 11 on). */
+        /** The one reminder time, 24-hour "10:00", from a file made at format 11. Newer files use [reminders]. */
         val reminder: String? = null,
+        /** The reminder times, 24-hour "10:00" (format 12 on); absent for none. */
+        val reminders: List<String> = emptyList(),
     )
 
     /** [type] is "daily", "weekdays" (with [days], e.g. "MONDAY") or "times" (with [times] a week). */
@@ -246,7 +249,7 @@ object DataExport {
                     icon = d.stored.icon,
                     color = d.stored.color,
                     entries = d.entries.toSortedMap().mapKeys { it.key.toString() },
-                    reminder = h.reminder?.toString(),
+                    reminders = h.reminders.map { it.toString() },
                 )
             },
             tasks = tasks.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id })).map {
@@ -419,7 +422,7 @@ object DataImport {
             startDate = LocalDate.parse(d.startDate),
             auto = AutoSource.entries.firstOrNull { it.name.lowercase() == d.auto } ?: AutoSource.NONE,
             archived = d.archived,
-            reminder = d.reminder?.let(java.time.LocalTime::parse),
+            reminders = Habits.tidyReminders((d.reminders + listOfNotNull(d.reminder)).map(java.time.LocalTime::parse)),
         )
         return HabitData(
             StoredHabit(habit, d.icon, d.color),

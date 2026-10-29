@@ -6,6 +6,7 @@ import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.Habit
 import com.homeworkoutcoach.engine.HabitKind
 import com.homeworkoutcoach.engine.HabitSchedule
+import com.homeworkoutcoach.engine.Habits
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.DayOfWeek
@@ -55,7 +56,8 @@ class RoomHabitRepository(private val db: TrainingDatabase) : HabitRepository {
             icon = s.icon,
             color = s.color,
             position = s.position,
-            reminderMinuteOfDay = h.reminder?.let { it.hour * 60 + it.minute },
+            reminderMinuteOfDay = null,
+            reminderMinutes = h.reminders.joinToString(",") { (it.hour * 60 + it.minute).toString() },
         )
     }
 
@@ -75,12 +77,18 @@ class RoomHabitRepository(private val db: TrainingDatabase) : HabitRepository {
                 startDate = LocalDate.ofEpochDay(e.startEpochDay),
                 auto = AutoSource.entries.firstOrNull { it.name.lowercase() == e.auto } ?: AutoSource.NONE,
                 archived = e.archived,
-                reminder = e.reminderMinuteOfDay?.let { java.time.LocalTime.of(it / 60, it % 60) },
+                reminders = remindersOf(e),
             ),
             icon = e.icon,
             color = e.color,
             position = e.position,
         )
+    }
+
+    /** The times saved with the habit; a habit saved before there were many has its one in the older column. */
+    private fun remindersOf(e: HabitEntity): List<java.time.LocalTime> {
+        val minutes = e.reminderMinutes?.split(",")?.mapNotNull { it.trim().toIntOrNull() } ?: listOfNotNull(e.reminderMinuteOfDay)
+        return Habits.tidyReminders(minutes.filter { it in 0 until 24 * 60 }.map { java.time.LocalTime.of(it / 60, it % 60) })
     }
 
     private companion object {

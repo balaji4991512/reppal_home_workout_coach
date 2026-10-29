@@ -62,6 +62,13 @@ data class HabitsUi(
 )
 
 object HabitFormat {
+    /** How a suggestion is tracked, in a few words: "8 a day", "20 min a day", "Done or not". */
+    fun suggestionDetail(s: Habits.Suggestion): String = when (s.kind) {
+        HabitKind.DONE -> "Done or not"
+        HabitKind.COUNT -> "${s.target} a day"
+        HabitKind.TIME -> "${minutes(s.target)} a day"
+    }
+
     /** A time of day as 10:00 AM. */
     fun clock(t: java.time.LocalTime): String =
         "%d:%02d %s".format(if (t.hour % 12 == 0) 12 else t.hour % 12, t.minute, if (t.hour < 12) "AM" else "PM")
@@ -339,8 +346,8 @@ data class HabitDraft(
     /** Kept when editing; a new habit starts today. */
     val startDate: LocalDate? = null,
     val position: Int? = null,
-    /** When to be reminded, or null for no reminder. */
-    val reminder: java.time.LocalTime? = null,
+    /** Times to be reminded, earliest first; empty for no reminder. */
+    val reminders: List<java.time.LocalTime> = emptyList(),
 ) {
     /** The target as a number, or null if what was typed is not valid for [kind]. */
     val target: Int?
@@ -378,7 +385,7 @@ data class HabitDraft(
             ScheduleType.TIMES -> HabitSchedule.TimesPerWeek(times)
         }
         return StoredHabit(
-            Habit(id ?: newId, name.trim(), kind, checkNotNull(target), schedule, startDate ?: today, auto, archived, reminder),
+            Habit(id ?: newId, name.trim(), kind, checkNotNull(target), schedule, startDate ?: today, auto, archived, Habits.tidyReminders(reminders)),
             icon = icon,
             color = color,
             position = position ?: nextPosition,
@@ -413,13 +420,12 @@ data class HabitDraft(
                 archived = h.archived,
                 startDate = h.startDate,
                 position = s.position,
-                reminder = h.reminder,
+                reminders = h.reminders,
             )
         }
 
         fun from(s: Habits.Suggestion): HabitDraft {
-            val (icon, color) = HabitStyles.forName(s.name)
-            return HabitDraft(name = s.name, icon = icon, color = color, kind = s.kind, targetText = s.target.toString(), auto = s.auto)
+            return HabitDraft(name = s.name, icon = s.icon, color = HabitStyles.colorFor(s.icon), kind = s.kind, targetText = s.target.toString(), auto = s.auto)
         }
     }
 }
@@ -429,35 +435,13 @@ object HabitStyles {
     const val DEFAULT_ICON = "check"
     const val DEFAULT_COLOR = "blue"
 
-    val icons = listOf(
-        "check", "drop", "moon", "sun", "book", "pen", "dumbbell", "walk", "lotus", "heart", "star", "list", "bolt",
-        "shower", "run", "apple", "sleep", "tooth", "pill", "broom", "brain", "money", "music", "plant", "phone",
-    )
+    val icons: List<String> = HabitIcons.all.map { it.key }
     val colors = listOf("blue", "green", "orange", "red", "purple", "teal", "amber", "pink")
 
-    private val named = mapOf(
-        "Workout" to ("dumbbell" to "orange"),
-        "Morning routine" to ("sun" to "amber"),
-        "Night routine" to ("moon" to "purple"),
-        "Journal" to ("pen" to "teal"),
-        "Water" to ("drop" to "blue"),
-        "Sleep" to ("moon" to "blue"),
-        "Reading" to ("book" to "green"),
-        "Meditation" to ("lotus" to "teal"),
-        "Yoga" to ("lotus" to "pink"),
-        "Walking" to ("walk" to "green"),
-    )
-
     /** The colour that goes with an icon, so a habit's tint always suits its emoji and nobody has to choose one. */
-    fun colorFor(icon: String): String = iconColors[icon] ?: DEFAULT_COLOR
+    fun colorFor(icon: String): String = HabitIcons.find(icon)?.color ?: DEFAULT_COLOR
 
-    private val iconColors = mapOf(
-        "check" to "blue", "drop" to "blue", "moon" to "purple", "sun" to "amber", "book" to "green", "pen" to "teal",
-        "dumbbell" to "orange", "walk" to "green", "lotus" to "pink", "heart" to "red", "star" to "amber", "list" to "blue",
-        "bolt" to "orange", "shower" to "teal", "run" to "orange", "apple" to "red", "sleep" to "purple", "tooth" to "teal",
-        "pill" to "pink", "broom" to "green", "brain" to "purple", "money" to "green", "music" to "pink", "plant" to "green",
-        "phone" to "red",
-    )
-
-    fun forName(name: String): Pair<String, String> = named[name] ?: (DEFAULT_ICON to DEFAULT_COLOR)
+    /** The look for a starting suggestion's name; anything else gets the default. */
+    fun forName(name: String): Pair<String, String> =
+        Habits.suggestions.firstOrNull { it.name.equals(name, ignoreCase = true) }?.let { it.icon to colorFor(it.icon) } ?: (DEFAULT_ICON to DEFAULT_COLOR)
 }

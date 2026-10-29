@@ -57,16 +57,16 @@ abstract class HabitRepositoryContract {
     }
 
     @Test
-    fun theReminderTimeComesBackAndANullStaysNull() = runTest {
+    fun theReminderTimesComeBackAndNoneStaysNone() = runTest {
         val h = storedHabit("a")
-        repo.save(h.copy(habit = h.habit.copy(reminder = java.time.LocalTime.of(10, 0))))
+        repo.save(h.copy(habit = h.habit.copy(reminders = listOf(java.time.LocalTime.of(10, 0), java.time.LocalTime.of(14, 0), java.time.LocalTime.of(20, 30)))))
         val late = storedHabit("b", position = 1)
-        repo.save(late.copy(habit = late.habit.copy(reminder = java.time.LocalTime.of(23, 59))))
+        repo.save(late.copy(habit = late.habit.copy(reminders = listOf(java.time.LocalTime.of(23, 59)))))
         repo.save(storedHabit("c", position = 2))
         val byId = repo.habits().first().associateBy { it.habit.id }
-        assertEquals(java.time.LocalTime.of(10, 0), byId.getValue("a").habit.reminder)
-        assertEquals(java.time.LocalTime.of(23, 59), byId.getValue("b").habit.reminder)
-        assertEquals(null, byId.getValue("c").habit.reminder)
+        assertEquals(listOf(java.time.LocalTime.of(10, 0), java.time.LocalTime.of(14, 0), java.time.LocalTime.of(20, 30)), byId.getValue("a").habit.reminders)
+        assertEquals(listOf(java.time.LocalTime.of(23, 59)), byId.getValue("b").habit.reminders)
+        assertEquals(emptyList<java.time.LocalTime>(), byId.getValue("c").habit.reminders)
     }
 
     @Test

@@ -38,14 +38,7 @@ import com.homeworkoutcoach.app.ui.theme.DarkTokens
 /** How the stored icon and colour keys look. Every habit colour is a soft hue that reads in light and dark. */
 object HabitLook {
     /** The emoji shown for a stored icon key. Keys never change, so saved habits keep their look. */
-    fun emoji(key: String): String = emojis[key] ?: "✅"
-
-    private val emojis = mapOf(
-        "check" to "✅", "drop" to "💧", "moon" to "🌙", "sun" to "☀️", "book" to "📖", "pen" to "✍️",
-        "dumbbell" to "🏋️", "walk" to "🚶", "lotus" to "🧘", "heart" to "❤️", "star" to "⭐", "list" to "📋", "bolt" to "⚡",
-        "shower" to "🚿", "run" to "🏃", "apple" to "🍎", "sleep" to "😴", "tooth" to "🪥", "pill" to "💊",
-        "broom" to "🧹", "brain" to "🧠", "money" to "💰", "music" to "🎵", "plant" to "🌱", "phone" to "📵",
-    )
+    fun emoji(key: String): String = HabitIcons.find(key)?.emoji ?: "✅"
 
     fun icon(key: String): ImageVector = when (key) {
         "drop" -> AppIcons.Drop

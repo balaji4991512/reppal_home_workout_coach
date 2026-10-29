@@ -240,7 +240,7 @@ class HabitsTest {
 
     // ---- Reminders ----
 
-    private fun remind(schedule: HabitSchedule = HabitSchedule.Daily, at: java.time.LocalTime? = java.time.LocalTime.of(10, 0), archived: Boolean = false) =
+    private fun remind(schedule: HabitSchedule = HabitSchedule.Daily, at: List<java.time.LocalTime> = listOf(java.time.LocalTime.of(10, 0)), archived: Boolean = false) =
         Habit("h", "Habit", HabitKind.DONE, 1, schedule, mon.minusDays(60), AutoSource.NONE, archived, at)
 
     @Test
@@ -250,7 +250,7 @@ class HabitsTest {
 
     @Test
     fun noReminderOrAnArchivedHabitStaysQuiet() {
-        assertFalse(Habits.shouldRemind(remind(at = null), HabitLog(), day(2)))
+        assertFalse(Habits.shouldRemind(remind(at = emptyList()), HabitLog(), day(2)))
         assertFalse(Habits.shouldRemind(remind(archived = true), HabitLog(), day(2)))
     }
 
@@ -333,15 +333,89 @@ class HabitsTest {
         val s = Habits.suggestions
         assertEquals(
             listOf("Workout", "Morning routine", "Night routine", "Journal", "Water", "Sleep", "Reading", "Meditation", "Yoga", "Walking"),
-            s.map { it.name },
+            s.take(10).map { it.name },
         )
         assertEquals(
             listOf(AutoSource.WORKOUT, AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE, AutoSource.JOURNAL),
             s.map { it.auto }.filter { it != AutoSource.NONE },
         )
-        assertEquals(Habits.Suggestion("Water", HabitKind.COUNT, 8), s.first { it.name == "Water" })
+        assertEquals(Habits.Suggestion("Water", HabitKind.COUNT, 8, icon = "drop"), s.first { it.name == "Water" })
         assertEquals(420, s.first { it.name == "Sleep" }.target) // 7 hours, in minutes
         // every suggestion makes a valid habit
         s.forEach { habit(kind = it.kind, target = it.target, auto = it.auto) }
+    }
+
+    @Test
+    fun thereAreAHundredOrMoreSuggestionsWithDistinctNames() {
+        val s = Habits.suggestions
+        assertTrue(s.size >= 100)
+        assertEquals(s.size, s.map { it.name.lowercase() }.toSet().size)
+        assertTrue(s.all { it.icon.isNotBlank() && it.name.length <= 40 })
+    }
+
+    @Test
+    fun suggestingWithNothingTypedGivesTheMostCommon() {
+        assertEquals(listOf("Workout", "Morning routine", "Night routine", "Journal", "Water", "Sleep"), Habits.suggest("").map { it.name })
+        assertEquals(listOf("Water", "Sleep"), Habits.suggest("", skip = listOf("workout", "Morning routine", "Night routine", "JOURNAL"), limit = 2).map { it.name })
+    }
+
+    @Test
+    fun suggestingMatchesWhatIsTypedStartsFirstThenContains() {
+        val names = Habits.suggest("wa", limit = 20).map { it.name }
+        assertTrue(names.first().startsWith("Wa", ignoreCase = true))
+        assertTrue("Water" in names && "Walking" in names)
+        assertEquals(listOf("Water"), Habits.suggest(" WATER ").map { it.name }.filter { it == "Water" })
+        // inside a name, at the start of a later word too
+        assertTrue("Walk the dog" in Habits.suggest("dog", limit = 20).map { it.name })
+        assertTrue(Habits.suggest("zzzz").isEmpty())
+    }
+
+    @Test
+    fun suggestingLeavesOutHabitsTheyAlreadyHave() {
+        assertTrue("Water" !in Habits.suggest("water", skip = listOf("water")).map { it.name })
+    }
+
+    // ---- Several reminders ----
+
+    private fun t(h: Int, m: Int = 0) = java.time.LocalTime.of(h, m)
+
+    @Test
+    fun aHabitCanHaveManyRemindersButNotTooMany() {
+        val many = (6..17).map { t(it) }
+        assertEquals(12, Habits.MAX_REMINDERS)
+        remind(at = many)
+        assertThrows(IllegalArgumentException::class.java) { remind(at = many + t(18)) }
+        assertThrows(IllegalArgumentException::class.java) { remind(at = listOf(t(9), t(9))) }
+    }
+
+    @Test
+    fun anyOfTheRemindersCanRingWhileTheHabitIsNotDone() {
+        val water = remind(at = listOf(t(9), t(13), t(17)))
+        assertTrue(Habits.shouldRemind(water, HabitLog(), day(2)))
+        assertFalse(Habits.shouldRemind(water, ticks(2), day(2)))
+    }
+
+    @Test
+    fun aCountHabitStopsRingingOnceTheTargetIsMet() {
+        val glasses = Habit("w", "Water", HabitKind.COUNT, 8, HabitSchedule.Daily, mon.minusDays(60), reminders = listOf(t(9), t(13)))
+        assertTrue(Habits.shouldRemind(glasses, HabitLog(entries = mapOf(day(2) to 5)), day(2)))
+        assertFalse(Habits.shouldRemind(glasses, HabitLog(entries = mapOf(day(2) to 8)), day(2)))
+    }
+
+    @Test
+    fun tidyRemindersSortsDropsRepeatsAndCaps() {
+        assertEquals(listOf(t(8), t(9, 30), t(20)), Habits.tidyReminders(listOf(t(20), t(8), t(9, 30), t(8))))
+        assertEquals(12, Habits.tidyReminders((0..20).map { t(it) }).size)
+    }
+
+    @Test
+    fun evenlySpacesReminders() {
+        assertEquals((8..20 step 2).map { t(it) }, Habits.evenly(t(8), t(20), 120))
+        assertEquals(listOf(t(8), t(11), t(14), t(17), t(20)), Habits.evenly(t(8), t(20), 180))
+        assertEquals(listOf(t(9)), Habits.evenly(t(9), t(9), 60))
+        assertEquals(12, Habits.evenly(t(6), t(23), 30).size) // capped
+        assertTrue(Habits.evenly(t(20), t(8), 60).isEmpty())
+        assertEquals(t(23, 30), Habits.evenly(t(22), t(23, 59), 90).last()) // never wraps past midnight
+        assertThrows(IllegalArgumentException::class.java) { Habits.evenly(t(8), t(9), 0) }
     }
 }

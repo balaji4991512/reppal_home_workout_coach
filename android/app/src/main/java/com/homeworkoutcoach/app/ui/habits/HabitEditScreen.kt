@@ -51,6 +51,14 @@ import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.HabitKind
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import com.homeworkoutcoach.engine.Habits
 import java.time.DayOfWeek
 import java.time.LocalTime
 import android.Manifest
@@ -81,42 +89,87 @@ fun HabitEditScreen(
     val d = s.draft
     val c = AppTheme.colors
     val context = LocalContext.current
-    var pickTime by rememberSaveable { mutableStateOf(false) }
-    // Android 13 and up ask before notifications show; the reminder is kept either way.
+    // Which reminder time is being set: its place in the list, or -1 for a new one; null when no clock is open.
+    var pickTime by rememberSaveable { mutableStateOf<Int?>(null) }
+    var allIcons by rememberSaveable { mutableStateOf(false) }
+    // Android 13 and up ask before notifications show; the reminders are kept either way.
     val askForNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    if (pickTime) {
-        val start = d.reminder ?: LocalTime.of(9, 0)
+    pickTime?.let { index ->
+        val start = d.reminders.getOrNull(index) ?: d.reminders.lastOrNull()?.plusHours(3)?.takeIf { it > d.reminders.last() } ?: LocalTime.of(9, 0)
         val state = rememberTimePickerState(initialHour = start.hour, initialMinute = start.minute, is24Hour = false)
         AlertDialog(
-            onDismissRequest = { pickTime = false },
+            onDismissRequest = { pickTime = null },
             confirmButton = {
                 TextButton({
-                    vm.edit { it.copy(reminder = LocalTime.of(state.hour, state.minute)) }
-                    pickTime = false
+                    val chosen = LocalTime.of(state.hour, state.minute)
+                    vm.edit { draft ->
+                        val rest = draft.reminders.filterIndexed { i, _ -> i != index }
+                        draft.copy(reminders = Habits.tidyReminders(rest + chosen))
+                    }
+                    pickTime = null
                     if (Build.VERSION.SDK_INT >= 33 &&
                         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                     ) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton({ pickTime = false }) { Text("Cancel") } },
+            dismissButton = {
+                Row {
+                    if (index >= 0) TextButton({
+                        vm.edit { draft -> draft.copy(reminders = draft.reminders.filterIndexed { i, _ -> i != index }) }
+                        pickTime = null
+                    }) { Text("Remove") }
+                    TextButton({ pickTime = null }) { Text("Cancel") }
+                }
+            },
             text = { TimePicker(state) },
         )
+    }
+
+    if (allIcons) {
+        ModalBottomSheet(onDismissRequest = { allIcons = false }, containerColor = c.bg) {
+            AllIcons(d.icon, d.color) { key ->
+                vm.edit { it.copy(icon = key, color = HabitStyles.colorFor(key)) }
+                allIcons = false
+            }
+        }
     }
 
     Page {
         H1(if (id == null) "New habit" else "Edit habit")
 
-        if (s.suggestions.isNotEmpty()) {
-            Label("Start from a suggestion")
-            Chips { s.suggestions.forEach { Chip(it.name, d.name == it.name, { vm.pick(it) }, small = true) } }
-        }
-
         Label("Name")
         Field(d.name, { v -> vm.edit { it.copy(name = v) } }, "For example, Drink water")
+        if (s.suggestions.isNotEmpty()) {
+            Small(if (d.name.isBlank()) "Popular, or type your own" else "Tap one to fill it in", Modifier.padding(top = 10.dp, bottom = 6.dp))
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.soft)) {
+                s.suggestions.forEachIndexed { i, sug ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.Button) { vm.pick(sug) }.padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(HabitLook.emoji(sug.icon), fontSize = 22.sp)
+                        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                            Text(sug.name, color = c.fg, style = AppTheme.type.bodyStrong)
+                            Small(HabitFormat.suggestionDetail(sug))
+                        }
+                    }
+                    if (i < s.suggestions.lastIndex) Box(Modifier.padding(horizontal = 14.dp).fillMaxWidth().height(1.dp).background(c.bd))
+                }
+            }
+        }
 
         Label("Icon")
-        IconPicker(d.icon, d.color) { v -> vm.edit { it.copy(icon = v, color = HabitStyles.colorFor(v)) } }
+        val quick = (listOfNotNull(HabitIcons.find(d.icon)) + HabitIcons.quickFor(d.name, HabitIcons.starters, 6)).distinctBy { it.key }.take(5)
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            quick.forEach { icon -> IconTile(icon.key, icon.key == d.icon, HabitStyles.colorFor(icon.key)) { vm.edit { it.copy(icon = icon.key, color = icon.color) } } }
+            Box(
+                Modifier.height(48.dp).clip(RoundedCornerShape(12.dp)).background(c.accentSoft).clickable(role = Role.Button) { allIcons = true }
+                    .padding(horizontal = 14.dp).semantics { contentDescription = "See all ${HabitIcons.all.size} icons" },
+                contentAlignment = Alignment.Center,
+            ) { Text("All icons", color = c.accent, style = AppTheme.type.label) }
+        }
 
         Label("How do you track it?")
         Chips {
@@ -161,15 +214,18 @@ fun HabitEditScreen(
             ScheduleType.DAILY -> Unit
         }
 
-        Label("Reminder")
+        Label("Reminders")
         Chips {
-            Chip("None", d.reminder == null, { vm.edit { it.copy(reminder = null) } }, small = true)
-            Chip(
-                d.reminder?.let { HabitFormat.clock(it) } ?: "At a time",
-                d.reminder != null, { pickTime = true }, small = true,
-            )
+            Chip("None", d.reminders.isEmpty(), { vm.edit { it.copy(reminders = emptyList()) } }, small = true)
+            d.reminders.forEachIndexed { i, time -> Chip(HabitFormat.clock(time), true, { pickTime = i }, small = true) }
+            if (d.reminders.size < Habits.MAX_REMINDERS) Chip("+ Add a time", false, { pickTime = -1 }, small = true)
         }
-        if (d.reminder != null) Small("A reminder at this time on days it is due and not done yet.")
+        Small("Or fill the day:", Modifier.padding(top = 4.dp))
+        Chips {
+            Chip("Every 2 hours", false, { vm.edit { it.copy(reminders = Habits.evenly(LocalTime.of(8, 0), LocalTime.of(20, 0), 120)) } }, small = true)
+            Chip("Every 3 hours", false, { vm.edit { it.copy(reminders = Habits.evenly(LocalTime.of(8, 0), LocalTime.of(20, 0), 180)) } }, small = true)
+        }
+        if (d.reminders.isNotEmpty()) Small("You are reminded at each time on days it is due and not done yet. Reminders stop once it is done.")
 
         if (d.auto == AutoSource.WORKOUT) Muted("This one ticks itself on days you finish a workout. You can still change it by hand.")
 
@@ -194,24 +250,35 @@ fun HabitEditScreen(
 @Composable
 private fun Label(text: String) = Small(text, Modifier.padding(top = 20.dp, bottom = 6.dp))
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun IconPicker(selected: String, color: String, onPick: (String) -> Unit) {
+private fun IconTile(key: String, on: Boolean, color: String, onClick: () -> Unit) {
     val c = AppTheme.colors
     val tint = HabitLook.color(color)
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        HabitStyles.icons.forEach { key ->
-            val on = key == selected
-            val shape = RoundedCornerShape(12.dp)
-            Box(
-                Modifier.size(48.dp).clip(shape)
-                    .background(if (on) c.accs else c.bg)
-                    .border(if (on) BorderStroke(2.dp, tint) else BorderStroke(1.dp, c.bd), shape)
-                    .clickable(role = Role.RadioButton) { onPick(key) }
-                    .semantics { this.selected = on; contentDescription = "Icon $key" },
-                contentAlignment = Alignment.Center,
-            ) { Text(HabitLook.emoji(key), fontSize = 22.sp) }
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier.size(48.dp).clip(shape)
+            .background(if (on) c.accs else c.bg)
+            .border(if (on) BorderStroke(2.dp, tint) else BorderStroke(1.dp, c.bd), shape)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics { this.selected = on; contentDescription = "Icon $key" },
+        contentAlignment = Alignment.Center,
+    ) { Text(HabitLook.emoji(key), fontSize = 22.sp) }
+}
+
+/** Every icon, in groups, in a sheet. Picking one closes it. */
+@Composable
+private fun AllIcons(selected: String, color: String, onPick: (String) -> Unit) {
+    val c = AppTheme.colors
+    LazyVerticalGrid(
+        GridCells.Adaptive(56.dp),
+        Modifier.fillMaxWidth().heightIn(max = 560.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HabitIcons.groups.forEach { group ->
+            item(span = { GridItemSpan(maxLineSpan) }) { Small(group, Modifier.padding(top = 12.dp)) }
+            items(HabitIcons.inGroup(group), key = { it.key }) { icon -> IconTile(icon.key, icon.key == selected, icon.color) { onPick(icon.key) } }
         }
     }
 }
-
