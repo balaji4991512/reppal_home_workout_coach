@@ -110,6 +110,44 @@ class AcceptanceTest {
         assertTrue(bw is LiveAdjustment.NothingHeavier)
     }
 
+    @Test
+    fun theNextSetStartsFromWhatWasDoneNotWhatWasPlanned() {
+        val bench = lib.exercise("bench") // top of the range is 12
+        val kit = Equipment(Bench.FLAT, setOf(5.0, 6.0, 8.0, 16.0))
+        fun adj(target: Int, reps: Int, effort: Effort, planned: Double, lifted: Double? = null) =
+            Progression.adjustLive(bench, kit, LiveTarget(planned, target), SetRecord(reps, lifted, effort))
+
+        // planned 12 x 5 kg, did 15 x 16 kg: the next set is at 16 kg and 15 reps, not the plan
+        assertEquals(LiveAdjustment.NotEasy(LiveTarget(16.0, 15)), adj(12, 15, Effort.JUST_RIGHT, 5.0, 16.0))
+        assertEquals(LiveAdjustment.NotEasy(LiveTarget(16.0, 15)), adj(12, 15, Effort.HARD, 5.0, 16.0))
+        // beating a target below the top, still hard: the reps reached are the new target
+        assertEquals(LiveAdjustment.NotEasy(LiveTarget(5.0, 11)), adj(10, 11, Effort.HARD, 5.0))
+        // easy and below the top: one more than was done
+        assertEquals(LiveAdjustment.AddRep(LiveTarget(5.0, 12)), adj(10, 11, Effort.EASY, 5.0))
+        // easy and already past the top: moves up, keeping the volume (15 x 5 = 75 -> 13 x 6 = 78)
+        assertEquals(LiveAdjustment.MoveUp(LiveTarget(6.0, 13)), adj(12, 15, Effort.EASY, 5.0))
+        // nothing heavier: stays at what was done
+        assertEquals(LiveAdjustment.NothingHeavier(LiveTarget(16.0, 15)), adj(12, 15, Effort.EASY, 5.0, 16.0))
+        // short of the target: unchanged, as before
+        assertEquals(LiveAdjustment.ShortOfTarget(LiveTarget(16.0, 12)), adj(12, 10, Effort.EASY, 5.0, 16.0))
+    }
+
+    @Test
+    fun theNextSetIsNeverWorthLessThanTheOneJustDone() {
+        val bench = lib.exercise("bench")
+        val pushup = lib.exercise("pushup")
+        val owned = setOf(2.5, 5.0, 6.5, 8.0, 10.0, 12.0, 16.0, 20.0)
+        val kit = Equipment(Bench.FLAT, owned)
+        for (e in listOf(bench, pushup)) for (target in 6..15) for (reps in target..30) for (effort in Effort.entries) for (w in owned) {
+            val weight = if (e.bodyweight) 0.0 else w
+            val a = Progression.adjustLive(e, kit, LiveTarget(weight, target), SetRecord(reps, if (e.bodyweight) null else w, effort))
+            val ctx = "${e.id} target $target did $reps x $w ($effort) -> ${a.next}"
+            val done = reps * (if (e.bodyweight) 1.0 else w)
+            val next = a.next.targetReps * (if (e.bodyweight) 1.0 else a.next.weightKg)
+            assertTrue(ctx, next >= done - 1e-9)
+        }
+    }
+
     // ---- Starting weights ----
 
     @Test

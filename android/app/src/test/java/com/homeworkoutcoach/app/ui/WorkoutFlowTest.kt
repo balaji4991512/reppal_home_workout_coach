@@ -68,6 +68,22 @@ class WorkoutSessionTest {
     }
 
     @Test
+    fun theNextSetFollowsWhatWasDoneNotThePlan() {
+        // planned 12 x 5 kg; did 15 x 6 kg
+        val s = start().save(set(15, kg = 6.0))
+        assertEquals(1, s.setIndex)
+        assertEquals(LiveTarget(6.0, 15), s.target)
+        assertEquals(LoggedSet(15, 6.0, 12, Effort.JUST_RIGHT), s.sets.getValue("bench").single())
+        assertEquals(
+            "You did 15, so the next set stays at 6 kg, 15 reps or more.",
+            Copy.liveNote(lib.exercise("bench"), LiveTarget(5.0, 12), s.lastAdjustment!!),
+        )
+        // the set after that is held to the same, and a rep short of it changes nothing
+        val t = s.save(set(14, kg = 6.0))
+        assertEquals(LiveTarget(6.0, 15), t.target)
+    }
+
+    @Test
     fun liveNotesMatchThePrototype() {
         val bench = lib.exercise("bench")
         val dead = lib.exercise("dead")

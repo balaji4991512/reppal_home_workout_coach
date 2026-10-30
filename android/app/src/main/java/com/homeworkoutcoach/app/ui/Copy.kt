@@ -47,11 +47,13 @@ object Copy {
         return when (a) {
             is LiveAdjustment.Pain -> null
             is LiveAdjustment.ShortOfTarget -> "Short of ${cp.targetReps}, so the next set stays at $u${cp.targetReps} reps."
-            is LiveAdjustment.NotEasy -> "Next set stays at $u${cp.targetReps} reps."
+            is LiveAdjustment.NotEasy ->
+                if (a.next.targetReps > cp.targetReps) "You did ${a.next.targetReps}, so the next set stays at $u${a.next.targetReps} reps or more."
+                else "Next set stays at $u${cp.targetReps} reps."
             is LiveAdjustment.AddRep -> "Easy, so the next set goes up to ${a.next.targetReps} reps" +
                 (if (e.bodyweight) "" else " at ${kg(a.next.weightKg)} kg") + "."
             is LiveAdjustment.MoveUp -> "Easy at the top of the range, so the next set moves up to ${kg(a.next.weightKg)} kg for ${a.next.targetReps} reps."
-            is LiveAdjustment.NothingHeavier -> "Easy, but there is nothing heavier to move up to, so the next set stays at $u${cp.targetReps} reps."
+            is LiveAdjustment.NothingHeavier -> "Easy, but there is nothing heavier to move up to, so the next set stays at $u${a.next.targetReps} reps."
         }
     }
 

@@ -134,6 +134,9 @@ class PrototypeGoldenTest {
                 effort = Effort.entries.first { it.key == pv.getValue("effort").str() },
                 flags = if (pv.getValue("flags").jsonArray.isEmpty()) emptySet() else setOf(SetFlag.PAIN),
             )
+            // Deliberately different from the prototype: a set that beat its target sets the next one's floor (the reps
+            // done, not the planned target). AcceptanceTest covers that; everything else still matches.
+            if (!set.pain && set.reps > cp.integer("target")) continue
             val result = Progression.adjustLive(
                 e, Equipment(Bench.ADJUSTABLE, o.getValue("owned").kgs()), LiveTarget(cp.num("w"), cp.integer("target")), set,
             )

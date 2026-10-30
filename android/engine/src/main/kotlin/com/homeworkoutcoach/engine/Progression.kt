@@ -57,21 +57,32 @@ object Progression {
         return if (equipment.owns(state.weightKg)) state else state.copy(weightKg = equipment.snapDown(state.weightKg))
     }
 
-    /** Live adjustment after a saved set [adjust]. [current] is the target that applied to this set. */
+    /**
+     * Live adjustment after a saved set [adjust]. [current] is the target that applied to this set.
+     *
+     * The next set starts from what was done, not from what was planned: the weight is the weight lifted, and when the
+     * set beat its target the reps it reached become the new floor, so the next set is never worth less than the one
+     * just finished (15 reps when 12 were planned means the next set asks for at least 15). A set short of its target
+     * leaves the target as it was.
+     */
     fun adjustLive(exercise: Exercise, equipment: Equipment, current: LiveTarget, set: SetRecord): LiveAdjustment {
         val top = exercise.topReps
         val w = set.weightKg ?: current.weightKg
         val same = LiveTarget(w, current.targetReps)
         if (set.pain) return LiveAdjustment.Pain(same)
         if (set.reps < current.targetReps) return LiveAdjustment.ShortOfTarget(same)
-        if (set.effort != Effort.EASY) return LiveAdjustment.NotEasy(same)
-        if (current.targetReps < top) return LiveAdjustment.AddRep(LiveTarget(w, minOf(top, current.targetReps + 1)))
+        // the reps done, which are at least the target here
+        val done = set.reps
+        val held = LiveTarget(w, done)
+        if (set.effort != Effort.EASY) return LiveAdjustment.NotEasy(held)
+        if (done < top) return LiveAdjustment.AddRep(LiveTarget(w, minOf(top, done + 1)))
         val heavier = if (exercise.bodyweight) null else equipment.nextHeavier(w)
         if (heavier != null) {
-            val reps = minOf(top, maxOf(6, floor(top * w / heavier).toInt() + 1))
+            // keeps the volume of the set just done: a little heavier, a few fewer reps, never less work
+            val reps = minOf(done, maxOf(6, floor(done * w / heavier).toInt() + 1))
             return LiveAdjustment.MoveUp(LiveTarget(heavier, reps))
         }
-        return LiveAdjustment.NothingHeavier(same)
+        return LiveAdjustment.NothingHeavier(held)
     }
 
     /** Plan for the next session from what was planned and what was done [progress]. [sets] must not be empty. */
