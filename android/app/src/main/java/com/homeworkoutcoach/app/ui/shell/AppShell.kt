@@ -92,6 +92,9 @@ private const val PRIVACY = "privacy"
 /** The workout page; "makeup" is the epoch day of a skipped workout being made up, or -1 for today's own. */
 private const val WORKOUT_PATTERN = "workout?makeup={makeup}"
 
+/** How to do an exercise: "howto/{id}". */
+private const val GUIDE = "howto"
+
 /** Correcting a saved workout, opened from the Week page or the Profile history. */
 private const val EDIT_WORKOUT = "edit-workout/{id}"
 
@@ -154,8 +157,12 @@ fun AppShell(
     var workoutActive by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
 
+    // An exercise guide opened from a workout is still inside that workout: leaving from there asks too.
+    fun inWorkout(): Boolean = current?.startsWith(Dest.Workout.route) == true ||
+        (current?.startsWith(GUIDE) == true && nav.previousBackStackEntry?.destination?.route?.startsWith(Dest.Workout.route) == true)
+
     fun guarded(action: () -> Unit) {
-        if (workoutActive && current?.startsWith(Dest.Workout.route) == true) pending = action else action()
+        if (workoutActive && inWorkout()) pending = action else action()
     }
 
     /** Opens a page on top of where you are, so Back returns here. */
@@ -178,7 +185,7 @@ fun AppShell(
     val onRun = current?.endsWith("/run") == true
 
     Column(Modifier.fillMaxSize().background(c.bg)) {
-        TopBar(appName, showBack) { guarded { nav.popBackStack() } }
+        TopBar(appName, showBack) { if (current?.startsWith(GUIDE) == true) nav.popBackStack() else guarded { nav.popBackStack() } }
         Box(Modifier.weight(1f)) {
             AppNavHost(
                 nav, appName, settings.started, ::go,
@@ -252,6 +259,7 @@ private fun AppNavHost(
             WeekScreen(
                 onStart = { go(Dest.Workout) }, onArrange = { nav.navigate(ARRANGE) }, onMakeUp = onMakeUp,
                 onEditWorkout = { nav.navigate("edit-workout/$it") },
+                onHowTo = { nav.navigate("$GUIDE/$it") },
             )
         }
         composable(
@@ -348,9 +356,16 @@ private fun AppNavHost(
             WORKOUT_PATTERN,
             arguments = listOf(androidx.navigation.navArgument("makeup") { type = androidx.navigation.NavType.LongType; defaultValue = -1L }),
         ) {
-            WorkoutScreen(onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = onWeekInstead, onMakeUp = onMakeUp)
+            WorkoutScreen(
+                onActive = onWorkoutActive, onLeaveRequest = onLeaveRequest, onWeek = onWeekInstead, onMakeUp = onMakeUp,
+                // a guide opens over the workout; Back returns to it with the sets kept
+                onHowTo = { nav.navigate("$GUIDE/$it") },
+            )
         }
         composable(Dest.Progress.route) { ProgressScreen(onOpen = { nav.navigate("exercise/$it") }) }
+        composable("$GUIDE/{id}") { entry ->
+            com.homeworkoutcoach.app.ui.guide.ExerciseGuideScreen(entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
+        }
         composable("exercise/{id}") { entry ->
             ExerciseProgressScreen(entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
         }

@@ -72,10 +72,12 @@ fun WeekScreen(
     onArrange: () -> Unit = {},
     onMakeUp: (Long) -> Unit = {},
     onEditWorkout: (Long) -> Unit = {},
+    /** Opens how to do the exercise with this id. */
+    onHowTo: (String) -> Unit = {},
     vm: WeekViewModel = viewModel(factory = Factories.Week),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    ui?.let { WeekContent(it, onStart, vm::swap, onArrange, onMakeUp, onEditWorkout) }
+    ui?.let { WeekContent(it, onStart, vm::swap, onArrange, onMakeUp, onEditWorkout, onHowTo) }
 }
 
 /** This week [vWeek]: hero, the seven days at a glance, a card per training day, left-out note, planned volume. */
@@ -87,6 +89,7 @@ fun WeekContent(
     onArrange: () -> Unit = {},
     onMakeUp: (Long) -> Unit = {},
     onEditWorkout: (Long) -> Unit = {},
+    onHowTo: (String) -> Unit = {},
 ) {
     // Days the user opened; the next workout starts open.
     var open by rememberSaveable { mutableStateOf<List<Int>?>(null) }
@@ -114,6 +117,7 @@ fun WeekContent(
                     onSwap = { base, to -> swapKey = null; onSwap(base, to) },
                     onMakeUp = onMakeUp,
                     onEditWorkout = onEditWorkout,
+                    onHowTo = onHowTo,
                 )
             }
         }
@@ -238,6 +242,7 @@ private fun TrainingDay(
     onSwap: (String, String) -> Unit,
     onMakeUp: (Long) -> Unit,
     onEditWorkout: (Long) -> Unit,
+    onHowTo: (String) -> Unit,
 ) {
     val c = AppTheme.colors
     val disc = when (day.status) {
@@ -289,6 +294,7 @@ private fun TrainingDay(
                             swapOpen = swapKey == key,
                             onSwapClick = { onSwapKey(key) },
                             onSwap = onSwap,
+                            onHowTo = onHowTo,
                         )
                     }
                     if (day.missing.isNotEmpty()) {
@@ -301,14 +307,24 @@ private fun TrainingDay(
 }
 
 @Composable
-private fun ExerciseRow(ex: ExerciseRowUi, last: Boolean, swapOpen: Boolean, onSwapClick: () -> Unit, onSwap: (String, String) -> Unit) {
+private fun ExerciseRow(
+    ex: ExerciseRowUi,
+    last: Boolean,
+    swapOpen: Boolean,
+    onSwapClick: () -> Unit,
+    onSwap: (String, String) -> Unit,
+    onHowTo: (String) -> Unit,
+) {
     val c = AppTheme.colors
     LineRow(
         // The card closes the list, so the last row has no line.
         divider = !swapOpen && !last,
         left = {
-            Body(ex.name)
-            if (ex.swapped) Small("Swapped")
+            // the name opens how to do it
+            Column(Modifier.clickable(role = Role.Button, onClickLabel = "How to do ${ex.name}") { onHowTo(ex.id) }) {
+                Body(ex.name)
+                Small(listOfNotNull("Swapped".takeIf { ex.swapped }, "How to do it").joinToString(" · "), color = c.accent)
+            }
         },
         right = {
             Text(ex.prescription, color = c.fg, style = AppTheme.type.tabular(AppTheme.type.bodyStrong))

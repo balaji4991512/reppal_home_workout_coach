@@ -354,6 +354,9 @@ object Factories {
     fun habitDetail(id: String) = viewModelFactory {
         initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training, it.routines, it.journal, it.focus) } }
     }
+    fun guide(id: String) = viewModelFactory {
+        initializer { app(this).let { com.homeworkoutcoach.app.ui.guide.GuideViewModel(it.library, id) } }
+    }
     fun habitEdit(id: String?) = viewModelFactory {
         initializer { app(this).let { HabitEditViewModel(id, it.habits, it.focus) } }
     }

@@ -63,6 +63,7 @@ import com.homeworkoutcoach.app.ui.components.Chip
 import com.homeworkoutcoach.app.ui.components.Chips
 import com.homeworkoutcoach.app.ui.components.Field
 import com.homeworkoutcoach.app.ui.components.H1
+import com.homeworkoutcoach.app.ui.components.TextLink
 import com.homeworkoutcoach.app.ui.components.Hairline
 import com.homeworkoutcoach.app.ui.components.LineRow
 import com.homeworkoutcoach.app.ui.components.Muted
@@ -93,6 +94,8 @@ fun WorkoutScreen(
     onLeaveRequest: () -> Unit,
     onWeek: () -> Unit,
     onMakeUp: (Long) -> Unit = {},
+    /** Opens how to do the exercise with this id. */
+    onHowTo: (String) -> Unit = {},
     vm: WorkoutViewModel = viewModel(factory = Factories.Workout),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -113,6 +116,7 @@ fun WorkoutScreen(
             onCheck = vm::onCheck,
             onSave = vm::onSave,
             voice = VoiceHandlers(vm::onVoiceListening, vm::onVoicePartial, vm::onVoiceResult, vm::onVoiceError),
+            onHowTo = onHowTo,
         )
         is WorkoutState.Done -> DoneContent(s.ui, onWeek)
     }
@@ -167,6 +171,7 @@ fun LoggingContent(
     onCheck: () -> Unit,
     onSave: () -> Unit,
     voice: VoiceHandlers? = null,
+    onHowTo: (String) -> Unit = {},
 ) {
     val c = AppTheme.colors
     val session = state.session
@@ -177,6 +182,7 @@ fun LoggingContent(
         ProgressDots(session)
         Muted("${session.slot}, exercise ${session.index + 1} of ${session.day.items.size}")
         H1(e.name)
+        TextLink("How to do it", { onHowTo(e.id) })
 
         // The target in a card, with the sets under it.
         Column(
