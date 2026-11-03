@@ -37,8 +37,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections. 13: focus tags and the habit link (older files still restore). */
-    const val FORMAT = 13
+    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections. 13: focus tags and the habit link. 14: the weight planned for each set (older files still restore). */
+    const val FORMAT = 14
 
     @Serializable
     data class File(
@@ -83,7 +83,16 @@ object DataExport {
     )
 
     @Serializable
-    data class PlannedDto(val exercise: String, val name: String, val sets: Int, val targetReps: Int, val weightKg: Double)
+    data class PlannedDto(
+        val exercise: String,
+        val name: String,
+        val sets: Int,
+        val targetReps: Int,
+        /** The heaviest set (the last of a ramp). */
+        val weightKg: Double,
+        /** The weight planned for each set, lightest first (format 14 on); absent when every set is at [weightKg]. */
+        val setWeightsKg: List<Double> = emptyList(),
+    )
 
     @Serializable
     data class SetDto(
@@ -225,7 +234,7 @@ object DataExport {
                     date = iso(w.dateMillis),
                     label = w.label,
                     day = planner.dayName(w.label),
-                    plan = w.plan.map { PlannedDto(it.exerciseId, name(it.exerciseId), it.sets, it.targetReps, it.weightKg) },
+                    plan = w.plan.map { PlannedDto(it.exerciseId, name(it.exerciseId), it.sets, it.targetReps, it.weightKg, it.setWeights) },
                     sets = w.sets.flatMap { (id, list) ->
                         list.map { SetDto(id, it.reps, it.weightKg, it.targetReps, it.effort.key, it.comment) }
                     },
@@ -347,7 +356,7 @@ object DataImport {
                         Workout(
                             dateMillis = millis(w.date),
                             label = w.label,
-                            plan = w.plan.map { PlannedExercise(it.exercise, it.sets, it.targetReps, it.weightKg) },
+                            plan = w.plan.map { PlannedExercise(it.exercise, it.sets, it.targetReps, it.weightKg, it.setWeightsKg) },
                             sets = w.sets.groupBy({ it.exercise }) {
                                 LoggedSet(it.reps, it.weightKg, it.targetReps, efforts[it.effort] ?: Effort.JUST_RIGHT, it.comment)
                             },

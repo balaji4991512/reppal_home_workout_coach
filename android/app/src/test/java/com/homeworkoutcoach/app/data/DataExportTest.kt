@@ -49,7 +49,7 @@ class DataExportTest {
 
         val o = Json.parseToJsonElement(r.json).jsonObject
         assertEquals("RepPal", o.getValue("app").jsonPrimitive.content)
-        assertEquals(13, o.getValue("format").jsonPrimitive.int)
+        assertEquals(14, o.getValue("format").jsonPrimitive.int)
         assertEquals("2026-10-27T14:57:36+05:30", o.getValue("exportedAt").jsonPrimitive.content)
         assertEquals("me@gmail.com", o.getValue("account").jsonPrimitive.content)
         assertEquals("Balaji", o.getValue("settings").jsonObject.getValue("name").jsonPrimitive.content)
@@ -160,5 +160,29 @@ class DataExportTest {
         DataImporter(InMemorySettingsRepository(UserSettings(guest = true)), t2, InMemoryBodyRepository())
             .restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
         assertEquals(listOf(monday, null), t2.workouts().first().map { it.madeUpForEpochDay })
+    }
+
+    @Test
+    fun theWeightOfEachSetSurvivesAnExportFileAndOlderFilesHaveNone() = runTest {
+        val training = InMemoryTrainingRepository()
+        val plan = listOf(PlannedExercise("floor", 3, 12, 16.0, listOf(11.5, 13.5, 16.0)), PlannedExercise("pushup", 3, 12, 0.0))
+        training.saveWorkout(Workout(dateMillis = now, label = "A", plan = plan, sets = emptyMap()), emptyMap())
+        val file = DataExporter(lib, InMemorySettingsRepository(UserSettings(started = true, guest = true)), training, InMemoryBodyRepository(), InMemoryAuthRepository(), ist)
+            .export("RepPal", now).json
+        val p = Json.parseToJsonElement(file).jsonObject.getValue("workouts").jsonArray[0].jsonObject.getValue("plan").jsonArray.map { it.jsonObject }
+        assertEquals(listOf(11.5, 13.5, 16.0), p[0].getValue("setWeightsKg").jsonArray.map { it.jsonPrimitive.content.toDouble() })
+
+        val back = InMemoryTrainingRepository()
+        DataImporter(InMemorySettingsRepository(UserSettings(guest = true)), back, InMemoryBodyRepository())
+            .restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
+        assertEquals(plan, back.workouts().first().single().plan)
+
+        // a file from before ramps has no setWeightsKg: the plan is flat
+        val old = file.replace(Regex(",\\s*\"setWeightsKg\": \\[[^\\]]*\\]"), "")
+        assertEquals(false, old.contains("setWeightsKg"))
+        val flat = InMemoryTrainingRepository()
+        DataImporter(InMemorySettingsRepository(UserSettings(guest = true)), flat, InMemoryBodyRepository())
+            .restore((DataImport.read(lib, old) as ImportCheck.Ok).restore)
+        assertEquals(emptyList<Double>(), flat.workouts().first().single().plan[0].setWeights)
     }
 }

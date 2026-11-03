@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
 /** JSON columns of [WorkoutEntity]. Field names are the stored format: rename only with a migration. */
 internal object WorkoutJson {
     @Serializable
-    private data class PlannedDto(val id: String, val sets: Int, val target: Int, val w: Double)
+    private data class PlannedDto(val id: String, val sets: Int, val target: Int, val w: Double, val ws: List<Double> = emptyList())
 
     @Serializable
     private data class SetDto(
@@ -33,7 +33,7 @@ internal object WorkoutJson {
         id = w.id,
         dateMillis = w.dateMillis,
         label = w.label,
-        planJson = json.encodeToString(plans, w.plan.map { PlannedDto(it.exerciseId, it.sets, it.targetReps, it.weightKg) }),
+        planJson = json.encodeToString(plans, w.plan.map { PlannedDto(it.exerciseId, it.sets, it.targetReps, it.weightKg, it.setWeights) }),
         setsJson = json.encodeToString(sets, w.sets.flatMap { (id, list) ->
             list.map { SetDto(id, it.reps, it.weightKg, it.targetReps, it.effort, it.comment) }
         }),
@@ -45,7 +45,7 @@ internal object WorkoutJson {
         id = e.id,
         dateMillis = e.dateMillis,
         label = e.label,
-        plan = json.decodeFromString(plans, e.planJson).map { PlannedExercise(it.id, it.sets, it.target, it.w) },
+        plan = json.decodeFromString(plans, e.planJson).map { PlannedExercise(it.id, it.sets, it.target, it.w, it.ws) },
         sets = json.decodeFromString(sets, e.setsJson).groupBy(
             keySelector = { it.id },
             valueTransform = { LoggedSet(it.reps, it.w, it.target, it.effort, it.comment) },

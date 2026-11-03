@@ -34,4 +34,13 @@ class WorkoutJsonTest {
 
     @Test
     fun writesAndReadsBack() = assertEquals(workout, WorkoutJson.fromEntity(WorkoutJson.toEntity(workout)))
+
+    @Test
+    fun theWeightOfEachSetIsStoredAndOlderRowsHaveNone() {
+        val ramped = workout.copy(plan = listOf(PlannedExercise("floor", 3, 12, 16.0, listOf(11.5, 13.5, 16.0))))
+        assertEquals(ramped, WorkoutJson.fromEntity(WorkoutJson.toEntity(ramped)))
+        assertEquals(listOf(11.5, 13.5, 16.0), WorkoutJson.fromEntity(WorkoutJson.toEntity(ramped)).plan.single().setWeights)
+        // a row saved before ramps has no set weights: every set at the one weight
+        assertEquals(emptyList<Double>(), WorkoutJson.fromEntity(entity).plan.single().setWeights)
+    }
 }

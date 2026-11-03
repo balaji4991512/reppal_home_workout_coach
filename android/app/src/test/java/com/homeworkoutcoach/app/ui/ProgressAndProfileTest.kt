@@ -116,7 +116,7 @@ class ProfilePresenterTest {
             ui.setup,
         )
         // only trained exercises still in the plan: curl has no workout yet, rdl is left out
-        assertEquals(listOf("Dumbbell overhead press" to "3 × 11 at 8 kg"), ui.current)
+        assertEquals(listOf("Dumbbell overhead press" to "3 × 11 at 2.5, 2.5, 8 kg"), ui.current)
         assertEquals("Upper A, Sat, 24 Oct", ui.history.single().title)
         assertEquals("288 kg, 30 bodyweight reps", ui.history.single().totals)
     }

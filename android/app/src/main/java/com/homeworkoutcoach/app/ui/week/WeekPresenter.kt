@@ -212,7 +212,7 @@ class WeekPresenter(private val lib: Library, private val planner: Planner = Pla
                         baseId = item.baseId,
                         name = e.name,
                         baseName = lib.exercise(item.baseId).name,
-                        prescription = Copy.prescription(e, state(e.id)),
+                        prescription = Copy.prescription(e, state(e.id), ps.equipment),
                         swapped = item.swapped,
                         alternatives = planner.swapAlternatives(item, day, ps).map { it to lib.exercise(it).name },
                     )

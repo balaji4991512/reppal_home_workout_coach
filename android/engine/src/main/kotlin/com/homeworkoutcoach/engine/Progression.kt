@@ -16,6 +16,27 @@ sealed interface LiveAdjustment {
     data class AddRep(override val next: LiveTarget) : LiveAdjustment
     data class MoveUp(override val next: LiveTarget) : LiveAdjustment
     data class NothingHeavier(override val next: LiveTarget) : LiveAdjustment
+
+    /** The set met its target and the plan is a ramp: the next set is the next step up. */
+    data class StepUp(override val next: LiveTarget) : LiveAdjustment
+}
+
+/** Why the plan for next time changed. */
+enum class ProgressReason {
+    /** The prototype's rule: about 10% more work than last time. Bodyweight moves and workouts saved before ramps. */
+    VOLUME,
+
+    /** The top set was lifted at a heavier weight than the plan had, so that weight is the new top. */
+    NEW_TOP,
+
+    /** The top set met its target but not the top of the range: one more rep next time. */
+    MORE_REPS,
+
+    /** The top set reached the top of the range: the top moves up a dumbbell. */
+    HEAVIER,
+
+    /** The top set reached the top of the range with nothing heavier to move to: one more set. */
+    EXTRA_SET,
 }
 
 /** Outcome of the between-sessions rule [progress]. [next] is the new exercise state. */
@@ -35,10 +56,45 @@ sealed interface NextSession {
         val nextVolume: Double,
         /** Rounded percent increase over [actualVolume]. Dumbbell steps can land a few percent off 10. */
         val increasePercent: Int,
+        val reason: ProgressReason = ProgressReason.VOLUME,
     ) : NextSession
+
+    /** The work was done but the top set was short of its target reps: same plan again. */
+    data class TopSetShort(override val next: ExerciseState, override val actualVolume: Double, override val plannedVolume: Double) : NextSession
 
     /** Volume met but no candidate beats it (no heavier dumbbell, no room for a set). */
     data class NoOption(override val next: ExerciseState, override val actualVolume: Double, override val plannedVolume: Double) : NextSession
+}
+
+/**
+ * A weighted move is planned as a ramp: the last set at the top weight, each earlier one a dumbbell step lighter (and at
+ * least 10% lighter, so a fine-stepped set still ramps). Starting light and building up is how the sets are planned; the
+ * same reps in each. With 11.5, 13.5 and 16 kg owned among others, a top of 16 kg over three sets is 11.5, 13.5, 16.
+ */
+object Ramp {
+    private const val MIN_DROP = 0.9
+    private const val EPS = 0.001
+
+    /** The weight of the set before one at [kg]: a step lighter, and at least 10% lighter. [kg] again when nothing is lighter. */
+    fun rungBelow(equipment: Equipment, kg: Double): Double {
+        val step = equipment.nextLighter(kg) ?: return kg
+        if (step <= kg * MIN_DROP + EPS) return step
+        return equipment.dumbbells.lastOrNull { it <= kg * MIN_DROP + EPS } ?: step
+    }
+
+    /** The weights of [sets] sets ending at [top], lightest first. */
+    fun weights(equipment: Equipment, top: Double, sets: Int): List<Double> {
+        require(sets >= 1) { "a ramp needs a set" }
+        val down = generateSequence(top) { rungBelow(equipment, it) }.take(sets).toList()
+        return down.reversed()
+    }
+
+    /** What a state is planned as for a workout: a ramp for a weighted move, every set alike for a bodyweight one. */
+    fun plan(exercise: Exercise, equipment: Equipment, state: ExerciseState): PlannedExercise =
+        PlannedExercise(
+            exercise.id, state.sets, state.targetReps, state.weightKg,
+            if (exercise.bodyweight) emptyList() else weights(equipment, state.weightKg, state.sets),
+        )
 }
 
 object Progression {
@@ -65,7 +121,18 @@ object Progression {
      * just finished (15 reps when 12 were planned means the next set asks for at least 15). A set short of its target
      * leaves the target as it was.
      */
-    fun adjustLive(exercise: Exercise, equipment: Equipment, current: LiveTarget, set: SetRecord): LiveAdjustment {
+    fun adjustLive(exercise: Exercise, equipment: Equipment, current: LiveTarget, set: SetRecord, planNext: LiveTarget? = null): LiveAdjustment {
+        val base = adjustWithoutRamp(exercise, equipment, current, set)
+        // On a ramp a met set goes up to the next set's planned weight, one dumbbell step at a time.
+        if (planNext != null && base !is LiveAdjustment.Pain && base !is LiveAdjustment.ShortOfTarget) {
+            val lifted = set.weightKg ?: current.weightKg
+            val step = minOf(planNext.weightKg, equipment.nextHeavier(lifted) ?: lifted)
+            if (step > base.next.weightKg + EPS) return LiveAdjustment.StepUp(LiveTarget(step, planNext.targetReps))
+        }
+        return base
+    }
+
+    private fun adjustWithoutRamp(exercise: Exercise, equipment: Equipment, current: LiveTarget, set: SetRecord): LiveAdjustment {
         val top = exercise.topReps
         val w = set.weightKg ?: current.weightKg
         val same = LiveTarget(w, current.targetReps)
@@ -88,6 +155,56 @@ object Progression {
     /** Plan for the next session from what was planned and what was done [progress]. [sets] must not be empty. */
     fun nextSession(exercise: Exercise, equipment: Equipment, planned: PlannedExercise, sets: List<LoggedSet>): NextSession {
         require(sets.isNotEmpty()) { "nextSession needs at least one logged set" }
+        return if (planned.ramped && !exercise.bodyweight) nextRamped(exercise, equipment, planned, sets) else nextUniform(exercise, equipment, planned, sets)
+    }
+
+    /**
+     * Plan for the next session after a ramped one: the top set leads. It adds a rep until it reaches the top of the range,
+     * then the top moves up a dumbbell (or a set is added when nothing is heavier). A top weight lifted beyond the plan is
+     * the new top. Work short of the plan, or a top set short of its reps, repeats the plan.
+     */
+    private fun nextRamped(exercise: Exercise, equipment: Equipment, planned: PlannedExercise, sets: List<LoggedSet>): NextSession {
+        val top = exercise.topReps
+        val plannedVol = planned.volume(bodyweight = false)
+        val actualVol = sets.sumOf { it.reps * it.weightKg }
+        val samePlan = ExerciseState(planned.weightKg, planned.targetReps, planned.sets)
+        if (actualVol < plannedVol - EPS) return NextSession.Repeat(samePlan, actualVol, plannedVol)
+
+        val topWeight = maxOf(planned.weightKg, sets.maxOf { it.weightKg })
+        val topReps = sets.filter { abs(it.weightKg - topWeight) < EPS }.maxOfOrNull { it.reps } ?: 0
+
+        fun progressed(next: ExerciseState, why: ProgressReason): NextSession {
+            val nextVol = Ramp.weights(equipment, next.weightKg, next.sets).sumOf { it * next.targetReps }
+            return NextSession.Progressed(next, actualVol, plannedVol, nextVol, jsRound((nextVol / actualVol - 1) * 100), why)
+        }
+
+        if (topWeight > planned.weightKg + EPS) {
+            return progressed(ExerciseState(topWeight, minOf(top, maxOf(LOW_REPS, topReps)), planned.sets), ProgressReason.NEW_TOP)
+        }
+        if (topReps < planned.targetReps) return NextSession.TopSetShort(samePlan, actualVol, plannedVol)
+        if (topReps < top) return progressed(samePlan.copy(targetReps = planned.targetReps + 1), ProgressReason.MORE_REPS)
+
+        val heavier = equipment.nextHeavier(topWeight)
+        return when {
+            heavier != null -> {
+                val reps = minOf(top, maxOf(6, floor(top * topWeight / heavier).toInt() + 1))
+                progressed(ExerciseState(heavier, reps, planned.sets), ProgressReason.HEAVIER)
+            }
+            planned.sets < MAX_SETS -> {
+                // one more set, with the reps that make the ramp about 10% more work than was done (a set is a big step)
+                val sets = planned.sets + 1
+                val target = actualVol * VOLUME_STEP
+                val rampKg = Ramp.weights(equipment, topWeight, sets).sum()
+                val reps = (LOW_REPS..top).minBy { abs(rampKg * it - target) }
+                progressed(ExerciseState(topWeight, reps, sets), ProgressReason.EXTRA_SET)
+            }
+            else -> NextSession.NoOption(samePlan, actualVol, plannedVol)
+        }
+    }
+
+    /** The prototype's rule, every set planned alike: about 10% more work than last time [progress]. */
+    fun nextUniform(exercise: Exercise, equipment: Equipment, planned: PlannedExercise, sets: List<LoggedSet>): NextSession {
+        require(sets.isNotEmpty()) { "nextUniform needs at least one logged set" }
         val bw = exercise.bodyweight
         val top = exercise.topReps
         fun vol(n: Int, r: Int, w: Double) = n * r * (if (bw) 1.0 else w)

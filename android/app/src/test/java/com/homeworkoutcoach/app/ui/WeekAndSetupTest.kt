@@ -65,7 +65,7 @@ class WeekPresenterTest {
         assertEquals(listOf("Mon", "Wed", "Fri"), training(ui).map { it.abbr })
         assertEquals(listOf(DayStatus.TODAY, DayStatus.UPCOMING, DayStatus.UPCOMING), training(ui).map { it.status })
         assertEquals(listOf("Full body A", "Full body B", "Full body A"), training(ui).map { it.name })
-        assertEquals("3 × 12 at 8 kg", training(ui)[0].exercises.first { it.id == "bench" }.prescription)
+        assertEquals("3 × 12 at 5, 5, 8 kg", training(ui)[0].exercises.first { it.id == "bench" }.prescription)
         assertEquals("3 × 12", training(ui)[0].exercises.first { it.id == "dead" }.prescription)
     }
 
@@ -73,7 +73,7 @@ class WeekPresenterTest {
     fun splitDayShowsFourSetsOnBigLiftsWithoutStoringThem() {
         val ui = presenter.present(started.copy(daysPerWeek = 4, split = Split.BODY_PART), emptyMap(), emptyMap(), emptyList())
         val chest = training(ui)[0]
-        assertEquals("4 × 12 at 8 kg", chest.exercises.first { it.id == "bench" }.prescription)
+        assertEquals("4 × 12 at 5, 5, 5, 8 kg", chest.exercises.first { it.id == "bench" }.prescription)
         assertEquals(3, ui.statesToStore.getValue("bench").sets)
     }
 

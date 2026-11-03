@@ -6,7 +6,11 @@ import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Level
 import com.homeworkoutcoach.engine.LiveAdjustment
 import com.homeworkoutcoach.engine.LiveTarget
+import com.homeworkoutcoach.engine.Equipment
 import com.homeworkoutcoach.engine.NextSession
+import com.homeworkoutcoach.engine.PlannedExercise
+import com.homeworkoutcoach.engine.ProgressReason
+import com.homeworkoutcoach.engine.Ramp
 import com.homeworkoutcoach.engine.Split
 import java.time.Instant
 import java.time.ZoneId
@@ -19,9 +23,23 @@ object Copy {
     /** "5" for whole kilos, "2.5" otherwise. */
     fun kg(w: Double): String = if (w % 1.0 == 0.0) w.toLong().toString() else w.toString()
 
-    /** "3 × 12 at 5 kg", or "3 × 12" for bodyweight. [presc] */
-    fun prescription(e: Exercise, s: ExerciseState): String =
-        "${s.sets} × ${s.targetReps}" + if (e.bodyweight) "" else " at ${kg(s.weightKg)} kg"
+    /** "11.5, 13.5, 16" for a ramp, or just "16" when every set has the same weight. */
+    fun kgList(weights: List<Double>): String =
+        if (weights.distinct().size <= 1) kg(weights.firstOrNull() ?: 0.0) else weights.joinToString(", ") { kg(it) }
+
+    /**
+     * "3 × 12 at 11.5, 13.5, 16 kg" (a ramp, when the [equipment] to ramp with is known), "3 × 12 at 5 kg", or
+     * "3 × 12" for bodyweight. [presc]
+     */
+    fun prescription(e: Exercise, s: ExerciseState, equipment: Equipment? = null): String {
+        if (e.bodyweight) return "${s.sets} × ${s.targetReps}"
+        val weights = if (equipment == null) listOf(s.weightKg) else Ramp.weights(equipment, s.weightKg, s.sets)
+        return "${s.sets} × ${s.targetReps} at ${kgList(weights)} kg"
+    }
+
+    /** The same for a plan that was made: its own set weights. */
+    fun prescription(e: Exercise, p: PlannedExercise): String =
+        if (e.bodyweight) "${p.sets} × ${p.targetReps}" else "${p.sets} × ${p.targetReps} at ${kgList((0 until p.sets).map(p::weightOf))} kg"
 
     fun count(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"
 
@@ -54,6 +72,7 @@ object Copy {
                 (if (e.bodyweight) "" else " at ${kg(a.next.weightKg)} kg") + "."
             is LiveAdjustment.MoveUp -> "Easy at the top of the range, so the next set moves up to ${kg(a.next.weightKg)} kg for ${a.next.targetReps} reps."
             is LiveAdjustment.NothingHeavier -> "Easy, but there is nothing heavier to move up to, so the next set stays at $u${a.next.targetReps} reps."
+            is LiveAdjustment.StepUp -> "On to the next step: ${kg(a.next.weightKg)} kg for ${a.next.targetReps} reps."
         }
     }
 
@@ -64,9 +83,16 @@ object Copy {
         val exp = n.plannedVolume.roundToLong()
         return when (n) {
             is NextSession.Repeat -> "Volume was $got of $exp $u, short of the target, so the same plan again."
-            is NextSession.Progressed -> "Volume was $got $u" +
-                (if (n.actualVolume > n.plannedVolume + 0.001) " (plan was $exp)" else "") +
-                ", so next time aims for about 10% more than that: ${n.nextVolume.roundToLong()} $u (+${n.increasePercent}%)."
+            is NextSession.TopSetShort -> "The top set was short of its reps, so the same plan again."
+            is NextSession.Progressed -> when (n.reason) {
+                ProgressReason.VOLUME -> "Volume was $got $u" +
+                    (if (n.actualVolume > n.plannedVolume + 0.001) " (plan was $exp)" else "") +
+                    ", so next time aims for about 10% more than that: ${n.nextVolume.roundToLong()} $u (+${n.increasePercent}%)."
+                ProgressReason.NEW_TOP -> "You lifted ${kg(n.next.weightKg)} kg on the top set, so next time ramps up to ${kg(n.next.weightKg)} kg for ${n.next.targetReps} reps."
+                ProgressReason.MORE_REPS -> "The top set met its target, so next time asks for ${n.next.targetReps} reps at ${kg(n.next.weightKg)} kg."
+                ProgressReason.HEAVIER -> "The top set reached the top of the range, so next time the top moves up to ${kg(n.next.weightKg)} kg for ${n.next.targetReps} reps."
+                ProgressReason.EXTRA_SET -> "The top set reached the top of the range and nothing is heavier, so next time adds a set."
+            }
             is NextSession.NoOption -> "Volume target met at $got $u, but there is no heavier option or room for another set, so the same plan again."
         }
     }

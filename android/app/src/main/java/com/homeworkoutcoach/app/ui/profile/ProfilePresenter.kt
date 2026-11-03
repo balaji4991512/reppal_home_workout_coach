@@ -62,7 +62,7 @@ class ProfilePresenter(
             ),
             // Exercises left out (for pain, or a concern) have no next session, so no target here.
             current = lib.exercises.values.filter { it.id in states && it.id in trained && it.id !in settings.excluded }.map { e ->
-                e.name to Copy.prescription(e, Progression.resolveState(e, states[e.id], equipment, settings.level))
+                e.name to Copy.prescription(e, Progression.resolveState(e, states[e.id], equipment, settings.level), equipment)
             },
             signedIn = account != null,
             history = workouts.reversed().map { w ->

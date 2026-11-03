@@ -38,7 +38,8 @@ data class ChangeUi(
 /** Workout done [vDone, sumCard]. [history] is every saved workout before this one, oldest first. */
 class DonePresenter(private val lib: Library) {
 
-    fun present(result: SessionResult, history: List<Workout>): DoneUi {
+    /** [equipment] is what the next plan ramps with, for its set weights; without it only the top weight is shown. */
+    fun present(result: SessionResult, history: List<Workout>, equipment: com.homeworkoutcoach.engine.Equipment? = null): DoneUi {
         val w = result.workout
         val now = Volume.summarize(lib, w.plan, w.sets, w.painIds)
         val prevWorkout = history.lastOrNull { it.label == w.label }
@@ -72,9 +73,9 @@ class DonePresenter(private val lib: Library) {
                 val next = c.next
                 ChangeUi(
                     name = e.name,
-                    summary = "Reps: ${reps.joinToString(", ")}. $load Was ${Copy.prescription(e, c.was)}.",
+                    summary = "Reps: ${reps.joinToString(", ")}. $load Was ${result.workout.plan.firstOrNull { it.exerciseId == e.id }?.let { Copy.prescription(e, it) } ?: Copy.prescription(e, c.was)}.",
                     message = c.outcome?.let { Copy.nextSessionNote(e, it) } ?: Copy.PAIN_NEXT,
-                    next = "Next: " + if (next == null) "Swapped out next time" else Copy.prescription(e, next),
+                    next = "Next: " + if (next == null) "Swapped out next time" else Copy.prescription(e, next, equipment),
                     up = c.outcome is NextSession.Progressed,
                 )
             },

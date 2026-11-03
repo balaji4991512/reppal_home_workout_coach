@@ -14,6 +14,7 @@ import com.homeworkoutcoach.engine.NextSession
 import com.homeworkoutcoach.engine.ParsedSet
 import com.homeworkoutcoach.engine.PlannedExercise
 import com.homeworkoutcoach.engine.Progression
+import com.homeworkoutcoach.engine.Ramp
 import com.homeworkoutcoach.engine.SetCheck
 import com.homeworkoutcoach.engine.SetRecord
 
@@ -40,9 +41,9 @@ data class WorkoutSession(
     val slot: String get() = day.items[index].slot
     val planned: PlannedExercise get() = plan[index]
 
-    /** What the current set should be: the plan, overridden by any live change [cur]. */
+    /** What the current set should be: the plan for this set (a ramp starts light), overridden by any live change [cur]. */
     val target: LiveTarget
-        get() = live[exercise.id] ?: LiveTarget(planned.weightKg, planned.targetReps)
+        get() = live[exercise.id] ?: LiveTarget(planned.weightOf(setIndex), planned.targetReps)
 
     val repsDone: List<Int> get() = sets[exercise.id].orEmpty().map { it.reps }
 
@@ -60,7 +61,9 @@ data class WorkoutSession(
             effort = record.effort,
             comment = record.comment,
         )
-        val adjustment = Progression.adjustLive(e, equipment, cp, record)
+        // On a ramp the next set has its own planned weight, which a met set steps up to.
+        val planNext = if (planned.ramped && setIndex + 1 < planned.sets) LiveTarget(planned.weightOf(setIndex + 1), planned.targetReps) else null
+        val adjustment = Progression.adjustLive(e, equipment, cp, record, planNext)
         // Pain: nothing further for this exercise.
         var nextSet = if (record.pain) planned.sets else setIndex + 1
         var nextIndex = index
@@ -109,8 +112,7 @@ data class WorkoutSession(
             equipment = equipment,
             day = day,
             plan = day.items.map { item ->
-                val s = stateOf(item.exerciseId).atLeast(item.sets)
-                PlannedExercise(item.exerciseId, s.sets, s.targetReps, s.weightKg)
+                Ramp.plan(lib.exercise(item.exerciseId), equipment, stateOf(item.exerciseId).atLeast(item.sets))
             },
         )
     }

@@ -69,7 +69,7 @@ object Volume {
         val rows = plan.map { p ->
             val e = lib.exercise(p.exerciseId)
             val done = sets[p.exerciseId].orEmpty()
-            val expected = p.sets * p.targetReps * (if (e.bodyweight) 1.0 else p.weightKg)
+            val expected = p.volume(e.bodyweight)
             val got = if (e.bodyweight) done.sumOf { it.reps }.toDouble() else done.sumOf { it.reps * it.weightKg }
             val metLiveTargets = done.all { it.reps >= it.targetReps }
             val stopped = p.exerciseId in pain

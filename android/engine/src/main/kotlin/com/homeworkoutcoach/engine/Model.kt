@@ -76,6 +76,9 @@ data class Equipment(val bench: Bench, val dumbbellsKg: Set<Double>) {
 
     fun nextHeavier(kg: Double): Double? = dumbbells.firstOrNull { it > kg }
 
+    /** The largest owned dumbbell lighter than [kg], or null when [kg] is the lightest. */
+    fun nextLighter(kg: Double): Double? = dumbbells.lastOrNull { it < kg }
+
     /** Largest owned dumbbell <= [kg], else the lightest owned (0 when none). */
     fun snapDown(kg: Double): Double = dumbbells.lastOrNull { it <= kg } ?: dumbbells.firstOrNull() ?: 0.0
 }
@@ -101,13 +104,27 @@ data class SetRecord(
     val pain: Boolean get() = SetFlag.PAIN in flags
 }
 
-/** The prescription an exercise had when the workout started. */
+/**
+ * The prescription an exercise had when the workout started. [weightKg] is the heaviest set. A weighted move is planned as
+ * a ramp, each set a dumbbell step above the one before and the last at [weightKg]; [setWeights] holds that, lightest
+ * first. It is empty when every set is at [weightKg]: bodyweight moves, and workouts saved before ramps.
+ */
 data class PlannedExercise(
     val exerciseId: String,
     val sets: Int,
     val targetReps: Int,
     val weightKg: Double,
-)
+    val setWeights: List<Double> = emptyList(),
+) {
+    val ramped: Boolean get() = setWeights.isNotEmpty()
+
+    /** The weight planned for the set at [index] (0 is the first). */
+    fun weightOf(index: Int): Double = setWeights.getOrNull(index) ?: weightKg
+
+    /** What the plan comes to: reps times kg over the sets, or reps only for a [bodyweight] move. */
+    fun volume(bodyweight: Boolean): Double =
+        if (bodyweight) (sets * targetReps).toDouble() else (0 until sets).sumOf { weightOf(it) * targetReps }
+}
 
 /** One saved set: reps done, the weight used and the live target that applied to it. */
 data class LoggedSet(

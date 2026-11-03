@@ -22,6 +22,8 @@ import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.KeywordConcernMapper
 import com.homeworkoutcoach.engine.KeywordSetParser
 import com.homeworkoutcoach.engine.Library
+import com.homeworkoutcoach.engine.PlannedExercise
+import com.homeworkoutcoach.engine.Ramp
 import com.homeworkoutcoach.engine.LiveAdjustment
 import com.homeworkoutcoach.engine.LiveTarget
 import com.homeworkoutcoach.engine.LoggedSet
@@ -83,6 +85,68 @@ class WorkoutSessionTest {
         assertEquals(LiveTarget(6.0, 15), t.target)
     }
 
+    // ---- Ramped sets: the bench session that started this (15 at 10 kg, 12 at 13.5, 12 at 16) ----
+
+    private val fullKit = Equipment(Bench.ADJUSTABLE, lib.dumbbellStepsKg.toSet())
+    private fun benchAt16() = WorkoutSession.start(lib, fullKit, Day("A", listOf(DayItem("Push", "bench")), emptyList())) { ExerciseState(16.0, 12, 3) }
+
+    @Test
+    fun aTopOfSixteenIsPlannedAsElevenAndAHalfThirteenAndAHalfThenSixteen() {
+        val s = benchAt16()
+        assertEquals(listOf(11.5, 13.5, 16.0), s.planned.setWeights)
+        assertEquals(16.0, s.planned.weightKg, 0.0)
+        assertEquals(LiveTarget(11.5, 12), s.target) // the first set starts light, not at 16
+    }
+
+    @Test
+    fun eachMetSetStepsUpToTheNextWeightOfTheRamp() {
+        var s = benchAt16()
+        val seen = mutableListOf(s.target.weightKg)
+        repeat(2) {
+            s = s.save(set(12))
+            seen += s.target.weightKg
+        }
+        assertEquals(listOf(11.5, 13.5, 16.0), seen)
+        assertEquals("On to the next step: 13.5 kg for 12 reps.", Copy.liveNote(lib.exercise("bench"), LiveTarget(11.5, 12), benchAt16().save(set(12)).lastAdjustment!!))
+    }
+
+    @Test
+    fun aShortSetHoldsTheWeightInsteadOfSteppingUp() {
+        val s = benchAt16().save(set(8, Effort.HARD))
+        assertEquals(LiveTarget(11.5, 12), s.target)
+    }
+
+    @Test
+    fun theWholeRampedExerciseProgressesFromItsTopSet() {
+        var s = benchAt16()
+        repeat(3) { s = s.save(set(12)) }
+        val r = s.finish(dateMillis = 1)
+        // 12 reps on the 16 kg top set: the top moves up to 18 kg for 11, and the plan ramps 13.5, 16, 18
+        assertEquals(mapOf("bench" to ExerciseState(18.0, 11, 3)), r.nextStates)
+        assertEquals(listOf(11.5, 13.5, 16.0), r.workout.plan.single().setWeights)
+        assertEquals(listOf(11.5, 13.5, 16.0), r.workout.sets.getValue("bench").map { it.weightKg })
+        assertEquals(listOf(13.5, 16.0, 18.0), Ramp.plan(lib.exercise("bench"), fullKit, r.nextStates.getValue("bench")).setWeights)
+    }
+
+    @Test
+    fun theSummaryCountsThePlannedRampNotEverySetAtTheTop() {
+        var s = benchAt16()
+        repeat(3) { s = s.save(set(12)) }
+        val summary = com.homeworkoutcoach.engine.Volume.summarize(lib, s.finish(1).workout.plan, s.sets, emptySet())
+        assertEquals((11.5 + 13.5 + 16.0) * 12, summary.plannedKg, 1e-9)
+        assertTrue(summary.targetReached) // not "short" for starting light
+    }
+
+    @Test
+    fun theRampShowsInThePlanText() {
+        val bench = lib.exercise("bench")
+        assertEquals("3 × 12 at 11.5, 13.5, 16 kg", Copy.prescription(bench, ExerciseState(16.0, 12, 3), fullKit))
+        assertEquals("3 × 12 at 16 kg", Copy.prescription(bench, ExerciseState(16.0, 12, 3))) // without the equipment: the top
+        assertEquals("3 × 12 at 11.5, 13.5, 16 kg", Copy.prescription(bench, benchAt16().planned))
+        assertEquals("3 × 12 at 16 kg", Copy.prescription(bench, PlannedExercise("bench", 3, 12, 16.0))) // a plan from before ramps
+        assertEquals("3 × 15", Copy.prescription(lib.exercise("pushup"), ExerciseState(0.0, 15, 3), fullKit))
+    }
+
     @Test
     fun liveNotesMatchThePrototype() {
         val bench = lib.exercise("bench")
@@ -120,14 +184,14 @@ class WorkoutSessionTest {
         assertEquals(setOf("dead"), r.workout.painIds)
         assertEquals(42L, r.workout.dateMillis)
 
-        val done = DonePresenter(lib).present(r, emptyList())
+        val done = DonePresenter(lib).present(r, emptyList(), kit)
         assertEquals(180L, done.totalKg)
         assertEquals("First time doing this session, so there is nothing to compare yet.", done.kgComparison)
         assertEquals("12 bodyweight reps", done.repsLine)
         val bench = done.changes[0]
         assertEquals("Reps: 12, 12, 12. Load 180 kg. Was 3 × 12 at 5 kg.", bench.summary)
-        assertEquals("Volume was 180 kg, so next time aims for about 10% more than that: 198 kg (+10%).", bench.message)
-        assertEquals("Next: 3 × 11 at 6 kg", bench.next)
+        assertEquals("The top set reached the top of the range, so next time the top moves up to 6 kg for 11 reps.", bench.message)
+        assertEquals("Next: 3 × 11 at 5, 5, 6 kg", bench.next) // the lightest dumbbell is the floor of the ramp
         assertTrue(bench.up)
         val dead = done.changes[1]
         assertEquals("Next: Swapped out next time", dead.next)
@@ -226,7 +290,8 @@ class WorkoutViewModelTest {
         val vm = vm()
         vm.onReps(12)
         vm.onEffort(Effort.EASY)
-        assertEquals(SetRecord(12, 6.0, Effort.EASY), vm.logging().input.preview)
+        // the first set of the ramp (5, 5, 6 kg) is the lighter weight
+        assertEquals(SetRecord(12, 5.0, Effort.EASY), vm.logging().input.preview)
         vm.onEffort(Effort.EASY)
         assertEquals(Effort.JUST_RIGHT, vm.logging().input.preview!!.effort)
         vm.onReps(12)
@@ -247,8 +312,8 @@ class WorkoutViewModelTest {
         assertEquals(false, input.listening)
         assertNull(input.reps)
         assertEquals("ten reps, hard, left wrist tight", input.text)
-        // one-line readback before Save set: weight defaults to the current target
-        assertEquals(SetRecord(10, 6.0, Effort.HARD, comment = "left wrist tight"), input.preview)
+        // one-line readback before Save set: weight defaults to the current target, the first set of the ramp
+        assertEquals(SetRecord(10, 5.0, Effort.HARD, comment = "left wrist tight"), input.preview)
     }
 
     @Test

@@ -228,7 +228,7 @@ class WorkoutViewModel(
             val history = training.workouts().first()
             val result = next.finish(now(), madeUpFor)
             actions.finishWorkout(result)
-            _state.value = WorkoutState.Done(DonePresenter(lib).present(result, history))
+            _state.value = WorkoutState.Done(DonePresenter(lib).present(result, history, next.equipment))
         }
     }
 }

@@ -31,7 +31,7 @@ object SessionCards {
                     else -> r.sets.joinToString(", ") { "${it.reps} at ${Copy.kg(it.weightKg)} kg" }
                 }
                 val planned = "${r.planned.sets} × ${r.planned.targetReps}" +
-                    if (e.bodyweight) "" else " at ${Copy.kg(r.planned.weightKg)} kg"
+                    if (e.bodyweight) "" else " at ${Copy.kgList((0 until r.planned.sets).map(r.planned::weightOf))} kg"
                 SessionRowUi(
                     name = e.name,
                     detail = if (r.outcome == ExerciseOutcome.HIT) did else "$did · planned $planned",
