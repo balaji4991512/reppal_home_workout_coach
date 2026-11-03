@@ -2,12 +2,15 @@ package com.homeworkoutcoach.app.ui.habits
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homeworkoutcoach.app.data.FocusRepository
 import com.homeworkoutcoach.app.data.HabitLogs
 import com.homeworkoutcoach.app.data.HabitRepository
 import com.homeworkoutcoach.app.data.JournalRepository
 import com.homeworkoutcoach.app.data.RoutineRepository
 import com.homeworkoutcoach.app.data.TrainingRepository
 import com.homeworkoutcoach.engine.AutoSource
+import com.homeworkoutcoach.engine.Focus
+import com.homeworkoutcoach.engine.HabitKind
 import com.homeworkoutcoach.engine.Journal
 import com.homeworkoutcoach.engine.Habits
 import kotlinx.coroutines.Dispatchers
@@ -39,11 +42,16 @@ internal fun todayFlow(clock: () -> LocalDate): Flow<LocalDate> = flow {
 }.distinctUntilChanged()
 
 /** What makes the self-ticking habits tick: the days with a workout, and the days the routines were finished. */
-data class AutoInputs(val workoutDays: Set<LocalDate>, val sourceDays: Map<AutoSource, Set<LocalDate>>)
+data class AutoInputs(
+    val workoutDays: Set<LocalDate>,
+    val sourceDays: Map<AutoSource, Set<LocalDate>>,
+    /** Minutes of focus per day under each tag (lower case), for the habits linked to a focus tag. */
+    val focusMinutes: Map<String, Map<LocalDate, Int>> = emptyMap(),
+)
 
-fun autoInputs(training: TrainingRepository, routines: RoutineRepository, journal: JournalRepository, zone: ZoneId): Flow<AutoInputs> =
-    combine(training.workouts(), routines.routines(), routines.done(), journal.entries()) { workouts, list, done, entries ->
-        AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.sourceDays(list, done, Journal.days(entries)))
+fun autoInputs(training: TrainingRepository, routines: RoutineRepository, journal: JournalRepository, focus: FocusRepository, zone: ZoneId): Flow<AutoInputs> =
+    combine(training.workouts(), routines.routines(), routines.done(), journal.entries(), focus.sessions()) { workouts, list, done, entries, sessions ->
+        AutoInputs(HabitLogs.workoutDays(workouts, zone), HabitLogs.sourceDays(list, done, Journal.days(entries)), HabitLogs.focusMinutes(sessions, zone))
     }
 
 class HabitsViewModel(
@@ -51,6 +59,7 @@ class HabitsViewModel(
     training: TrainingRepository,
     routines: RoutineRepository,
     journal: JournalRepository,
+    focus: FocusRepository,
     presenter: HabitsPresenter = HabitsPresenter(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     clock: () -> LocalDate = { LocalDate.now(zone) },
@@ -60,9 +69,9 @@ class HabitsViewModel(
 
     /** Null until loaded. */
     val ui: StateFlow<HabitsUi?> = combine(
-        habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), todayFlow(clock), selected,
+        habits.habits(), habits.entries(), autoInputs(training, routines, journal, focus, zone), todayFlow(clock), selected,
     ) { list, entries, auto, today, day ->
-        presenter.present(list, entries, auto.workoutDays, today, auto.sourceDays, shown = day ?: today)
+        presenter.present(list, entries, auto.workoutDays, today, auto.sourceDays, shown = day ?: today, focusMinutes = auto.focusMinutes)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -101,6 +110,7 @@ class HabitDetailViewModel(
     training: TrainingRepository,
     routines: RoutineRepository,
     journal: JournalRepository,
+    focus: FocusRepository,
     presenter: HabitDetailPresenter = HabitDetailPresenter(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     clock: () -> LocalDate = { LocalDate.now(zone) },
@@ -109,9 +119,9 @@ class HabitDetailViewModel(
 
     /** Null until loaded, and when the habit no longer exists. */
     val ui: StateFlow<HabitDetailUi?> = combine(
-        habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), todayFlow(clock), month,
+        habits.habits(), habits.entries(), autoInputs(training, routines, journal, focus, zone), todayFlow(clock), month,
     ) { list, entries, auto, today, m ->
-        list.firstOrNull { it.habit.id == id }?.let { presenter.present(it, entries, auto.workoutDays, today, m, auto.sourceDays) }
+        list.firstOrNull { it.habit.id == id }?.let { presenter.present(it, entries, auto.workoutDays, today, m, auto.sourceDays, auto.focusMinutes) }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -129,6 +139,7 @@ class HabitDetailViewModel(
 class HabitEditViewModel(
     private val id: String?,
     private val habits: HabitRepository,
+    private val focus: FocusRepository,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val clock: () -> LocalDate = { LocalDate.now(zone) },
 ) : ViewModel() {
@@ -139,6 +150,8 @@ class HabitEditViewModel(
         /** True for a habit being added: only then are suggestions offered. */
         val isNew: Boolean,
         val nextPosition: Int,
+        /** The focus tags a habit can count the time of. */
+        val tags: List<String> = emptyList(),
         /** The first problem is shown only after trying to save. */
         val showProblem: Boolean = false,
     ) {
@@ -168,16 +181,21 @@ class HabitEditViewModel(
                 others = names,
                 isNew = id == null,
                 nextPosition = (all.maxOfOrNull { it.position } ?: -1) + 1,
+                tags = tagsFor(existing?.habit?.focusTag),
             )
         }
     }
+
+    /** The tags in use and the starters, with the habit's own tag kept in the list even if no session uses it any more. */
+    private suspend fun tagsFor(own: String?): List<String> =
+        (listOfNotNull(own) + Focus.tags(focus.sessions().first())).distinctBy { it.lowercase() }
 
     fun edit(transform: (HabitDraft) -> HabitDraft) = _state.update { s -> s?.copy(draft = transform(s.draft)) }
 
     /** Fills the form from a starting suggestion. */
     fun pick(s: Habits.Suggestion) = _state.update {
         // what was already chosen for when and how often stays
-        it?.copy(draft = HabitDraft.from(s).copy(scheduleType = it.draft.scheduleType, weekdays = it.draft.weekdays, times = it.draft.times, reminders = it.draft.reminders), showProblem = false)
+        it?.copy(draft = HabitDraft.from(s).copy(scheduleType = it.draft.scheduleType, weekdays = it.draft.weekdays, times = it.draft.times, reminders = it.draft.reminders, focusTag = it.draft.focusTag.takeIf { _ -> s.kind != HabitKind.COUNT }), showProblem = false)
     }
 
     fun save(onDone: () -> Unit) {

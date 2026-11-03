@@ -41,6 +41,7 @@ class TodayViewModel(
     private val habits: HabitRepository,
     private val routines: RoutineRepository,
     private val journal: JournalRepository,
+    focus: com.homeworkoutcoach.app.data.FocusRepository,
     tasks: TaskRepository,
     private val actions: PlanActions,
     private val plannerActions: PlannerActions,
@@ -63,7 +64,7 @@ class TodayViewModel(
     )
 
     private val plan = combine(settings.settings, training.exerciseStates(), training.swaps(), training.workouts(), ::Plan)
-    private val habitData = combine(habits.habits(), habits.entries(), autoInputs(training, routines, journal, zone), ::HabitData)
+    private val habitData = combine(habits.habits(), habits.entries(), autoInputs(training, routines, journal, focus, zone), ::HabitData)
     private val routineData = combine(routines.routines(), routines.done(), journal.entries()) { list, done, entries ->
         RoutineData(list, done, Journal.days(entries))
     }
@@ -77,7 +78,7 @@ class TodayViewModel(
             now = now,
             workout = WorkoutCardPresenter.present(p.settings, p.swaps, week, p.workouts, lib, planner, today, zone),
             routines = routinesPresenter.present(r.routines, r.done, today, now.toLocalTime()),
-            habits = habitsPresenter.present(h.habits, h.entries, h.auto.workoutDays, today, h.auto.sourceDays),
+            habits = habitsPresenter.present(h.habits, h.entries, h.auto.workoutDays, today, h.auto.sourceDays, focusMinutes = h.auto.focusMinutes),
             tasks = tasksPresenter.present(t, today, today),
             journalWritten = today in r.journalDays,
         )

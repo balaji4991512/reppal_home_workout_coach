@@ -349,13 +349,13 @@ object Factories {
         }
     }
     val HabitList = viewModelFactory {
-        initializer { app(this).let { HabitsViewModel(it.habits, it.training, it.routines, it.journal) } }
+        initializer { app(this).let { HabitsViewModel(it.habits, it.training, it.routines, it.journal, it.focus) } }
     }
     fun habitDetail(id: String) = viewModelFactory {
-        initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training, it.routines, it.journal) } }
+        initializer { app(this).let { HabitDetailViewModel(id, it.habits, it.training, it.routines, it.journal, it.focus) } }
     }
     fun habitEdit(id: String?) = viewModelFactory {
-        initializer { app(this).let { HabitEditViewModel(id, it.habits) } }
+        initializer { app(this).let { HabitEditViewModel(id, it.habits, it.focus) } }
     }
     val Planner = viewModelFactory {
         initializer { app(this).let { PlannerViewModel(it.tasks, PlannerActions(it.tasks)) } }
@@ -378,7 +378,7 @@ object Factories {
     val Today = viewModelFactory {
         initializer {
             app(this).let {
-                TodayViewModel(it.settings, it.training, it.habits, it.routines, it.journal, it.tasks, it.actions, PlannerActions(it.tasks), it.library, it.planner)
+                TodayViewModel(it.settings, it.training, it.habits, it.routines, it.journal, it.focus, it.tasks, it.actions, PlannerActions(it.tasks), it.library, it.planner)
             }
         }
     }
@@ -386,7 +386,7 @@ object Factories {
         initializer { app(this).let { JournalViewModel(it.journal, JournalActions(it.journal)) } }
     }
     val GoalList = viewModelFactory {
-        initializer { app(this).let { GoalsViewModel(it.goals, it.habits, it.training, it.routines, it.journal, it.body) } }
+        initializer { app(this).let { GoalsViewModel(it.goals, it.habits, it.training, it.routines, it.journal, it.focus, it.body) } }
     }
     fun goalEdit(id: String?) = viewModelFactory {
         initializer { app(this).let { GoalEditViewModel(id, it.goals, it.habits, it.body) } }

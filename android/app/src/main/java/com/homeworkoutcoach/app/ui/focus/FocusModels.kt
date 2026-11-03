@@ -16,7 +16,16 @@ import java.time.ZoneId
 /** The session that is running. The screen counts down from [endMillis] itself. */
 data class RunningUi(val title: String?, val plannedText: String, val startMillis: Long, val endMillis: Long)
 
-data class SessionRowUi(val whenText: String, val lengthText: String, val note: String?, val completed: Boolean)
+data class SessionRowUi(
+    val id: String,
+    val whenText: String,
+    val lengthText: String,
+    /** The planner task it was for, if any. */
+    val note: String?,
+    val completed: Boolean,
+    /** What the time went on ("Reading"), if named. */
+    val tag: String? = null,
+)
 
 data class FocusUi(
     val running: RunningUi?,
@@ -38,6 +47,8 @@ data class FocusUi(
     val badges: Map<LocalDate, DayBadge>,
     /** Planner tasks to work on: not done, for today or left over. */
     val taskChoices: List<String>,
+    /** The names to tag a session with: those used before, then the starters. */
+    val tags: List<String>,
     val presets: List<Int>,
 )
 
@@ -61,7 +72,10 @@ class FocusPresenter {
         val countToday = Focus.sessionsOn(sessions, today, zone)
         return FocusUi(
             running = active?.let {
-                RunningUi(it.taskTitle, HabitFormat.minutes(it.plannedMinutes), it.startMillis, it.toRun().endMillis)
+                RunningUi(
+                    listOfNotNull(it.tag, it.taskTitle).joinToString(" · ").ifEmpty { null },
+                    HabitFormat.minutes(it.plannedMinutes), it.startMillis, it.toRun().endMillis,
+                )
             },
             today = if (countToday == 0) "No sessions yet today" else "${HabitFormat.minutes(minutesToday)} today, ${if (countToday == 1) "1 session" else "$countToday sessions"}",
             week = "${HabitFormat.minutes(Focus.minutesInWeek(sessions, today, zone))} this week",
@@ -77,6 +91,8 @@ class FocusPresenter {
                 .map { s ->
                     val at = Instant.ofEpochMilli(s.startMillis).atZone(zone)
                     SessionRowUi(
+                        id = s.id,
+                        tag = s.tag,
                         whenText = PlannerFormat.time(at.toLocalTime()),
                         lengthText = if (s.completed) HabitFormat.minutes(s.actualMinutes) else "${s.actualMinutes} of ${s.plannedMinutes} min",
                         note = s.taskTitle,
@@ -91,6 +107,7 @@ class FocusPresenter {
             }.toMap(),
             taskChoices = tasks.filter { !it.done && !it.date.isAfter(today) }
                 .sortedWith(compareBy<Task> { it.date }.then(Tasks.order)).map { it.title }.distinct().take(6),
+            tags = Focus.tags(sessions),
             presets = Focus.presets,
         )
     }

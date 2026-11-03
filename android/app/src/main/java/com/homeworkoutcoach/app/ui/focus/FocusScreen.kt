@@ -24,7 +24,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -87,7 +91,8 @@ import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.engine.Focus
 import com.homeworkoutcoach.engine.FocusRun
 
-/** The focus timer: choose a length (and a task), start, and watch it count down. */
+/** The focus timer: choose a length (and a tag and task), start, and watch it count down. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -101,9 +106,12 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
     var custom by rememberSaveable { mutableStateOf(false) }
     var customText by rememberSaveable { mutableStateOf("") }
     var task by rememberSaveable { mutableStateOf<String?>(null) }
+    var tag by rememberSaveable { mutableStateOf<String?>(null) }
+    // The finished session whose name is being changed.
+    var editing by remember { mutableStateOf<SessionRowUi?>(null) }
     var problem by rememberSaveable { mutableStateOf<String?>(null) }
 
-    fun begin() = vm.start(minutes, task)
+    fun begin() = vm.start(minutes, task, tag)
     // Android 13 and up asks before a notification can show. The timer starts either way.
     val askForNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { begin() }
     fun startTimer() {
@@ -156,6 +164,18 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                     break
                 }
                 kotlinx.coroutines.delay(250)
+            }
+        }
+    }
+
+    editing?.let { row ->
+        ModalBottomSheet(onDismissRequest = { editing = null }, containerColor = c.bg) {
+            var name by remember(row.id) { mutableStateOf(row.tag) }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+                H2("Name this session")
+                Small(listOfNotNull(row.whenText, row.lengthText, row.note).joinToString(" · "), Modifier.padding(top = 2.dp, bottom = 10.dp))
+                TagPicker(s.tags, name, onWash = false) { name = it }
+                PrimaryButton("Save", { vm.retag(row.id, name); editing = null }, Modifier.padding(top = 16.dp))
             }
         }
     }
@@ -221,8 +241,10 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                         label = "Minutes", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
                 }
+                Small("Focusing on (optional)", Modifier.padding(top = 16.dp, bottom = 4.dp), color = c.mut)
+                TagPicker(s.tags, tag, onWash = true) { tag = it }
                 if (s.taskChoices.isNotEmpty()) {
-                    Small("Working on (optional)", Modifier.padding(top = 16.dp, bottom = 4.dp), color = c.mut)
+                    Small("Planner task (optional)", Modifier.padding(top = 16.dp, bottom = 4.dp), color = c.mut)
                     TaskChips(s.taskChoices, task) { task = if (task == it) null else it }
                 }
                 problem?.let { Text(it, Modifier.padding(top = 10.dp), color = c.bad, style = AppTheme.type.small) }
@@ -261,9 +283,13 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                         Icon(AppIcons.Timer, null, Modifier.size(20.dp), tint = c.fg)
                     }
                     Column(Modifier.weight(1f)) {
-                        Body(r.lengthText, strong = true)
+                        Body(listOfNotNull(r.tag, r.lengthText).joinToString(" · "), strong = true)
                         Small(listOfNotNull(r.whenText, r.note).joinToString(" · "))
                     }
+                    Box(
+                        Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Edit session") { editing = r },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(AppIcons.Pen, "Edit session", Modifier.size(20.dp), tint = c.mut) }
                 }
             }
         }
@@ -322,6 +348,47 @@ private fun DurationChips(presets: List<Int>, minutes: Int, custom: Boolean, onP
         presets.forEach { m -> ColorChip("$m min", !custom && minutes == m) { onPreset(m) } }
         ColorChip("Other", custom, onClick = onOther)
     }
+}
+
+/**
+ * The names a session can be tagged with, and "+ New" to type one that is not there. Tapping the chosen one again clears
+ * it. A name just typed shows as chosen even before any session uses it. [onWash] is for the tinted start card;
+ * otherwise the chips are the plain ones.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagPicker(tags: List<String>, selected: String?, onWash: Boolean, onPick: (String?) -> Unit) {
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var typed by rememberSaveable { mutableStateOf("") }
+    val shown = if (selected != null && tags.none { Focus.sameTag(it, selected) }) listOf(selected) + tags else tags
+    fun add() {
+        val name = Focus.tagFor(typed, shown) ?: return
+        onPick(name)
+        typed = ""
+        adding = false
+    }
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        shown.forEach { t ->
+            val on = Focus.sameTag(selected, t)
+            TagChip(t, on, onWash) { onPick(if (on) null else t) }
+        }
+        TagChip("+ New", adding, onWash) { adding = !adding }
+    }
+    if (adding) {
+        Field(
+            typed, { typed = it.take(Focus.MAX_TAG) }, "A new name, like Piano", Modifier.padding(top = 10.dp), label = "New name",
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { add() }),
+        )
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TagChip("Add", Focus.cleanTag(typed) != null, onWash) { add() }
+            TagChip("Cancel", false, onWash) { adding = false; typed = "" }
+        }
+    }
+}
+
+@Composable
+private fun TagChip(text: String, selected: Boolean, onWash: Boolean, onClick: () -> Unit) {
+    if (onWash) ColorChip(text, selected, small = true, onClick = onClick) else Chip(text, selected, onClick, small = true)
 }
 
 @OptIn(ExperimentalLayoutApi::class)

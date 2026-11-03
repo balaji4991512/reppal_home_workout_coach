@@ -221,4 +221,32 @@ class HabitLogsTest {
         // unticked by hand wins
         assertFalse(Habits.isDone(workoutHabit, HabitLogs.log(workoutHabit, mapOf(DAY to 0), days), DAY))
     }
+
+    @Test
+    fun anHourOfStudyFocusCompletesAnHourStudyHabit() {
+        val study = storedHabit("study", kind = HabitKind.TIME, target = 60).habit.copy(focusTag = "Study")
+        val at = DAY.atTime(9, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+        fun session(id: String, minutes: Int, tag: String?) = com.homeworkoutcoach.engine.FocusSession(id, at + id.hashCode(), minutes, minutes, true, null, tag)
+        fun doneWith(vararg sessions: com.homeworkoutcoach.engine.FocusSession): Boolean {
+            val log = HabitLogs.log(study, emptyMap(), emptySet(), emptyMap(), HabitLogs.focusMinutes(sessions.toList(), ZoneOffset.UTC))
+            return Habits.isDone(study, log, DAY)
+        }
+
+        assertFalse(doneWith(session("a", 25, "Study"), session("b", 25, "Study")))           // 50 of 60
+        assertTrue(doneWith(session("a", 25, "Study"), session("b", 25, "Study"), session("c", 10, "study"))) // 60 of 60, any capitals
+        assertFalse(doneWith(session("a", 25, "Study"), session("b", 45, "Reading"), session("c", 45, null))) // other tags do not count
+        // only the habit linked to the tag ticks
+        val unlinked = study.copy(focusTag = null)
+        val log = HabitLogs.log(unlinked, emptyMap(), emptySet(), emptyMap(), HabitLogs.focusMinutes(listOf(session("a", 90, "Study")), ZoneOffset.UTC))
+        assertFalse(Habits.isDone(unlinked, log, DAY))
+    }
+
+    @Test
+    fun focusMinutesAreCountedOnTheLocalDayTheSessionStarted() {
+        val ist = ZoneOffset.ofHoursMinutes(5, 30)
+        val late = java.time.OffsetDateTime.of(2026, 10, 27, 23, 30, 0, 0, ist).toInstant().toEpochMilli()
+        val s = com.homeworkoutcoach.engine.FocusSession("x", late, 45, 45, true, null, "Study")
+        assertEquals(mapOf("study" to mapOf(DAY to 45)), HabitLogs.focusMinutes(listOf(s), ist))
+        assertEquals(mapOf("study" to mapOf(DAY.plusDays(1) to 45)), HabitLogs.focusMinutes(listOf(s), ZoneOffset.ofHours(9)))
+    }
 }

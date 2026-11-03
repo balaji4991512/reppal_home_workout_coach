@@ -135,4 +135,26 @@ class FocusSessionsTest {
         assertNull(service.settleIfFinished())
         assertTrue(repo.sessions().first().isEmpty())
     }
+
+    @Test
+    fun aTagStaysWithTheTimerAndTheSavedSession() = runTest {
+        assertTrue(service.start(25, null, "  Study  "))
+        assertEquals(ActiveFocus(t0, 25, null, "Study"), active())
+        clock = t0 + 25 * min
+        assertEquals("Study", service.settleIfFinished()!!.tag)
+        assertEquals(listOf("Study"), repo.sessions().first().map { it.tag })
+    }
+
+    @Test
+    fun aTypedTagTakesTheSpellingAlreadyUsed() = runTest {
+        repo.save(com.homeworkoutcoach.engine.FocusSession("old", t0 - 99 * min, 25, 25, true, null, "Reading"))
+        service.start(10, null, "reading")
+        assertEquals("Reading", active()!!.tag)
+    }
+
+    @Test
+    fun aBlankTagIsNoTag() = runTest {
+        service.start(10, null, "   ")
+        assertNull(active()!!.tag)
+    }
 }

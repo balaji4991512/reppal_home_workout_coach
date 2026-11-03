@@ -98,4 +98,27 @@ class FocusPresenterTest {
         val tasks = (1..9).map { task("t$it", "Task $it", createdAt = it.toLong()) }
         assertEquals(6, presenter.present(null, emptyList(), tasks, TODAY, ZONE).taskChoices.size)
     }
+
+    @Test
+    fun sessionsShowTheirTagAndTheTagsToChooseFromFollowUse() {
+        val sessions = listOf(
+            focusSession("a", at(TODAY, 9), tag = "Piano"),
+            focusSession("b", at(TODAY, 11), planned = 45, tag = "Reading"),
+            focusSession("c", at(TODAY, 13)),
+        )
+        val ui = presenter.present(null, sessions, emptyList(), TODAY, ZONE)
+        assertEquals(listOf(null, "Reading", "Piano"), ui.sessions.map { it.tag })
+        assertEquals(listOf("c", "b", "a"), ui.sessions.map { it.id })
+        assertEquals(listOf("Reading", "Piano"), ui.tags.take(2)) // latest used first
+        assertEquals(1, ui.tags.count { it == "Reading" })
+        assertEquals(com.homeworkoutcoach.engine.Focus.starterTags, presenter.present(null, emptyList(), emptyList(), TODAY, ZONE).tags)
+    }
+
+    @Test
+    fun aRunningSessionShowsItsTagBeforeItsTask() {
+        val tagged = presenter.present(ActiveFocus(1_000, 25, "Chapter 2", "Reading"), emptyList(), emptyList(), TODAY, ZONE)
+        assertEquals("Reading · Chapter 2", tagged.running!!.title)
+        assertEquals("Reading", presenter.present(ActiveFocus(1_000, 25, null, "Reading"), emptyList(), emptyList(), TODAY, ZONE).running!!.title)
+        assertNull(presenter.present(ActiveFocus(1_000, 25), emptyList(), emptyList(), TODAY, ZONE).running!!.title)
+    }
 }

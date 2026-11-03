@@ -58,6 +58,7 @@ class RoomHabitRepository(private val db: TrainingDatabase) : HabitRepository {
             position = s.position,
             reminderMinuteOfDay = null,
             reminderMinutes = h.reminders.joinToString(",") { (it.hour * 60 + it.minute).toString() },
+            focusTag = h.focusTag,
         )
     }
 
@@ -78,6 +79,7 @@ class RoomHabitRepository(private val db: TrainingDatabase) : HabitRepository {
                 auto = AutoSource.entries.firstOrNull { it.name.lowercase() == e.auto } ?: AutoSource.NONE,
                 archived = e.archived,
                 reminders = remindersOf(e),
+                focusTag = e.focusTag,
             ),
             icon = e.icon,
             color = e.color,

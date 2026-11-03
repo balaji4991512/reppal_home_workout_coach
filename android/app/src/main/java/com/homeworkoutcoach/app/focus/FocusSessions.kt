@@ -29,10 +29,11 @@ class FocusSessions(
     private fun idOf(run: ActiveFocus) = idFor(run.startMillis)
 
     /** Starts a session. Returns false if one is already running or the length is not allowed. */
-    suspend fun start(minutes: Int, taskTitle: String?): Boolean {
+    suspend fun start(minutes: Int, taskTitle: String?, tag: String? = null): Boolean {
         if (Focus.problem(minutes) != null) return false
         if (settings.settings.first().activeFocus != null) return false
-        val run = ActiveFocus(now(), minutes, taskTitle?.trim()?.takeIf { it.isNotEmpty() })
+        val known = Focus.tags(sessions.sessions().first())
+        val run = ActiveFocus(now(), minutes, taskTitle?.trim()?.takeIf { it.isNotEmpty() }, Focus.tagFor(tag, known))
         settings.update { it.copy(activeFocus = run) }
         alarms.schedule(run.startMillis, run.toRun().endMillis)
         return true

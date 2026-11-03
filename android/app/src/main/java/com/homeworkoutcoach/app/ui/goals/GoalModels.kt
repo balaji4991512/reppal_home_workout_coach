@@ -27,8 +27,9 @@ object GoalInputs {
         sourceDays: Map<AutoSource, Set<LocalDate>>,
         from: LocalDate,
         to: LocalDate,
+        focusMinutes: Map<String, Map<LocalDate, Int>> = emptyMap(),
     ): Set<LocalDate> {
-        val log = HabitLogs.log(habit, entries, workoutDays, sourceDays)
+        val log = HabitLogs.log(habit, entries, workoutDays, sourceDays, focusMinutes)
         return generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }.filter { Habits.isDone(habit, log, it) }.toSet()
     }
 

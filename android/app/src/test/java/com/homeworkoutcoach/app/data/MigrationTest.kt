@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -97,7 +98,39 @@ class MigrationTest {
         assertEquals(1, RoomFocusRepository(db).sessions().first().size)
         RoomReflectionRepository(db).save(reflection(java.time.LocalDate.of(2026, 10, 26)))
         assertEquals(1, RoomReflectionRepository(db).reflections().first().size)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test
+    fun version13FocusSessionsAndHabitsSurviveAndCanBeTagged() = runTest {
+        val file = tmp.newFile("training.db").also { it.delete() }
+        create(file, 13) { db ->
+            insertWorkoutAndState(db)
+            db.execSQL(
+                "INSERT INTO habit (id, name, kind, target, scheduleType, scheduleValue, startEpochDay, auto, archived, icon, color, position) " +
+                    "VALUES ('s', 'Study', 'time', 60, 'daily', 0, 20000, 'none', 0, 'book', 'green', 0)",
+            )
+            db.execSQL(
+                "INSERT INTO focus_session (id, startMillis, plannedMinutes, actualMinutes, completed, taskTitle) " +
+                    "VALUES ('old', 1000, 25, 25, 1, 'Chapter 2')",
+            )
+        }
+
+        val db = open(file)
+        val focus = RoomFocusRepository(db)
+        val old = focus.sessions().first().single()
+        assertEquals("Chapter 2", old.taskTitle)
+        assertNull(old.tag) // an older session simply has no tag
+        val habits = RoomHabitRepository(db)
+        val study = habits.habits().first().single()
+        assertNull(study.habit.focusTag)
+
+        focus.save(old.copy(tag = "Study")) // naming it later
+        assertEquals("Study", focus.sessions().first().single().tag)
+        habits.save(study.copy(habit = study.habit.copy(focusTag = "Study")))
+        assertEquals("Study", habits.habits().first().single().habit.focusTag)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -128,7 +161,7 @@ class MigrationTest {
         assertEquals(times, habits.habits().first().first { it.habit.id == "h" }.habit.reminders)
         habits.save(water.copy(habit = water.habit.copy(reminders = emptyList()))) // clearing really clears the old column too
         assertEquals(emptyList<java.time.LocalTime>(), habits.habits().first().first { it.habit.id == "h" }.habit.reminders)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -152,7 +185,7 @@ class MigrationTest {
 
         habits.save(old.copy(habit = old.habit.copy(reminders = listOf(java.time.LocalTime.of(10, 0)))))
         assertEquals(listOf(java.time.LocalTime.of(10, 0)), habits.habits().first().single().habit.reminders)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -168,7 +201,7 @@ class MigrationTest {
         assertEquals(null, old.madeUpForEpochDay) // what was saved before makes nothing up
         repo.saveWorkout(old.copy(id = 0, dateMillis = old.dateMillis + 1, madeUpForEpochDay = 20_000), emptyMap())
         assertEquals(listOf(null, 20_000L), repo.workouts().first().map { it.madeUpForEpochDay })
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -194,7 +227,7 @@ class MigrationTest {
         assertEquals(java.time.LocalTime.of(17, 0), saved.getValue("b").endTime)
         assertEquals(null, saved.getValue("d").time)
         assertEquals(java.time.LocalTime.of(18, 0), saved.getValue("d").endTime)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -214,7 +247,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.WeeklyReflection>(), reflections.reflections().first())
         reflections.save(reflection(java.time.LocalDate.of(2026, 10, 26)))
         assertEquals(1, reflections.reflections().first().size)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -237,7 +270,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.FocusSession>(), focus.sessions().first())
         focus.save(focusSession("f"))
         assertEquals(listOf("f"), focus.sessions().first().map { it.id })
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -257,7 +290,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Goal>(), goals.goals().first())
         goals.save(goal("g"))
         assertEquals(listOf("g"), goals.goals().first().map { it.id })
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -281,7 +314,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.JournalEntry>(), journal.entries().first())
         journal.save(com.homeworkoutcoach.engine.JournalEntry(java.time.LocalDate.of(2026, 10, 28), "a win", "do better"))
         assertEquals("a win", journal.entries().first().single().win)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -306,7 +339,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Routine>(), routines.routines().first())
         routines.save(routine("r", linkedTo = "h"))
         assertEquals("h", routines.routines().first().single().items.first().habitId)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -333,7 +366,7 @@ class MigrationTest {
         assertEquals(emptyList<com.homeworkoutcoach.engine.Task>(), tasks.tasks().first())
         tasks.save(task("t"))
         assertEquals(listOf("t"), tasks.tasks().first().map { it.id })
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -354,7 +387,7 @@ class MigrationTest {
         habits.save(storedHabit("water"))
         habits.setAmount("water", java.time.LocalDate.of(2026, 10, 27), 1)
         assertEquals(1, habits.entries().first().getValue("water").size)
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

@@ -1,6 +1,8 @@
 package com.homeworkoutcoach.app.data
 
 import com.homeworkoutcoach.engine.AutoSource
+import com.homeworkoutcoach.engine.Focus
+import com.homeworkoutcoach.engine.FocusSession
 import com.homeworkoutcoach.engine.Habit
 import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.HabitLog
@@ -67,11 +69,15 @@ object HabitLogs {
         AutoSource.JOURNAL to journalDays,
     )
 
+    /** Minutes of focus per day under each tag (the tag in lower case), for habits linked to a focus tag. */
+    fun focusMinutes(sessions: List<FocusSession>, zone: ZoneId): Map<String, Map<LocalDate, Int>> = Focus.minutesByTagAndDay(sessions, zone)
+
     fun log(
         habit: Habit,
         entries: Map<LocalDate, Int>,
         workoutDays: Set<LocalDate>,
         sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        focusMinutes: Map<String, Map<LocalDate, Int>> = emptyMap(),
     ): HabitLog = HabitLog(
         entries = entries,
         autoDays = when (habit.auto) {
@@ -79,5 +85,6 @@ object HabitLogs {
             AutoSource.MORNING_ROUTINE, AutoSource.NIGHT_ROUTINE, AutoSource.JOURNAL -> sourceDays[habit.auto].orEmpty()
             AutoSource.NONE -> emptySet()
         },
+        focusMinutes = habit.focusTag?.let { focusMinutes[it.trim().lowercase()] }.orEmpty(),
     )
 }

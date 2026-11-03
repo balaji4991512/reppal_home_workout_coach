@@ -33,6 +33,7 @@ class GoalsViewModel(
     training: TrainingRepository,
     routines: RoutineRepository,
     journal: JournalRepository,
+    focus: com.homeworkoutcoach.app.data.FocusRepository,
     body: BodyRepository,
     presenter: GoalsPresenter = GoalsPresenter(),
     zone: ZoneId = ZoneId.systemDefault(),
@@ -51,7 +52,7 @@ class GoalsViewModel(
     )
 
     private val records = combine(goals.goals(), habits.habits(), habits.entries(), ::Records)
-    private val activity = combine(autoInputs(training, routines, journal, zone), body.weights(), training.workouts()) { auto, weights, workouts ->
+    private val activity = combine(autoInputs(training, routines, journal, focus, zone), body.weights(), training.workouts()) { auto, weights, workouts ->
         Activity(
             auto,
             GoalInputs.firstWeighInPerDay(weights, zone),
@@ -65,7 +66,7 @@ class GoalsViewModel(
         val doneDates = r.goals.mapNotNull { g -> g.habitId?.let { it to byId[it] } }.toMap().mapNotNull { (id, stored) ->
             stored?.let {
                 val from = r.goals.filter { g -> g.habitId == id }.minOf { g -> g.startDate }
-                id to GoalInputs.habitDoneDays(it.habit, r.entries[id].orEmpty(), a.auto.workoutDays, a.auto.sourceDays, from, today)
+                id to GoalInputs.habitDoneDays(it.habit, r.entries[id].orEmpty(), a.auto.workoutDays, a.auto.sourceDays, from, today, a.auto.focusMinutes)
             }
         }.toMap()
         presenter.present(r.goals, r.habits.associate { it.habit.id to it.habit.name }, a.workoutDates, doneDates, a.weights, today)

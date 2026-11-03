@@ -7,6 +7,7 @@ import com.homeworkoutcoach.app.data.SettingsRepository
 import com.homeworkoutcoach.app.data.TaskRepository
 import com.homeworkoutcoach.app.focus.FocusSessions
 import com.homeworkoutcoach.app.ui.habits.todayFlow
+import com.homeworkoutcoach.engine.Focus
 import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.FocusSession
 import kotlinx.coroutines.Dispatchers
@@ -72,10 +73,24 @@ class FocusViewModel(
         viewModelScope.launch { service.settleIfFinished()?.let { _finished.value = it } }
     }
 
-    fun start(minutes: Int, taskTitle: String?) {
+    fun start(minutes: Int, taskTitle: String?, tag: String? = null) {
         viewModelScope.launch {
             _finished.value = null
-            service.start(minutes, taskTitle)
+            service.start(minutes, taskTitle, tag)
+        }
+    }
+
+    /**
+     * Gives a finished session a new tag, or none (a blank name). A name that is not in the list yet is kept as typed,
+     * and one that is takes the spelling already used, so "reading" joins "Reading".
+     */
+    fun retag(id: String, name: String?) {
+        viewModelScope.launch {
+            val all = sessions.sessions().first()
+            val session = all.firstOrNull { it.id == id } ?: return@launch
+            val tag = Focus.tagFor(name, Focus.tags(all))
+            if (session.tag != tag) sessions.save(session.copy(tag = tag))
+            if (_finished.value?.id == id) _finished.value = _finished.value?.copy(tag = tag)
         }
     }
 

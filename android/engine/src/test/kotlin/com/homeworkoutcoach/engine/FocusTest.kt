@@ -123,4 +123,59 @@ class FocusTest {
         assertThrows(IllegalArgumentException::class.java) { FocusSession("x", 0, 25, 26, true) }
         assertThrows(IllegalArgumentException::class.java) { FocusSession("x", 0, 181, 25, true) }
     }
+
+    // ---- Tags ----
+
+    private fun tagged(id: String, day: LocalDate, minutes: Int, tag: String?) =
+        FocusSession(id, day.atStartOfDay(zone).toInstant().toEpochMilli() + 9 * 60 * min, minutes, minutes, true, null, tag)
+
+    @Test
+    fun aFinishedSessionKeepsTheTagItStartedWith() {
+        val r = FocusRun(start, 25, "Read chapter 3", "Reading")
+        val s = Focus.finish(r, r.endMillis, "x")!!
+        assertEquals("Reading", s.tag)
+        assertEquals("Read chapter 3", s.taskTitle)
+    }
+
+    @Test
+    fun aTypedTagIsTidied() {
+        assertEquals("Book club", Focus.cleanTag("  Book   club "))
+        assertEquals(Focus.MAX_TAG, Focus.cleanTag("x".repeat(60))!!.length)
+        assertNull(Focus.cleanTag("   "))
+        assertNull(Focus.cleanTag(null))
+    }
+
+    @Test
+    fun aTypedTagTakesTheSpellingAlreadyInUse() {
+        val known = listOf("Reading", "Deep work")
+        assertEquals("Reading", Focus.tagFor(" reading ", known))
+        assertEquals("Deep work", Focus.tagFor("DEEP WORK", known))
+        assertEquals("Piano", Focus.tagFor("Piano", known))
+        assertNull(Focus.tagFor("  ", known))
+        assertTrue(Focus.sameTag("study", "Study "))
+    }
+
+    @Test
+    fun theTagsToChooseFromStartWithTheOnesUsedLatest() {
+        val d = LocalDate.of(2026, 10, 28)
+        val all = listOf(tagged("a", d.minusDays(3), 20, "Piano"), tagged("b", d, 20, "study"), tagged("c", d.minusDays(1), 20, "Piano"), tagged("n", d, 5, null))
+        val tags = Focus.tags(all)
+        assertEquals(listOf("study", "Piano"), tags.take(2))
+        assertEquals(1, tags.count { it.equals("study", ignoreCase = true) }) // the starter "Study" is not listed twice
+        assertTrue("Reading" in tags)
+        assertEquals(Focus.starterTags, Focus.tags(emptyList()))
+    }
+
+    @Test
+    fun minutesAreAddedUpPerTagAndDay() {
+        val d = LocalDate.of(2026, 10, 28)
+        val all = listOf(
+            tagged("a", d, 25, "Study"), tagged("b", d, 40, "study"), tagged("c", d.minusDays(1), 10, "Study"),
+            tagged("d", d, 15, "Reading"), tagged("e", d, 5, null),
+        )
+        assertEquals(mapOf(d to 65, d.minusDays(1) to 10), Focus.minutesByDay(all, "STUDY", zone))
+        assertEquals(mapOf(d to 15), Focus.minutesByDay(all, "Reading", zone))
+        assertEquals(setOf("study", "reading"), Focus.minutesByTagAndDay(all, zone).keys)
+        assertEquals(65, Focus.minutesByTagAndDay(all, zone)["study"]!![d])
+    }
 }

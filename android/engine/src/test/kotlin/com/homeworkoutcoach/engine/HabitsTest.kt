@@ -418,4 +418,61 @@ class HabitsTest {
         assertEquals(t(23, 30), Habits.evenly(t(22), t(23, 59), 90).last()) // never wraps past midnight
         assertThrows(IllegalArgumentException::class.java) { Habits.evenly(t(8), t(9), 0) }
     }
+
+    // ---- Focus link ----
+
+    private fun studying(kind: HabitKind = HabitKind.TIME, target: Int = 60, tag: String? = "Study") =
+        habit(kind = kind, target = target).copy(focusTag = tag)
+
+    private fun focus(vararg dayAndMinutes: Pair<Int, Int>) = HabitLog(focusMinutes = dayAndMinutes.associate { day(it.first) to it.second })
+
+    @Test
+    fun anHourOfFocusCompletesAnHourHabit() {
+        val h = studying()
+        assertEquals(45, Habits.amount(h, focus(0 to 45), day(0)))
+        assertFalse(Habits.isDone(h, focus(0 to 45), day(0)))
+        assertTrue(Habits.isDone(h, focus(0 to 60), day(0)))
+        assertTrue(Habits.isDone(h, focus(0 to 95), day(0)))
+        assertEquals(DayState.PARTIAL, Habits.dayState(h, focus(0 to 45), day(0)))
+        assertEquals(DayState.DONE, Habits.dayState(h, focus(0 to 60), day(0)))
+    }
+
+    @Test
+    fun focusOnAnotherDayDoesNotCount() {
+        assertFalse(Habits.isDone(studying(), focus(1 to 120), day(0)))
+        assertEquals(0, Habits.amount(studying(), focus(1 to 120), day(0)))
+    }
+
+    @Test
+    fun handEnteredTimeAndFocusTimeDoNotAddUpButTheMoreCounts() {
+        val h = studying()
+        assertEquals(50, Habits.amount(h, HabitLog(entries = mapOf(day(0) to 50), focusMinutes = mapOf(day(0) to 20)), day(0)))
+        assertEquals(50, Habits.amount(h, HabitLog(entries = mapOf(day(0) to 10), focusMinutes = mapOf(day(0) to 50)), day(0)))
+        assertEquals(20, Habits.amount(h, HabitLog(entries = mapOf(day(0) to 0), focusMinutes = mapOf(day(0) to 20)), day(0)))
+    }
+
+    @Test
+    fun aDoneHabitIsTickedByAnyFocusTime() {
+        val h = studying(HabitKind.DONE, 1)
+        assertTrue(Habits.isDone(h, focus(0 to 1), day(0)))
+        assertFalse(Habits.isDone(h, focus(0 to 0), day(0)))
+        assertFalse(Habits.isDone(h, focus(), day(0)))
+    }
+
+    @Test
+    fun aCountedHabitIgnoresFocusTime() {
+        assertEquals(0, Habits.amount(studying(HabitKind.COUNT, 8), focus(0 to 500), day(0)))
+    }
+
+    @Test
+    fun aHabitWithoutALinkIgnoresFocusTime() {
+        assertEquals(0, Habits.amount(studying(tag = null), focus(0 to 500), day(0)))
+    }
+
+    @Test
+    fun focusTimeBuildsTheStreakAndTheWeek() {
+        val h = studying().copy(schedule = HabitSchedule.TimesPerWeek(3))
+        val log = focus(0 to 60, 1 to 90, 2 to 30)
+        assertEquals(WeekProgress(2, 3), Habits.weekProgress(h, log, day(2)))
+    }
 }

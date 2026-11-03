@@ -90,9 +90,9 @@ class HabitReminderReceiver : BroadcastReceiver() {
                 val zone = ZoneId.systemDefault()
                 val stored = container.habits.habits().first().firstOrNull { it.habit.id == id } ?: return@launch
                 val now = LocalDateTime.now(zone)
-                val auto = autoInputs(container.training, container.routines, container.journal, zone).first()
+                val auto = autoInputs(container.training, container.routines, container.journal, container.focus, zone).first()
                 val entries = container.habits.entries().first()[id].orEmpty()
-                val log = HabitLogs.log(stored.habit, entries, auto.workoutDays, auto.sourceDays)
+                val log = HabitLogs.log(stored.habit, entries, auto.workoutDays, auto.sourceDays, auto.focusMinutes)
                 if (Habits.shouldRemind(stored.habit, log, now.toLocalDate())) HabitNotifications.remind(context, stored, log)
                 // a minute on, so an alarm that rings a little early still moves to the next day
                 if (minute >= 0) HabitReminders(context, zone).scheduleNext(stored, LocalTime.of(minute / 60, minute % 60), now.plusMinutes(1))

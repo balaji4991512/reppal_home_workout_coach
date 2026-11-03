@@ -44,6 +44,11 @@ data class Habit(
     val archived: Boolean = false,
     /** The times of day to be reminded, on the days the habit is due; empty for no reminder. Water may want many. */
     val reminders: List<LocalTime> = emptyList(),
+    /**
+     * A focus tag whose time counts for this habit: minutes for a time habit, any time at all for a done/not done habit.
+     * Not used by a counted habit, or one that ticks itself some other way.
+     */
+    val focusTag: String? = null,
 ) {
     init {
         require(reminders.size <= Habits.MAX_REMINDERS) { "at most ${Habits.MAX_REMINDERS} reminders" }
@@ -66,6 +71,8 @@ data class Habit(
 data class HabitLog(
     val entries: Map<LocalDate, Int> = emptyMap(),
     val autoDays: Set<LocalDate> = emptySet(),
+    /** Minutes of focus under the habit's tag on each day; only filled for a habit linked to a tag. */
+    val focusMinutes: Map<LocalDate, Int> = emptyMap(),
 )
 
 /** How a single day looks in the habit's calendar. No state means "missed": there are no red marks. */
@@ -92,9 +99,23 @@ object Habits {
     /** The week starts on Monday. */
     fun weekStart(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
-    /** Amount counted on [date]: what was entered by hand, otherwise the target if it ticked itself, otherwise 0. */
+    /**
+     * Amount counted on [date]: what was entered by hand, otherwise the target if it ticked itself, otherwise 0. A habit
+     * linked to a focus tag counts the focus time too, whichever is more, so a day's focus can only add to it.
+     */
     fun amount(habit: Habit, log: HabitLog, date: LocalDate): Int =
-        log.entries[date] ?: if (date in log.autoDays) habit.target else 0
+        maxOf(log.entries[date] ?: if (date in log.autoDays) habit.target else 0, focusAmount(habit, log, date))
+
+    /** What the focus time under the habit's tag comes to on [date], in the habit's own units. */
+    fun focusAmount(habit: Habit, log: HabitLog, date: LocalDate): Int {
+        if (habit.focusTag == null) return 0
+        val minutes = log.focusMinutes[date] ?: 0
+        return when (habit.kind) {
+            HabitKind.TIME -> minutes
+            HabitKind.DONE -> if (minutes >= 1) 1 else 0
+            HabitKind.COUNT -> 0
+        }
+    }
 
     fun isDone(habit: Habit, log: HabitLog, date: LocalDate): Boolean = amount(habit, log, date) >= habit.target
 

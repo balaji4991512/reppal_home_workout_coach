@@ -250,6 +250,24 @@ fun HabitEditScreen(
             ScheduleType.DAILY -> Unit
         }
 
+        // A time or done/not done habit can count the time of a focus tag. Not one that ticks itself some other way.
+        if (d.kind != HabitKind.COUNT && d.auto == AutoSource.NONE) {
+            Label("Counts focus time")
+            Chips {
+                Chip("None", d.focusTag == null, { vm.edit { it.copy(focusTag = null) } }, small = true)
+                s.tags.forEach { t ->
+                    Chip(t, com.homeworkoutcoach.engine.Focus.sameTag(d.focusTag, t), { vm.edit { it.copy(focusTag = t) } }, small = true)
+                }
+            }
+            Small(
+                when {
+                    d.focusTag == null -> "Pick a tag to tick this habit by itself from your Focus timer."
+                    d.kind == HabitKind.TIME -> "Focus sessions tagged ${d.focusTag} add up here. It is done once they reach ${d.target?.let { HabitFormat.minutes(it) } ?: "the target"}."
+                    else -> "It is done once you focus on ${d.focusTag} for any time."
+                },
+            )
+        }
+
         Label("Reminders")
         Chips {
             Chip("None", mode == RemindMode.NONE, { mode = RemindMode.NONE; vm.edit { it.copy(reminders = emptyList()) } }, small = true)

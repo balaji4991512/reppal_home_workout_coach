@@ -74,6 +74,8 @@ data class HabitEntity(
     val reminderMinuteOfDay: Int? = null,
     /** Reminder times as minutes since midnight, comma separated ("540,780"); null when saved before there were many. */
     val reminderMinutes: String? = null,
+    /** The focus tag whose time counts for this habit; added at version 14. */
+    val focusTag: String? = null,
 )
 
 /** What was entered for a habit on a local calendar day. Deleting the habit deletes its entries. */
@@ -175,6 +177,8 @@ data class FocusSessionEntity(
     val actualMinutes: Int,
     val completed: Boolean,
     val taskTitle: String?,
+    /** What the time went on ("Reading"); added at version 14. */
+    val tag: String? = null,
 )
 
 /** A weekly reflection. [weekStartEpochDay] is the Monday of the week, a local calendar day. */
@@ -398,15 +402,15 @@ interface JournalDao {
         RoutineEntity::class, RoutineItemEntity::class, RoutineDoneEntity::class, JournalEntity::class, GoalEntity::class, FocusSessionEntity::class,
         WeeklyReflectionEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
     // 2: body_weight table added. 3: habit and habit_entry tables added. 4: task table added.
-    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added. 10: task.endMinuteOfDay added. 11: workout.madeUpForEpochDay added. 12: habit.reminderMinuteOfDay added. 13: habit.reminderMinutes added (many reminders; the older single column is still read).
+    // 5: routine, routine_item and routine_done tables added. 6: journal_entry table added. 7: goal table added. 8: focus_session table added. 9: weekly_reflection table added. 10: task.endMinuteOfDay added. 11: workout.madeUpForEpochDay added. 12: habit.reminderMinuteOfDay added. 13: habit.reminderMinutes added (many reminders; the older single column is still read). 14: focus_session.tag and habit.focusTag added.
     autoMigrations = [
         AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8),
-        AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11), AutoMigration(from = 11, to = 12), AutoMigration(from = 12, to = 13),
+        AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11), AutoMigration(from = 11, to = 12), AutoMigration(from = 12, to = 13), AutoMigration(from = 13, to = 14),
     ],
 )
 abstract class TrainingDatabase : RoomDatabase() {

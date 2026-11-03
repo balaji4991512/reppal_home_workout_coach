@@ -10,7 +10,7 @@ import java.time.temporal.TemporalAdjusters
  * A focus session that is running: it started at [startMillis] and ends [plannedMinutes] later. The timer counts from
  * the end time, so it keeps counting with the screen off or the app closed.
  */
-data class FocusRun(val startMillis: Long, val plannedMinutes: Int, val taskTitle: String? = null) {
+data class FocusRun(val startMillis: Long, val plannedMinutes: Int, val taskTitle: String? = null, val tag: String? = null) {
     val endMillis: Long get() = startMillis + plannedMinutes * MINUTE_MS
 
     companion object {
@@ -27,6 +27,8 @@ data class FocusSession(
     /** True if the whole planned time was spent. */
     val completed: Boolean,
     val taskTitle: String? = null,
+    /** What the time went on ("Reading", "Study"); a habit linked to the same tag counts these minutes. */
+    val tag: String? = null,
 ) {
     init {
         require(plannedMinutes in 1..Focus.MAX_MINUTES) { "planned minutes must be 1..${Focus.MAX_MINUTES}" }
@@ -37,6 +39,10 @@ data class FocusSession(
 object Focus {
     const val MIN_MINUTES = 1
     const val MAX_MINUTES = 180
+    const val MAX_TAG = 24
+
+    /** Tags offered before any has been used. */
+    val starterTags = listOf("Reading", "Work", "Study", "Writing", "Coding", "Learning", "Practice", "Creative", "Planning", "Meditation")
 
     /** The quick choices, in minutes. */
     val presets = listOf(15, 25, 45, 60)
@@ -70,8 +76,39 @@ object Focus {
         val finished = isFinished(run, now)
         val spent = if (finished) run.plannedMinutes else ((now - run.startMillis) / FocusRun.MINUTE_MS).toInt().coerceIn(0, run.plannedMinutes)
         if (spent < 1) return null
-        return FocusSession(id, run.startMillis, run.plannedMinutes, spent, finished, run.taskTitle)
+        return FocusSession(id, run.startMillis, run.plannedMinutes, spent, finished, run.taskTitle, run.tag)
     }
+
+    /** A typed tag tidied up: spaces squeezed, cut to [MAX_TAG] characters; null if nothing is left. */
+    fun cleanTag(raw: String?): String? =
+        raw?.trim()?.replace(Regex("\\s+"), " ")?.take(MAX_TAG)?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** Tags are the same whatever the capital letters ("reading" is "Reading"). */
+    fun sameTag(a: String?, b: String?): Boolean = a != null && b != null && a.trim().equals(b.trim(), ignoreCase = true)
+
+    /**
+     * The tag to keep for what was typed: the spelling already in use if there is one ("reading" becomes "Reading"),
+     * otherwise the typed name tidied up. Null for a blank name.
+     */
+    fun tagFor(raw: String?, known: Collection<String>): String? {
+        val clean = cleanTag(raw) ?: return null
+        return known.firstOrNull { sameTag(it, clean) } ?: clean
+    }
+
+    /** The tags to choose from: the ones used before, latest first, then the starters not used yet. */
+    fun tags(sessions: List<FocusSession>): List<String> {
+        val used = sessions.sortedByDescending { it.startMillis }.mapNotNull { it.tag }
+        return (used + starterTags).distinctBy { it.lowercase() }
+    }
+
+    /** Minutes under [tag] on each day, by when the sessions started. */
+    fun minutesByDay(sessions: List<FocusSession>, tag: String, zone: ZoneId): Map<LocalDate, Int> =
+        sessions.filter { sameTag(it.tag, tag) }.groupBy { day(it, zone) }.mapValues { (_, list) -> list.sumOf { it.actualMinutes } }
+
+    /** The same, for every tag at once, keyed by the tag in lower case. */
+    fun minutesByTagAndDay(sessions: List<FocusSession>, zone: ZoneId): Map<String, Map<LocalDate, Int>> =
+        sessions.filter { it.tag != null }.groupBy { it.tag!!.trim().lowercase() }
+            .mapValues { (_, list) -> list.groupBy { day(it, zone) }.mapValues { (_, d) -> d.sumOf { it.actualMinutes } } }
 
     private fun day(s: FocusSession, zone: ZoneId): LocalDate = Instant.ofEpochMilli(s.startMillis).atZone(zone).toLocalDate()
 

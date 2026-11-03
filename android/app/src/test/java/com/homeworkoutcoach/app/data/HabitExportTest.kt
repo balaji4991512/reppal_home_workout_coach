@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.DayOfWeek
@@ -171,5 +172,24 @@ class HabitExportTest {
         assertTrue(p.habits.habits().first().isEmpty())
         assertTrue(p.habits.entries().first().isEmpty())
         assertEquals(UserSettings(), p.settings.settings.first())
+    }
+
+    @Test
+    fun aFocusLinkSurvivesAnExportFileButNotOnACountedHabit() = runTest {
+        val p = Phone().also { it.addHabits() }
+        val h = p.habits.habits().first().first()
+        p.habits.save(h.copy(habit = h.habit.copy(kind = HabitKind.TIME, target = 60, focusTag = "Study")))
+        val file = exporter(p).export("RepPal", now).json
+        assertTrue(file.contains("\"focusTag\": \"Study\""))
+
+        val fresh = Phone()
+        DataImporter(fresh.settings, fresh.training, fresh.body, fresh.habits).restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
+        assertEquals("Study", fresh.habits.habits().first().first { it.habit.id == h.habit.id }.habit.focusTag)
+
+        // a counted habit cannot count focus time, so a file that says so is read without the link
+        val counted = file.replace("\"kind\": \"time\"", "\"kind\": \"count\"")
+        val other = Phone()
+        DataImporter(other.settings, other.training, other.body, other.habits).restore((DataImport.read(lib, counted) as ImportCheck.Ok).restore)
+        assertNull(other.habits.habits().first().first { it.habit.id == h.habit.id }.habit.focusTag)
     }
 }

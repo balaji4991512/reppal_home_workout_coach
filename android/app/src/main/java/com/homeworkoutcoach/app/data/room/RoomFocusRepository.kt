@@ -9,11 +9,11 @@ class RoomFocusRepository(private val db: TrainingDatabase) : FocusRepository {
     private val dao get() = db.focus()
 
     override fun sessions(): Flow<List<FocusSession>> = dao.observeAll().map { rows ->
-        rows.map { FocusSession(it.id, it.startMillis, it.plannedMinutes, it.actualMinutes, it.completed, it.taskTitle) }
+        rows.map { FocusSession(it.id, it.startMillis, it.plannedMinutes, it.actualMinutes, it.completed, it.taskTitle, it.tag) }
     }
 
     override suspend fun save(session: FocusSession) = dao.upsert(
-        FocusSessionEntity(session.id, session.startMillis, session.plannedMinutes, session.actualMinutes, session.completed, session.taskTitle),
+        FocusSessionEntity(session.id, session.startMillis, session.plannedMinutes, session.actualMinutes, session.completed, session.taskTitle, session.tag),
     )
 
     override suspend fun delete(id: String) = dao.delete(id)

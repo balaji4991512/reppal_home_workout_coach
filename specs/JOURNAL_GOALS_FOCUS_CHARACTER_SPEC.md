@@ -37,6 +37,17 @@ A goal has a title, a kind, a target, a start day and an end day.
   shows next time the app opens.
 - Every session is saved: when it started, planned and actual minutes, and the task's title. The Focus screen shows
   today's total, this week's total and recent sessions.
+- **Tags.** A session can be tagged with what the time went on (Reading, Work, Study, Writing, Coding, Learning, Practice,
+  Creative, Planning, Meditation to start with). "+ New" types a name that is not there; once used it stays in the list,
+  latest first. Names match without regard to capitals ("reading" is "Reading"), up to 24 characters. The tag is saved
+  with the session (`focus_session.tag`).
+- **Naming a finished session.** Each session in the history has an edit (pencil) button: pick a tag, type a new one, or
+  clear it. Nothing else about the session changes.
+- **Habit link.** A time habit or a done/not done habit can count the time of one tag (`habit.focusTag`, set on the habit
+  form under "Counts focus time"). A time habit gets that tag's focus minutes for the day, so one hour of Study ticks a
+  "Study 1 hour" habit; a done/not done habit ticks with any time. Minutes typed by hand count too, and the larger of the
+  two is used (they are not added). A counted habit, or one that ticks itself some other way, cannot be linked. Editing a
+  session's tag moves its minutes between habits.
 - Menu item **Focus**. Data: `focus_session` (and the running timer in settings). In export, restore and Delete.
 
 ## 4. Character (and the AI layer)

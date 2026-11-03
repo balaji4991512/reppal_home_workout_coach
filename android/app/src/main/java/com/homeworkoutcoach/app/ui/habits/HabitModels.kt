@@ -42,6 +42,8 @@ data class HabitRowUi(
     val auto: Boolean,
     /** What ticks it, for the habits that tick themselves. */
     val source: AutoSource = AutoSource.NONE,
+    /** The focus tag whose time counts for this habit, or null. */
+    val focusTag: String? = null,
 )
 
 data class HabitsUi(
@@ -112,9 +114,10 @@ object HabitRows {
         workoutDays: Set<LocalDate>,
         today: LocalDate,
         sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        focusMinutes: Map<String, Map<LocalDate, Int>> = emptyMap(),
     ): HabitRowUi {
         val h = s.habit
-        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, sourceDays)
+        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, sourceDays, focusMinutes)
         val amount = Habits.amount(h, log, today)
         return HabitRowUi(
             id = h.id,
@@ -132,6 +135,7 @@ object HabitRows {
             archived = h.archived,
             auto = h.auto != AutoSource.NONE,
             source = h.auto,
+            focusTag = h.focusTag.takeIf { h.kind != HabitKind.COUNT },
         )
     }
 }
@@ -146,8 +150,9 @@ class HabitsPresenter {
         today: LocalDate,
         sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
         shown: LocalDate = today,
+        focusMinutes: Map<String, Map<LocalDate, Int>> = emptyMap(),
     ): HabitsUi {
-        val rows = habits.map { HabitRows.row(it, entries, workoutDays, shown, sourceDays) }
+        val rows = habits.map { HabitRows.row(it, entries, workoutDays, shown, sourceDays, focusMinutes) }
         val live = rows.filterNot { it.archived }
         val due = live.filter { it.due }
         val done = due.count { it.done }
@@ -156,7 +161,7 @@ class HabitsPresenter {
         // The week's little numbers: how many of what was due on each past day got done.
         val badges = buildMap {
             (0L..6L).map { Habits.weekStart(shown).plusDays(it) }.filter { !it.isAfter(today) }.forEach { d ->
-                val day = habits.map { HabitRows.row(it, entries, workoutDays, d, sourceDays) }.filter { !it.archived && it.due }
+                val day = habits.map { HabitRows.row(it, entries, workoutDays, d, sourceDays, focusMinutes) }.filter { !it.archived && it.due }
                 if (day.isNotEmpty()) put(d, DayBadge("${day.count { it.done }}/${day.size}", complete = day.all { it.done }))
             }
         }
@@ -241,9 +246,10 @@ class HabitDetailPresenter {
         today: LocalDate,
         month: YearMonth,
         sourceDays: Map<AutoSource, Set<LocalDate>> = emptyMap(),
+        focusMinutes: Map<String, Map<LocalDate, Int>> = emptyMap(),
     ): HabitDetailUi {
         val h = s.habit
-        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, sourceDays)
+        val log = HabitLogs.log(h, entries[h.id].orEmpty(), workoutDays, sourceDays, focusMinutes)
         val first = month.atDay(1)
         val days = (0 until month.lengthOfMonth()).map { i ->
             val date = first.plusDays(i.toLong())
@@ -267,7 +273,7 @@ class HabitDetailPresenter {
         val rate = Habits.stats(h, log, h.startDate, today).let { if (it.due == 0) null else it.done * 100 / it.due }
         val daysSince = if (h.startDate <= today) java.time.temporal.ChronoUnit.DAYS.between(h.startDate, today).toInt() + 1 else 0
         return HabitDetailUi(
-            row = HabitRows.row(s, entries, workoutDays, today, sourceDays),
+            row = HabitRows.row(s, entries, workoutDays, today, sourceDays, focusMinutes),
             currentStreak = streaks.current,
             bestStreak = streaks.best,
             streakUnit = if (streaks.weekly) "weeks" else "days",
@@ -348,6 +354,8 @@ data class HabitDraft(
     val position: Int? = null,
     /** Times to be reminded, earliest first; empty for no reminder. */
     val reminders: List<java.time.LocalTime> = emptyList(),
+    /** The focus tag whose time counts for this habit; null for none. Only for a time or done/not done habit. */
+    val focusTag: String? = null,
 ) {
     /** The target as a number, or null if what was typed is not valid for [kind]. */
     val target: Int?
@@ -360,6 +368,7 @@ data class HabitDraft(
     /** Switching how it is tracked also resets the target to something sensible. */
     fun withKind(k: HabitKind): HabitDraft = copy(
         kind = k,
+        focusTag = focusTag.takeIf { k != HabitKind.COUNT },
         targetText = when (k) {
             HabitKind.DONE -> "1"
             HabitKind.COUNT -> if (kind == HabitKind.COUNT) targetText else "8"
@@ -385,7 +394,10 @@ data class HabitDraft(
             ScheduleType.TIMES -> HabitSchedule.TimesPerWeek(times)
         }
         return StoredHabit(
-            Habit(id ?: newId, name.trim(), kind, checkNotNull(target), schedule, startDate ?: today, auto, archived, Habits.tidyReminders(reminders)),
+            Habit(
+                id ?: newId, name.trim(), kind, checkNotNull(target), schedule, startDate ?: today, auto, archived, Habits.tidyReminders(reminders),
+                focusTag = focusTag.takeIf { kind != HabitKind.COUNT && auto == AutoSource.NONE },
+            ),
             icon = icon,
             color = color,
             position = position ?: nextPosition,
@@ -421,6 +433,7 @@ data class HabitDraft(
                 startDate = h.startDate,
                 position = s.position,
                 reminders = h.reminders,
+                focusTag = h.focusTag,
             )
         }
 

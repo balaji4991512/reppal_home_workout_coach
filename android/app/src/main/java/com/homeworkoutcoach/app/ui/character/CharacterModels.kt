@@ -47,8 +47,9 @@ object CharacterInputsBuilder {
         val workoutDays = HabitLogs.workoutDays(workouts, zone)
         val journalDays = journal.map { it.date }.toSet()
         val sourceDays = HabitLogs.sourceDays(routines, routineDone, journalDays)
+        val focusByTag = HabitLogs.focusMinutes(focus, zone)
         val live = habits.filterNot { it.habit.archived }
-        val facts = live.map { HabitFact(it.habit, HabitLogs.log(it.habit, entries[it.habit.id].orEmpty(), workoutDays, sourceDays)) }
+        val facts = live.map { HabitFact(it.habit, HabitLogs.log(it.habit, entries[it.habit.id].orEmpty(), workoutDays, sourceDays, focusByTag)) }
 
         // Every day with anything done, over all history, to find the quiet stretches and the comebacks.
         val habitDays = facts.flatMap { f ->

@@ -128,4 +128,29 @@ class FocusExportTest {
         assertTrue(p.focus.sessions().first().isEmpty())
         assertEquals(UserSettings(), p.settings.settings.first())
     }
+
+    @Test
+    fun tagsRoundTripThroughAnExportFile() = runTest {
+        val p = Phone()
+        p.focus.save(focusSession("t1", start = now - 3_600_000, tag = "Reading"))
+        p.focus.save(focusSession("t2", start = now - 1_800_000))
+        val file = exporter(p).export("RepPal", now).json
+        val list = Json.parseToJsonElement(file).jsonObject.getValue("focus").jsonArray.map { it.jsonObject }
+        assertEquals("Reading", list[0].getValue("tag").jsonPrimitive.content)
+        val fresh = Phone()
+        importer(fresh).restore((DataImport.read(lib, file) as ImportCheck.Ok).restore)
+        assertEquals(listOf("Reading", null), fresh.focus.sessions().first().sortedBy { it.startMillis }.map { it.tag })
+    }
+
+    @Test
+    fun aSessionFromAnOlderFileHasNoTag() = runTest {
+        val old = """{"app":"RepPal","format":12,"exportedAt":"2026-10-27T14:57:36+05:30","account":null,
+            "settings":{},"exerciseStates":{},"swaps":{},"workouts":[],"weighIns":[],
+            "focus":[{"id":"f","start":"2026-10-27T14:57:36+05:30","plannedMinutes":25,"actualMinutes":25,"completed":true,"task":"Chapter 2"}]}"""
+        val p = Phone()
+        importer(p).restore((DataImport.read(lib, old) as ImportCheck.Ok).restore)
+        val s = p.focus.sessions().first().single()
+        assertNull(s.tag)
+        assertEquals("Chapter 2", s.taskTitle)
+    }
 }

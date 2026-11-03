@@ -4,6 +4,7 @@ import com.homeworkoutcoach.engine.AutoSource
 import com.homeworkoutcoach.engine.DayPart
 import com.homeworkoutcoach.engine.Effort
 import com.homeworkoutcoach.engine.ExerciseState
+import com.homeworkoutcoach.engine.Focus
 import com.homeworkoutcoach.engine.FocusSession
 import com.homeworkoutcoach.engine.Goal
 import com.homeworkoutcoach.engine.GoalKind
@@ -36,8 +37,8 @@ import java.time.format.DateTimeFormatter
  * Field names are the file format: add fields freely, rename only with a new [FORMAT].
  */
 object DataExport {
-    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections (older files still restore). */
-    const val FORMAT = 12
+    /** 1: workouts and weigh-ins. 2: habits. 3: planner tasks. 4: routines. 5: journal. 6: goals. 7: focus sessions. 8: weekly reflections. 13: focus tags and the habit link (older files still restore). */
+    const val FORMAT = 13
 
     @Serializable
     data class File(
@@ -115,6 +116,8 @@ object DataExport {
         val reminder: String? = null,
         /** The reminder times, 24-hour "10:00" (format 12 on); absent for none. */
         val reminders: List<String> = emptyList(),
+        /** The focus tag whose time counts for this habit (format 13 on). */
+        val focusTag: String? = null,
     )
 
     /** [type] is "daily", "weekdays" (with [days], e.g. "MONDAY") or "times" (with [times] a week). */
@@ -174,6 +177,8 @@ object DataExport {
         val actualMinutes: Int,
         val completed: Boolean,
         val task: String? = null,
+        /** What the time went on, e.g. "Reading" (format 13 on). */
+        val tag: String? = null,
     )
 
     /** [week] is the Monday of the week (2026-10-26). */
@@ -250,6 +255,7 @@ object DataExport {
                     color = d.stored.color,
                     entries = d.entries.toSortedMap().mapKeys { it.key.toString() },
                     reminders = h.reminders.map { it.toString() },
+                    focusTag = h.focusTag,
                 )
             },
             tasks = tasks.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.id })).map {
@@ -267,7 +273,7 @@ object DataExport {
             journal = journal.sortedBy { it.date }.map { JournalDto(it.date.toString(), it.win, it.improve) },
             reflections = reflections.sortedBy { it.weekStart }.map { ReflectionDto(it.weekStart.toString(), it.wentWell, it.differently) },
             focus = focus.sortedBy { it.startMillis }.map {
-                FocusDto(it.id, iso(it.startMillis), it.plannedMinutes, it.actualMinutes, it.completed, it.taskTitle)
+                FocusDto(it.id, iso(it.startMillis), it.plannedMinutes, it.actualMinutes, it.completed, it.taskTitle, it.tag)
             },
             goals = goals.sortedWith(compareBy({ it.endDate }, { it.startDate }, { it.id })).map {
                 GoalDto(it.id, it.title, it.kind.name.lowercase(), it.target, it.startDate.toString(), it.endDate.toString(), it.habitId, it.startWeightKg)
@@ -361,7 +367,7 @@ object DataImport {
                     routines = file.routines?.map(::routine),
                     journal = file.journal?.map { JournalEntry(LocalDate.parse(it.date), it.win, it.improve) },
                     reflections = file.reflections?.map { WeeklyReflection(LocalDate.parse(it.week), it.wentWell, it.differently) },
-                    focus = file.focus?.map { f -> FocusSession(f.id, millis(f.start), f.plannedMinutes, f.actualMinutes, f.completed, f.task) },
+                    focus = file.focus?.map { f -> FocusSession(f.id, millis(f.start), f.plannedMinutes, f.actualMinutes, f.completed, f.task, Focus.cleanTag(f.tag)) },
                     goals = file.goals?.map { g ->
                         Goal(
                             id = g.id,
@@ -413,16 +419,18 @@ object DataImport {
             "times" -> HabitSchedule.TimesPerWeek(d.schedule.times)
             else -> error("unknown schedule ${d.schedule.type}")
         }
+        val kind = HabitKind.entries.first { it.name.lowercase() == d.kind }
         val habit = Habit(
             id = d.id,
             name = d.name,
-            kind = HabitKind.entries.first { it.name.lowercase() == d.kind },
+            kind = kind,
             target = d.target,
             schedule = schedule,
             startDate = LocalDate.parse(d.startDate),
             auto = AutoSource.entries.firstOrNull { it.name.lowercase() == d.auto } ?: AutoSource.NONE,
             archived = d.archived,
             reminders = Habits.tidyReminders((d.reminders + listOfNotNull(d.reminder)).map(java.time.LocalTime::parse)),
+            focusTag = Focus.cleanTag(d.focusTag).takeIf { kind != HabitKind.COUNT },
         )
         return HabitData(
             StoredHabit(habit, d.icon, d.color),

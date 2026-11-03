@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,7 +22,8 @@ internal fun focusSession(
     planned: Int = 25,
     actual: Int = planned,
     task: String? = null,
-) = FocusSession(id, start, planned, actual, completed = actual == planned, taskTitle = task)
+    tag: String? = null,
+) = FocusSession(id, start, planned, actual, completed = actual == planned, taskTitle = task, tag = tag)
 
 /** Behaviour every [FocusRepository] must have. Runs against Room and the in-memory fake. */
 abstract class FocusRepositoryContract {
@@ -32,6 +34,16 @@ abstract class FocusRepositoryContract {
     @Before
     fun setUp() {
         repo = create()
+    }
+
+    @Test
+    fun aTagIsKeptAndCanBeChangedOrRemoved() = runTest {
+        repo.save(focusSession("a", tag = "Reading"))
+        assertEquals("Reading", repo.sessions().first().single().tag)
+        repo.save(focusSession("a", tag = "Piano")) // naming it again replaces the one session
+        assertEquals(listOf("Piano"), repo.sessions().first().map { it.tag })
+        repo.save(focusSession("a", tag = null))
+        assertNull(repo.sessions().first().single().tag)
     }
 
     @Test

@@ -96,6 +96,7 @@ fun HabitDetailScreen(
                 Small(s.schedule + if (s.row.archived) " · Archived" else "")
             }
         }
+        s.row.focusTag?.let { Small("Counts your ${it} focus time", Modifier.padding(top = 10.dp)) }
 
         StreakCards(s, Modifier.padding(top = 20.dp))
         HistoryCard(s, Modifier.padding(top = 12.dp))
