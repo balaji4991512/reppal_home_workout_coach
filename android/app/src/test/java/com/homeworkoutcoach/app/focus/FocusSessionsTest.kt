@@ -157,4 +157,44 @@ class FocusSessionsTest {
         service.start(10, null, "   ")
         assertNull(active()!!.tag)
     }
+
+    @Test
+    fun pausingCallsOffTheAlarmAndResumingSetsItLater() = runTest {
+        service.start(25, null)
+        clock += 10 * min
+        assertTrue(service.pause())
+        assertEquals(t0 + 10 * min, active()!!.pausedAtMillis)
+        assertNull(alarms.scheduledAt)
+        clock += 60 * min // an hour away
+        assertNull(service.settleIfFinished()) // paused, so not over
+        assertTrue(service.resume())
+        assertEquals(60 * min, active()!!.pausedMillis)
+        assertNull(active()!!.pausedAtMillis)
+        assertEquals(t0 + 85 * min, alarms.scheduledAt)
+        assertEquals(t0, alarms.scheduledFor) // still the same session
+        assertFalse(service.resume()) // nothing paused
+        clock = t0 + 85 * min
+        val s = service.settleIfFinished()!!
+        assertEquals(25, s.actualMinutes)
+        assertEquals("focus-$t0", s.id)
+    }
+
+    @Test
+    fun stoppingWhilePausedKeepsOnlyTheFocusedMinutes() = runTest {
+        service.start(25, null)
+        clock += 8 * min + 20_000
+        service.pause()
+        clock += 40 * min
+        assertEquals(8, service.stop()!!.actualMinutes)
+        assertNull(active())
+    }
+
+    @Test
+    fun nothingToPauseOrASessionAlreadyOver() = runTest {
+        assertFalse(service.pause())
+        service.start(5, null)
+        clock += 6 * min
+        assertFalse(service.pause()) // it ran out first; settling will save it
+        assertNull(active()!!.pausedAtMillis)
+    }
 }

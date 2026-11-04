@@ -7,11 +7,22 @@ import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 
 /**
- * A focus session that is running: it started at [startMillis] and ends [plannedMinutes] later. The timer counts from
- * the end time, so it keeps counting with the screen off or the app closed.
+ * A focus session that is running: it started at [startMillis] and ends [plannedMinutes] later, pushed back by the time
+ * spent paused. The timer counts from the end time, so it keeps counting with the screen off or the app closed.
+ * [pausedMillis] is the paused time already over; [pausedAtMillis] is when the current pause began, null while running.
  */
-data class FocusRun(val startMillis: Long, val plannedMinutes: Int, val taskTitle: String? = null, val tag: String? = null) {
-    val endMillis: Long get() = startMillis + plannedMinutes * MINUTE_MS
+data class FocusRun(
+    val startMillis: Long,
+    val plannedMinutes: Int,
+    val taskTitle: String? = null,
+    val tag: String? = null,
+    val pausedMillis: Long = 0,
+    val pausedAtMillis: Long? = null,
+) {
+    /** When it ends, counting the pauses that are over. While paused this keeps moving on; see [Focus.remainingMillis]. */
+    val endMillis: Long get() = startMillis + plannedMinutes * MINUTE_MS + pausedMillis
+
+    val paused: Boolean get() = pausedAtMillis != null
 
     companion object {
         const val MINUTE_MS = 60_000L
@@ -51,13 +62,27 @@ object Focus {
     fun problem(minutes: Int?): String? =
         if (minutes == null || minutes !in MIN_MINUTES..MAX_MINUTES) "Enter minutes from $MIN_MINUTES to $MAX_MINUTES." else null
 
-    fun remainingMillis(run: FocusRun, now: Long): Long = (run.endMillis - now).coerceAtLeast(0)
+    /** Time focused so far, leaving out the pauses. It stands still while paused. */
+    fun focusedMillis(run: FocusRun, now: Long): Long =
+        ((run.pausedAtMillis ?: now) - run.startMillis - run.pausedMillis).coerceIn(0, run.plannedMinutes * FocusRun.MINUTE_MS)
 
-    fun isFinished(run: FocusRun, now: Long): Boolean = now >= run.endMillis
+    fun remainingMillis(run: FocusRun, now: Long): Long = run.plannedMinutes * FocusRun.MINUTE_MS - focusedMillis(run, now)
+
+    /** A paused session never runs out. */
+    fun isFinished(run: FocusRun, now: Long): Boolean = !run.paused && now >= run.endMillis
 
     /** 0 at the start to 1 at the end. */
     fun fraction(run: FocusRun, now: Long): Double =
-        ((now - run.startMillis).toDouble() / (run.endMillis - run.startMillis)).coerceIn(0.0, 1.0)
+        focusedMillis(run, now).toDouble() / (run.plannedMinutes * FocusRun.MINUTE_MS)
+
+    /** [run] paused at [now]; unchanged if it already is. */
+    fun pause(run: FocusRun, now: Long): FocusRun = if (run.paused) run else run.copy(pausedAtMillis = now)
+
+    /** [run] going again at [now], its end pushed back by the pause; unchanged if it is not paused. */
+    fun resume(run: FocusRun, now: Long): FocusRun {
+        val at = run.pausedAtMillis ?: return run
+        return run.copy(pausedMillis = run.pausedMillis + (now - at).coerceAtLeast(0), pausedAtMillis = null)
+    }
 
     /** The countdown as "24:59", or "1:05:00" from an hour up. Rounded up, so it never shows 0:00 while time is left. */
     fun format(millis: Long): String {
@@ -69,12 +94,12 @@ object Focus {
     }
 
     /**
-     * Ends [run] at [now]: the whole time if it ran out, otherwise the whole minutes spent so far. Under a minute is too
-     * short to count, so nothing is saved (null).
+     * Ends [run] at [now]: the whole time if it ran out, otherwise the whole minutes focused so far (pauses left out).
+     * Under a minute is too short to count, so nothing is saved (null).
      */
     fun finish(run: FocusRun, now: Long, id: String): FocusSession? {
         val finished = isFinished(run, now)
-        val spent = if (finished) run.plannedMinutes else ((now - run.startMillis) / FocusRun.MINUTE_MS).toInt().coerceIn(0, run.plannedMinutes)
+        val spent = if (finished) run.plannedMinutes else (focusedMillis(run, now) / FocusRun.MINUTE_MS).toInt()
         if (spent < 1) return null
         return FocusSession(id, run.startMillis, run.plannedMinutes, spent, finished, run.taskTitle, run.tag)
     }

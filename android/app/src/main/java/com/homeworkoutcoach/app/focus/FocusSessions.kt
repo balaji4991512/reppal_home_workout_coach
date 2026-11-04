@@ -39,7 +39,29 @@ class FocusSessions(
         return true
     }
 
-    /** Ends the running session now. Returns what was saved, or null if nothing was running or it was too short. */
+    /** Pauses the running session: the countdown stands still and the alarm is called off. False if nothing is running. */
+    suspend fun pause(): Boolean {
+        val run = settings.settings.first().activeFocus ?: return false
+        if (run.pausedAtMillis != null) return true
+        // A session that ran out before the pause is over, not paused.
+        if (Focus.isFinished(run.toRun(), now())) return false
+        val paused = ActiveFocus.of(Focus.pause(run.toRun(), now()))
+        settings.update { if (it.activeFocus == run) it.copy(activeFocus = paused) else it }
+        alarms.cancel()
+        return true
+    }
+
+    /** Lets a paused session count down again, its end (and the alarm) pushed back by the pause. False if nothing is paused. */
+    suspend fun resume(): Boolean {
+        val run = settings.settings.first().activeFocus ?: return false
+        if (run.pausedAtMillis == null) return false
+        val going = Focus.resume(run.toRun(), now())
+        settings.update { if (it.activeFocus == run) it.copy(activeFocus = ActiveFocus.of(going)) else it }
+        alarms.schedule(going.startMillis, going.endMillis)
+        return true
+    }
+
+    /** Ends the running (or paused) session now. Returns what was saved, or null if nothing was running or it was too short. */
     suspend fun stop(): FocusSession? = end(requireFinished = false)
 
     /** If the running session has run out, saves it and clears the timer. Returns what was saved. */

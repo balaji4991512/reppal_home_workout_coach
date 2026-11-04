@@ -46,6 +46,43 @@ class FocusTest {
     }
 
     @Test
+    fun aPausedSessionStandsStillAndItsEndMovesOnByThePause() {
+        val r = Focus.pause(run(10), start + 4 * min)
+        assertTrue(r.paused)
+        assertEquals(6 * min, Focus.remainingMillis(r, start + 4 * min))
+        assertEquals(6 * min, Focus.remainingMillis(r, start + 60 * min)) // a long pause: still 6 minutes left
+        assertFalse(Focus.isFinished(r, start + 60 * min)) // a paused session never runs out
+        assertEquals(0.4, Focus.fraction(r, start + 60 * min), 1e-9)
+        assertEquals(r, Focus.pause(r, start + 9 * min)) // pausing twice keeps the first pause
+
+        val going = Focus.resume(r, start + 7 * min) // three minutes paused
+        assertFalse(going.paused)
+        assertEquals(3 * min, going.pausedMillis)
+        assertEquals(start + 13 * min, going.endMillis)
+        assertEquals(6 * min, Focus.remainingMillis(going, start + 7 * min))
+        assertTrue(Focus.isFinished(going, start + 13 * min))
+        assertEquals(going, Focus.resume(going, start + 8 * min)) // nothing to resume
+
+        // a second pause adds to the first
+        val again = Focus.resume(Focus.pause(going, start + 8 * min), start + 10 * min)
+        assertEquals(5 * min, again.pausedMillis)
+        assertEquals(start + 15 * min, again.endMillis)
+    }
+
+    @Test
+    fun pausedTimeIsNotCountedWhenStopped() {
+        val r = Focus.pause(run(25), start + 7 * min + 30_000)
+        val s = Focus.finish(r, start + 90 * min, "a")!!
+        assertEquals(7, s.actualMinutes)
+        assertFalse(s.completed)
+        val going = Focus.resume(r, start + 20 * min) // paused 12.5 minutes, then on to the end
+        val full = Focus.finish(going, going.endMillis, "b")!!
+        assertEquals(25, full.actualMinutes)
+        assertTrue(full.completed)
+        assertNull(Focus.finish(Focus.pause(run(25), start + 50_000), start + 30 * min, "c")) // under a minute focused
+    }
+
+    @Test
     fun theCountdownReadsAsMinutesAndSecondsRoundedUp() {
         assertEquals("25:00", Focus.format(25 * min))
         assertEquals("00:01", Focus.format(1))

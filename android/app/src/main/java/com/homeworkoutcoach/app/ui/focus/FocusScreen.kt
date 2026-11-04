@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.em
@@ -110,6 +112,8 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
     // The finished session whose name is being changed.
     var editing by remember { mutableStateOf<SessionRowUi?>(null) }
     var problem by rememberSaveable { mutableStateOf<String?>(null) }
+    // The sheet open for choosing a tag or a planner task, if any.
+    var picking by rememberSaveable { mutableStateOf<Picking?>(null) }
 
     fun begin() = vm.start(minutes, task, tag)
     // Android 13 and up asks before a notification can show. The timer starts either way.
@@ -143,18 +147,21 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
     }
 
     val running = s.running
-    // Keep the screen on while counting down.
+    // Keep the screen on while counting down (not while paused).
     val view = LocalView.current
-    DisposableEffect(running != null) {
-        view.keepScreenOn = running != null
+    val counting = running != null && !running.paused
+    DisposableEffect(counting) {
+        view.keepScreenOn = counting
         onDispose { view.keepScreenOn = false }
     }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val haptic = LocalHapticFeedback.current
     // The countdown only runs (and only settles the session) while the screen is on show. In the background the alarm
-    // does it, so it can tell the user; settling here would cancel the alarm.
-    LaunchedEffect(running?.startMillis, lifecycle) {
+    // does it, so it can tell the user; settling here would cancel the alarm. A paused session stands still.
+    LaunchedEffect(running?.run, lifecycle) {
         val r = running ?: return@LaunchedEffect
+        now = System.currentTimeMillis()
+        if (r.paused) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
             while (true) {
                 now = System.currentTimeMillis()
@@ -180,22 +187,48 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
         }
     }
 
+    picking?.let { which ->
+        ModalBottomSheet(onDismissRequest = { picking = null }, containerColor = c.bg) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+                when (which) {
+                    Picking.TAG -> {
+                        H2("Focusing on")
+                        Small("Name what the time goes on. A habit linked to it counts these minutes.", Modifier.padding(top = 2.dp, bottom = 12.dp))
+                        TagPicker(s.tags, tag, onWash = false) { tag = it; picking = null }
+                    }
+                    Picking.TASK -> {
+                        H2("Planner task")
+                        Small("Work on one of today’s tasks.", Modifier.padding(top = 2.dp, bottom = 12.dp))
+                        TaskChips(s.taskChoices, task) { task = if (task == it) null else it; picking = null }
+                    }
+                }
+            }
+        }
+    }
+
     Page {
         H1("Focus")
         if (running != null) {
-            val remaining = (running.endMillis - now).coerceAtLeast(0)
-            val total = running.endMillis - running.startMillis
+            val remaining = Focus.remainingMillis(running.run, now)
             Hero(Modifier.padding(top = 16.dp)) {
                 Pill(running.title ?: "A focus session")
-                Dial(((total - remaining).toFloat() / total).coerceIn(0f, 1f), 260.dp, 16.dp, Modifier.padding(top = 20.dp)) {
+                Dial(Focus.fraction(running.run, now).toFloat(), 240.dp, 16.dp, Modifier.padding(top = 20.dp)) {
                     Text(
-                        Focus.format(remaining), color = c.fg, textAlign = TextAlign.Center,
+                        Focus.format(remaining), color = if (running.paused) c.mut else c.fg, textAlign = TextAlign.Center,
                         style = AppTheme.type.tabular(AppTheme.type.big.copy(fontSize = 56.sp, lineHeight = 60.sp)),
                     )
-                    Small("of ${running.plannedText}", color = c.mut)
+                    Small(if (running.paused) "Paused" else "of ${running.plannedText}", color = c.mut)
                 }
-                SoftButton("End session", vm::stop, Modifier.padding(top = 24.dp))
-                Small("The time you have spent so far is kept.", Modifier.padding(top = 10.dp), color = c.mut)
+                if (running.paused) {
+                    AccentButton("Resume", vm::resume, Modifier.padding(top = 24.dp), icon = AppIcons.Play)
+                } else {
+                    AccentButton("Pause", vm::pause, Modifier.padding(top = 24.dp), icon = AppIcons.Pause)
+                }
+                SoftButton("End session", vm::stop, Modifier.padding(top = 10.dp))
+                Text(
+                    if (running.paused) "The clock waits for you. Paused time doesn’t count." else "The time you have spent so far is kept.",
+                    Modifier.padding(top = 10.dp), color = c.mut, style = AppTheme.type.small, textAlign = TextAlign.Center,
+                )
             }
         } else {
             finished?.let { f ->
@@ -219,13 +252,13 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                 }
             }
 
-            Hero(Modifier.padding(top = 16.dp)) {
+            Hero(Modifier.padding(top = 12.dp)) {
                 val shown = if (custom) customText.toIntOrNull() ?: 0 else minutes
                 val fill by animateFloatAsState((shown / 60f).coerceIn(0.08f, 1f), label = "dial")
-                Dial(fill, 220.dp, 14.dp) {
+                Dial(fill, 168.dp, 12.dp) {
                     Text(
                         if (shown > 0) "$shown" else "–", color = c.fg,
-                        style = AppTheme.type.tabular(AppTheme.type.big.copy(fontSize = 64.sp, lineHeight = 68.sp)),
+                        style = AppTheme.type.tabular(AppTheme.type.big.copy(fontSize = 52.sp, lineHeight = 56.sp)),
                     )
                     Small("minutes", color = c.mut)
                 }
@@ -233,7 +266,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                     presets = s.presets, minutes = minutes, custom = custom,
                     onPreset = { custom = false; minutes = it; problem = null },
                     onOther = { custom = true; problem = null },
-                    modifier = Modifier.padding(top = 20.dp),
+                    modifier = Modifier.padding(top = 16.dp),
                 )
                 if (custom) {
                     Field(
@@ -241,14 +274,12 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                         label = "Minutes", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
                 }
-                Small("Focusing on (optional)", Modifier.padding(top = 16.dp, bottom = 4.dp), color = c.mut)
-                TagPicker(s.tags, tag, onWash = true) { tag = it }
-                if (s.taskChoices.isNotEmpty()) {
-                    Small("Planner task (optional)", Modifier.padding(top = 16.dp, bottom = 4.dp), color = c.mut)
-                    TaskChips(s.taskChoices, task) { task = if (task == it) null else it }
+                Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceRow("Focusing on", tag) { picking = Picking.TAG }
+                    if (s.taskChoices.isNotEmpty()) ChoiceRow("Planner task", task) { picking = Picking.TASK }
                 }
                 problem?.let { Text(it, Modifier.padding(top = 10.dp), color = c.bad, style = AppTheme.type.small) }
-                AccentButton("Start", ::startTimer, Modifier.padding(top = 20.dp))
+                AccentButton("Start", ::startTimer, Modifier.padding(top = 16.dp))
             }
 
             Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -296,6 +327,27 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
     }
 }
 
+private enum class Picking { TAG, TASK }
+
+/** One line on the wash: what it is, what is chosen (or "Optional"), and a chevron; tapping opens the choices. */
+@Composable
+private fun ChoiceRow(label: String, value: String?, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.8f))
+            .clickable(role = Role.Button, onClickLabel = "Choose", onClick = onClick).padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = c.mut, style = AppTheme.type.small)
+        Text(
+            value ?: "Optional", Modifier.weight(1f).padding(start = 12.dp), color = if (value != null) c.accent else c.mut,
+            style = AppTheme.type.label.copy(fontWeight = if (value != null) FontWeight.SemiBold else FontWeight.Normal),
+            textAlign = TextAlign.End, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+        Icon(AppIcons.ChevronRight, null, Modifier.padding(start = 6.dp).size(18.dp), tint = c.mut)
+    }
+}
+
 /** A rounded card with a soft lavender-to-peach wash, holding the dial and its controls. */
 @Composable
 private fun Hero(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
@@ -337,16 +389,12 @@ private fun Pill(text: String) {
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** The lengths in one row of equal chips (the dial already says "minutes"), then "Other". */
 @Composable
 private fun DurationChips(presets: List<Int>, minutes: Int, custom: Boolean, onPreset: (Int) -> Unit, onOther: () -> Unit, modifier: Modifier = Modifier) {
-    FlowRow(
-        modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        presets.forEach { m -> ColorChip("$m min", !custom && minutes == m) { onPreset(m) } }
-        ColorChip("Other", custom, onClick = onOther)
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        presets.forEach { m -> ColorChip("$m", !custom && minutes == m, Modifier.weight(1f), label = "$m minutes") { onPreset(m) } }
+        ColorChip("Other", custom, Modifier.weight(1.4f), onClick = onOther)
     }
 }
 
@@ -395,20 +443,21 @@ private fun TagChip(text: String, selected: Boolean, onWash: Boolean, onClick: (
 @Composable
 private fun TaskChips(choices: List<String>, selected: String?, onPick: (String) -> Unit) {
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        choices.forEach { t -> ColorChip(t, selected == t, small = true) { onPick(t) } }
+        choices.forEach { t -> Chip(t, selected == t, { onPick(t) }, small = true) }
     }
 }
 
-/** Selected is filled indigo; the rest are white on the wash. */
+/** Selected is filled indigo; the rest are white on the wash. [label] is what a screen reader says, if not [text]. */
 @Composable
-private fun ColorChip(text: String, selected: Boolean, small: Boolean = false, onClick: () -> Unit) {
+private fun ColorChip(text: String, selected: Boolean, modifier: Modifier = Modifier, small: Boolean = false, label: String? = null, onClick: () -> Unit) {
     val c = AppTheme.colors
     val shape = RoundedCornerShape(99.dp)
     Box(
-        Modifier.heightIn(min = if (small) 38.dp else 44.dp).clip(shape)
+        modifier.heightIn(min = if (small) 38.dp else 44.dp).clip(shape)
             .background(if (selected) c.accent else c.bg.copy(alpha = 0.8f))
             .selectable(selected = selected, role = Role.Button, onClick = onClick)
-            .padding(horizontal = if (small) 14.dp else 18.dp, vertical = 6.dp),
+            .then(if (label != null) Modifier.semantics { contentDescription = label } else Modifier)
+            .padding(horizontal = if (small) 14.dp else 4.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -419,7 +468,7 @@ private fun ColorChip(text: String, selected: Boolean, small: Boolean = false, o
 }
 
 @Composable
-private fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector = AppIcons.Timer) {
     val c = AppTheme.colors
     Row(
         modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp)).background(c.accent)
@@ -427,7 +476,7 @@ private fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier =
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(AppIcons.Timer, null, Modifier.size(20.dp), tint = c.onAccent)
+        Icon(icon, null, Modifier.size(20.dp), tint = c.onAccent)
         Text(text, Modifier.padding(start = 10.dp), color = c.onAccent, style = AppTheme.type.bodyStrong)
     }
 }

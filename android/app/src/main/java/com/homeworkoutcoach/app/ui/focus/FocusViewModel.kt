@@ -94,6 +94,14 @@ class FocusViewModel(
         }
     }
 
+    fun pause() {
+        viewModelScope.launch { service.pause() }
+    }
+
+    fun resume() {
+        viewModelScope.launch { service.resume() }
+    }
+
     /** Ends the session now; the time spent so far is kept. */
     fun stop() {
         viewModelScope.launch { service.stop() }

@@ -12,10 +12,22 @@ import kotlinx.serialization.Serializable
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 
-/** A focus session that is running. The settings keep it, so it survives the app being closed. */
+/** A focus session that is running (or paused). The settings keep it, so it survives the app being closed. */
 @Serializable
-data class ActiveFocus(val startMillis: Long, val plannedMinutes: Int, val taskTitle: String? = null, val tag: String? = null) {
-    fun toRun() = com.homeworkoutcoach.engine.FocusRun(startMillis, plannedMinutes, taskTitle, tag)
+data class ActiveFocus(
+    val startMillis: Long,
+    val plannedMinutes: Int,
+    val taskTitle: String? = null,
+    val tag: String? = null,
+    val pausedMillis: Long = 0,
+    val pausedAtMillis: Long? = null,
+) {
+    fun toRun() = com.homeworkoutcoach.engine.FocusRun(startMillis, plannedMinutes, taskTitle, tag, pausedMillis, pausedAtMillis)
+
+    companion object {
+        fun of(run: com.homeworkoutcoach.engine.FocusRun) =
+            ActiveFocus(run.startMillis, run.plannedMinutes, run.taskTitle, run.tag, run.pausedMillis, run.pausedAtMillis)
+    }
 }
 
 /** The quality picked for the week that starts on [weekStartEpochDay] (a Monday). A new week goes back to the suggestion. */

@@ -78,6 +78,14 @@ class FocusPresenterTest {
         assertEquals("25 min", r.plannedText)
         assertEquals(1_000L, r.startMillis)
         assertEquals(1_000L + 25 * 60_000, r.endMillis)
+        assertFalse(r.paused)
+    }
+
+    @Test
+    fun aPausedSessionShowsAsPaused() {
+        val r = presenter.present(ActiveFocus(1_000, 25, pausedMillis = 60_000, pausedAtMillis = 500_000), emptyList(), emptyList(), TODAY, ZONE).running!!
+        assertTrue(r.paused)
+        assertEquals(1_000L + 26 * 60_000, r.endMillis)
     }
 
     @Test

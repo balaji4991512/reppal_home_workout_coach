@@ -6,6 +6,7 @@ import com.homeworkoutcoach.app.ui.planner.PlannerFormat
 import com.homeworkoutcoach.app.ui.components.DayBadge
 import com.homeworkoutcoach.engine.Habits
 import com.homeworkoutcoach.engine.Focus
+import com.homeworkoutcoach.engine.FocusRun
 import com.homeworkoutcoach.engine.FocusSession
 import com.homeworkoutcoach.engine.Task
 import com.homeworkoutcoach.engine.Tasks
@@ -13,8 +14,12 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** The session that is running. The screen counts down from [endMillis] itself. */
-data class RunningUi(val title: String?, val plannedText: String, val startMillis: Long, val endMillis: Long)
+/** The session that is running or paused. The screen counts down from [run] itself. */
+data class RunningUi(val title: String?, val plannedText: String, val run: FocusRun) {
+    val startMillis: Long get() = run.startMillis
+    val endMillis: Long get() = run.endMillis
+    val paused: Boolean get() = run.paused
+}
 
 data class SessionRowUi(
     val id: String,
@@ -74,7 +79,7 @@ class FocusPresenter {
             running = active?.let {
                 RunningUi(
                     listOfNotNull(it.tag, it.taskTitle).joinToString(" · ").ifEmpty { null },
-                    HabitFormat.minutes(it.plannedMinutes), it.startMillis, it.toRun().endMillis,
+                    HabitFormat.minutes(it.plannedMinutes), it.toRun(),
                 )
             },
             today = if (countToday == 0) "No sessions yet today" else "${HabitFormat.minutes(minutesToday)} today, ${if (countToday == 1) "1 session" else "$countToday sessions"}",

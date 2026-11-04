@@ -30,8 +30,13 @@ A goal has a title, a kind, a target, a start day and an end day.
 - Data: `goal`. In export, restore and Delete.
 
 ## 3. Focus timer
-- Choose 15, 25, 45 or 60 minutes (or type 1 to 180), optionally pick a planner task to work on, Start. A big countdown,
-  Pause is not offered (stop ends the session; time done so far is kept).
+- Choose 15, 25, 45 or 60 minutes (or type 1 to 180), optionally pick a tag and a planner task, Start. The setup card is
+  compact so Start shows without scrolling: the lengths sit in one row, and the tag and the task are one line each that
+  opens a sheet of choices. A big countdown follows.
+- **Pause.** While counting, Pause stops the clock and Resume carries on; paused time is not counted and the end (and its
+  alarm) moves back by the pause. End session works paused or not; time focused so far is kept. A paused session never
+  runs out, and the screen is allowed to sleep while paused. The pause is kept with the running timer in settings, so it
+  survives the app being closed.
 - The timer runs from an end time, so it keeps counting with the screen off or the app closed. When it ends the phone
   vibrates and shows a notification ("Focus session finished"). If notifications are not allowed, the finished state
   shows next time the app opens.
