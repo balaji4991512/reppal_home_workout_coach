@@ -379,6 +379,20 @@ class WorkoutViewModelTest {
         assertTrue(sets > 3)
     }
 
+    @Test
+    fun aWorkoutFinishedAfterMidnightCountsForTheDayItStarted() = runTest {
+        // Monday's workout opened at 23:30, its last set saved at 00:40 on Tuesday
+        val lateMonday = java.time.LocalDate.of(2026, 10, 26).atTime(23, 30).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        var clock = lateMonday
+        val vm = WorkoutViewModel(lib, Planner(lib), settings, training, actions, KeywordSetParser, java.time.ZoneOffset.UTC, { clock })
+        clock += 70 * 60_000L
+        while (vm.state.value is WorkoutState.Logging) {
+            vm.onReps(vm.logging().session.target.targetReps)
+            vm.onSave()
+        }
+        assertEquals(lateMonday, training.workouts().first().single().dateMillis)
+    }
+
     private val tuesday = monday + 24 * 3_600_000L
     private val mondayDay = java.time.LocalDate.of(2026, 10, 26).toEpochDay()
 

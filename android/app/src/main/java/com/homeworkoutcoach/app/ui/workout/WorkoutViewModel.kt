@@ -86,6 +86,12 @@ class WorkoutViewModel(
     /** Set when this session makes up a skipped day; saved with the workout. */
     private var madeUpFor: Long? = null
 
+    /**
+     * When the workout was opened. It is saved under this time, not when the last set was saved, so a workout started
+     * on Thursday and finished after midnight still counts for Thursday.
+     */
+    private var startedAt: Long = now()
+
     private val _state = MutableStateFlow<WorkoutState>(WorkoutState.Loading)
     val state: StateFlow<WorkoutState> = _state
 
@@ -98,11 +104,12 @@ class WorkoutViewModel(
      * or once today's is done, there is nothing to start.
      */
     private suspend fun startToday(): WorkoutState {
+        startedAt = now()
         val s = settings.settings.first()
         val ps = s.planSettings(training.swaps().first())
         val stored = training.exerciseStates().first()
         val seq = planner.weekSequence(ps)
-        val today = Instant.ofEpochMilli(now()).atZone(zone).toLocalDate()
+        val today = Instant.ofEpochMilli(startedAt).atZone(zone).toLocalDate()
         val workouts = training.workouts().first()
         val madeUpDates = workouts.mapNotNull { it.madeUpForEpochDay }.map(LocalDate::ofEpochDay).toSet()
         val own = workouts.filter { it.madeUpForEpochDay == null }.map { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toSet()
@@ -226,7 +233,7 @@ class WorkoutViewModel(
         _state.value = WorkoutState.Saving
         viewModelScope.launch {
             val history = training.workouts().first()
-            val result = next.finish(now(), madeUpFor)
+            val result = next.finish(startedAt, madeUpFor)
             actions.finishWorkout(result)
             _state.value = WorkoutState.Done(DonePresenter(lib).present(result, history, next.equipment))
         }
