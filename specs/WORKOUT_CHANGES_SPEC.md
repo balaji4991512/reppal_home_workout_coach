@@ -45,3 +45,11 @@ the workout.
 - The chips follow each set: after saving, they start again from the next set's target (a ramp's next step, or the
   weight just used). The weight saved is what the next set follows, as before.
 - Reps you did now runs from two over the target to three under, so a set that beat the target can be logged with a tap.
+
+## Layout (first screen)
+- Everything needed to log a set fits on the first screen of a 384 × 823 dp phone: exercise name with How to do it,
+  Replace and Skip; a compact target card ("SET 2 OF 3 · TARGET", the reps and weight, the set pills, done ones reading
+  "✓ 12 × 4.5"); then three rows of equal chips (Weight (kg), Reps, How it felt with Pain); then the Save button.
+- Save set names what will be saved: "Save set · 12 × 4.5 kg, just right". Until the reps are tapped it reads "Tap the
+  reps you did to save the set".
+- Saying or typing a set moves below the Save button; "Check my note" shows only once something is typed.

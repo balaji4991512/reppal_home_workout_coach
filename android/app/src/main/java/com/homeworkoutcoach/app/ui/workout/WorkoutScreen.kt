@@ -19,6 +19,7 @@ import androidx.compose.foundation.Canvas
 import com.homeworkoutcoach.app.ui.components.H2
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -242,27 +243,30 @@ fun LoggingContent(
             }
             NavArrow(AppIcons.ChevronRight, "Next exercise", enabled = session.index < session.day.items.lastIndex) { controls.goTo(session.index + 1) }
         }
-        H1(e.name)
+        Text(e.name, color = c.fg, style = AppTheme.type.h1.copy(fontSize = 28.sp, lineHeight = 32.sp))
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            TextLink("How to do it", { onHowTo(e.id) })
-            if (!complete || session.logged.isEmpty()) TextLink("Replace", { replacing = true })
-            if (!complete && session.canSkip) TextLink("Skip", controls.skip)
+            SmallLink("How to do it") { onHowTo(e.id) }
+            if (!complete || session.logged.isEmpty()) SmallLink("Replace") { replacing = true }
+            if (!complete && session.canSkip) SmallLink("Skip", controls.skip)
         }
 
         // The target in a card, with the sets under it.
         Column(
-            Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp))
+            Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp))
                 .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 600f)))
-                .padding(20.dp),
+                .padding(horizontal = 18.dp, vertical = 14.dp),
         ) {
             if (!complete) {
-            Text("YOUR TARGET", color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, letterSpacing = 0.08.em, fontWeight = FontWeight.SemiBold))
-            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "SET ${session.setIndex + 1} OF ${session.planned.sets} · TARGET",
+                color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, letterSpacing = 0.08.em, fontWeight = FontWeight.SemiBold),
+            )
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "${target.targetReps}",
                     Modifier.alignByBaseline(),
                     color = c.fg,
-                    style = AppTheme.type.tabular(AppTheme.type.big),
+                    style = AppTheme.type.tabular(AppTheme.type.big.copy(fontSize = 48.sp, lineHeight = 52.sp)),
                 )
                 Text(
                     "reps" + if (e.bodyweight) "" else " at ${Copy.kg(target.weightKg)} kg",
@@ -282,7 +286,9 @@ fun LoggingContent(
                 )
             }
             SetPills(session) { editing = it }
-            if (session.logged.isNotEmpty()) Small("Tap a done set to change or delete it.", Modifier.padding(top = 10.dp))
+            if (session.logged.isNotEmpty()) {
+                Text("Tap a done set to change it.", Modifier.padding(top = 6.dp), color = c.mut, style = AppTheme.type.small.copy(fontSize = 12.sp))
+            }
         }
 
         if (complete) {
@@ -306,10 +312,48 @@ fun LoggingContent(
         }
 
         if (state.note != null && session.setIndex > 0) {
-            Text(state.note, Modifier.padding(top = 10.dp), color = c.ok, style = AppTheme.type.bodyStrong)
+            Text(state.note, Modifier.padding(top = 8.dp), color = c.ok, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold))
         }
 
-        Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // The quick way: a tap on each row, then Save set.
+        if (!e.bodyweight) {
+            val kg = input.shownWeight(target.weightKg)
+            ChipRow("Weight (kg)") {
+                weightChoices(session.equipment.dumbbells, target.weightKg, kg).forEach { w ->
+                    EvenChip(Copy.kg(w), kotlin.math.abs(w - kg) < 1e-9, "${Copy.kg(w)} kg") { onWeight(w) }
+                }
+            }
+        }
+        ChipRow("Reps") {
+            repChoices(target.targetReps).forEach { n -> EvenChip("$n", input.shownReps == n, "$n reps") { onReps(n) } }
+        }
+        ChipRow("How it felt") {
+            listOf(Effort.EASY to "Easy", Effort.JUST_RIGHT to "Just right", Effort.HARD to "Hard").forEach { (k, label) ->
+                EvenChip(label, input.shownEffort == k, label) { onEffort(k) }
+            }
+            EvenChip("Pain", input.shownPain, "Felt pain", onPain)
+        }
+
+        input.error?.let { Text(it, Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
+        val preview = input.preview
+        if (preview?.pain == true) {
+            Text(
+                "Pain reported. Saving will stop this exercise and remove it from your plan.",
+                Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.small.copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
+        if (preview != null) {
+            AccentButton("Save set · ${readback(preview, e.bodyweight, target.weightKg)}", onSave, Modifier.padding(top = 14.dp), icon = AppIcons.Check)
+            if (preview.comment.isNotEmpty()) Small("“${preview.comment}”", Modifier.padding(top = 4.dp))
+        } else {
+            Box(
+                Modifier.padding(top = 14.dp).fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp)).background(c.soft),
+                contentAlignment = Alignment.Center,
+            ) { Text("Tap the reps you did to save the set", color = c.mut, style = AppTheme.type.body) }
+        }
+
+        // The other way: say or type it.
+        Row(Modifier.padding(top = 22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(
                 input.text,
                 onText,
@@ -323,33 +367,46 @@ fun LoggingContent(
                 MicButton(input.listening, v.onListening, v.onPartial, v.onResult, v.onError, Modifier.heightIn(min = 50.dp))
             }
         }
+        if (input.text.isNotBlank() && input.reps == null && input.preview == null) OutlineButton("Check my note", onCheck, tint = c.accent)
+        preview?.let { SavedData(it) }
+    }
+}
 
-        if (!e.bodyweight) {
-            val kg = input.shownWeight(target.weightKg)
-            Muted("Weight you used", Modifier.padding(top = 10.dp))
-            Chips {
-                weightChoices(session.equipment.dumbbells, target.weightKg, kg).forEach { w ->
-                    AccentChip("${Copy.kg(w)} kg", kotlin.math.abs(w - kg) < 1e-9, { onWeight(w) }, Modifier.widthIn(min = 64.dp))
-                }
-            }
-        }
-        Muted("Reps you did", Modifier.padding(top = 10.dp))
-        Chips {
-            repChoices(target.targetReps).forEach { n ->
-                AccentChip("$n", input.shownReps == n, { onReps(n) }, Modifier.widthIn(min = 52.dp))
-            }
-        }
-        Muted("How it felt")
-        Chips {
-            listOf(Effort.EASY to "Easy", Effort.JUST_RIGHT to "Just right", Effort.HARD to "Hard").forEach { (k, label) ->
-                AccentChip(label, input.shownEffort == k, { onEffort(k) })
-            }
-            AccentChip("Felt pain", input.shownPain, onPain)
-        }
+/** "12 × 4.5 kg, hard", or "12 reps, easy" for a bodyweight set. A set with no weight said was done at [targetKg]. */
+private fun readback(r: SetRecord, bodyweight: Boolean, targetKg: Double): String =
+    (if (bodyweight) "${r.reps} reps" else "${r.reps} × ${Copy.kg(r.weightKg ?: targetKg)} kg") + ", ${r.effort.key}"
 
-        if (input.reps == null && input.preview == null) OutlineButton("Check my note", onCheck, tint = c.accent)
-        input.error?.let { Text(it, Modifier.padding(vertical = 6.dp), color = c.bad, style = AppTheme.type.bodyStrong) }
-        input.preview?.let { SetPreview(it, onSave) }
+/** A small label over a row of equal chips. */
+@Composable
+private fun ChipRow(label: String, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Text(label, Modifier.padding(top = 12.dp, bottom = 4.dp), color = AppTheme.colors.mut, style = AppTheme.type.small.copy(fontSize = 13.sp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), content = content)
+}
+
+/** A chip that takes an equal share of its row. [description] is what a screen reader says. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.EvenChip(text: String, selected: Boolean, description: String, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Box(
+        Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(99.dp))
+            .background(if (selected) c.accent else c.soft)
+            .border(androidx.compose.foundation.BorderStroke(1.dp, if (selected) c.accent else c.bd), RoundedCornerShape(99.dp))
+            .selectable(selected = selected, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text, color = if (selected) c.onAccent else c.fg, maxLines = 1,
+            style = AppTheme.type.tabular(AppTheme.type.label.copy(fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)),
+        )
+    }
+}
+
+/** A quiet underlined link, shorter than [TextLink], for the row under the exercise name. */
+@Composable
+private fun SmallLink(text: String, onClick: () -> Unit) {
+    Box(Modifier.heightIn(min = 36.dp).clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.CenterStart) {
+        Text(text, color = AppTheme.colors.mut, style = AppTheme.type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline))
     }
 }
 
@@ -530,7 +587,7 @@ private fun SetPills(session: WorkoutSession, onEdit: (Int) -> Unit) {
     val c = AppTheme.colors
     val done = session.repsDone
     FlowRow(
-        Modifier.padding(top = 16.dp).semantics { contentDescription = "Sets" },
+        Modifier.padding(top = 10.dp).semantics { contentDescription = "Sets" },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -540,14 +597,18 @@ private fun SetPills(session: WorkoutSession, onEdit: (Int) -> Unit) {
             val current = open && !isDone && i == session.setIndex
             if (!isDone && !open) return@repeat
             Box(
-                Modifier.widthIn(min = 60.dp).height(44.dp).clip(RoundedCornerShape(99.dp))
+                Modifier.widthIn(min = 56.dp).height(38.dp).clip(RoundedCornerShape(99.dp))
                     .background(if (isDone) c.ok else if (current) c.accent else c.bg.copy(alpha = 0.7f))
                     .then(if (isDone) Modifier.clickable(role = Role.Button, onClickLabel = "Change set ${i + 1}") { onEdit(i) } else Modifier)
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    if (isDone) "✓ ${done[i]}" else "Set ${i + 1}",
+                    when {
+                        !isDone -> "Set ${i + 1}"
+                        session.exercise.bodyweight -> "✓ ${done[i]}"
+                        else -> "✓ ${done[i]} × ${Copy.kg(session.logged[i].weightKg)}"
+                    },
                     color = if (isDone) c.bg else if (current) c.onAccent else c.mut,
                     style = AppTheme.type.tabular(AppTheme.type.label.copy(fontWeight = FontWeight.SemiBold)),
                 )
@@ -556,41 +617,25 @@ private fun SetPills(session: WorkoutSession, onEdit: (Int) -> Unit) {
     }
 }
 
-/** One-line readback, Save set, and the raw record folded away. */
+/** The raw record of the set about to be saved, folded away. */
 @Composable
-private fun SetPreview(r: SetRecord, onSave: () -> Unit) {
+private fun SavedData(r: SetRecord) {
     val c = AppTheme.colors
     var showData by remember { mutableStateOf(false) }
-    Column(Modifier.padding(top = 8.dp)) {
-        Body(
-            "${r.reps} reps" + (r.weightKg?.let { " at ${Copy.kg(it)} kg" } ?: "") + ", ${r.effort.key}" +
-                (if (r.comment.isNotEmpty()) ". ${r.comment}" else ""),
-            strong = true,
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button) { showData = !showData }
+            .semantics { stateDescription = if (showData) "Expanded" else "Collapsed" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Small("Show saved data")
+    }
+    if (showData) {
+        Text(
+            recordJson(r),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.soft).padding(10.dp),
+            color = c.fg,
+            style = AppTheme.type.small.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
         )
-        if (r.pain) {
-            Text(
-                "Pain reported. Saving will stop this exercise and remove it from your plan.",
-                Modifier.padding(top = 6.dp),
-                color = c.bad,
-                style = AppTheme.type.bodyStrong,
-            )
-        }
-        AccentButton("Save set", onSave, Modifier.padding(top = 14.dp))
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button) { showData = !showData }
-                .semantics { stateDescription = if (showData) "Expanded" else "Collapsed" },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Small("Show saved data")
-        }
-        if (showData) {
-            Text(
-                recordJson(r),
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.soft).padding(10.dp),
-                color = c.fg,
-                style = AppTheme.type.small.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
-            )
-        }
     }
 }
 
