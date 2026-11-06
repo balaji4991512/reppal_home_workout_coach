@@ -71,9 +71,13 @@ class DonePresenter(private val lib: Library) {
                 val reps = c.sets.map { it.reps }
                 val load = if (e.bodyweight) "Total ${reps.sum()} reps." else "Load ${c.sets.sumOf { it.reps * it.weightKg }.roundToLong()} kg."
                 val next = c.next
+                val was = result.workout.plan.firstOrNull { it.exerciseId == e.id }?.let { Copy.prescription(e, it) } ?: Copy.prescription(e, c.was)
+                if (c.skipped) {
+                    return@map ChangeUi(name = e.name, summary = "Skipped. Was $was.", message = Copy.SKIPPED_NEXT, next = "Next: $was", up = false)
+                }
                 ChangeUi(
                     name = e.name,
-                    summary = "Reps: ${reps.joinToString(", ")}. $load Was ${result.workout.plan.firstOrNull { it.exerciseId == e.id }?.let { Copy.prescription(e, it) } ?: Copy.prescription(e, c.was)}.",
+                    summary = "Reps: ${reps.joinToString(", ")}. $load Was $was.",
                     message = c.outcome?.let { Copy.nextSessionNote(e, it) } ?: Copy.PAIN_NEXT,
                     next = "Next: " + if (next == null) "Swapped out next time" else Copy.prescription(e, next, equipment),
                     up = c.outcome is NextSession.Progressed,

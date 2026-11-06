@@ -9,6 +9,7 @@ import com.homeworkoutcoach.app.plan.WorkoutSession
 import com.homeworkoutcoach.app.ui.Copy
 import com.homeworkoutcoach.app.voice.VoiceError
 import com.homeworkoutcoach.engine.Effort
+import com.homeworkoutcoach.engine.ExerciseState
 import com.homeworkoutcoach.engine.Library
 import com.homeworkoutcoach.engine.Planner
 import com.homeworkoutcoach.engine.Progression
@@ -92,6 +93,10 @@ class WorkoutViewModel(
      */
     private var startedAt: Long = now()
 
+    /** The plan settings and stored states the workout started from, to plan a replacement exercise. */
+    private var planSettings: com.homeworkoutcoach.engine.PlanSettings? = null
+    private var storedStates: Map<String, ExerciseState> = emptyMap()
+
     private val _state = MutableStateFlow<WorkoutState>(WorkoutState.Loading)
     val state: StateFlow<WorkoutState> = _state
 
@@ -108,6 +113,8 @@ class WorkoutViewModel(
         val s = settings.settings.first()
         val ps = s.planSettings(training.swaps().first())
         val stored = training.exerciseStates().first()
+        planSettings = ps
+        storedStates = stored
         val seq = planner.weekSequence(ps)
         val today = Instant.ofEpochMilli(startedAt).atZone(zone).toLocalDate()
         val workouts = training.workouts().first()
@@ -230,12 +237,73 @@ class WorkoutViewModel(
             _state.value = WorkoutState.Logging(next, SetInput(), note)
             return
         }
+        finish(next)
+    }
+
+    private fun finish(done: WorkoutSession) {
         _state.value = WorkoutState.Saving
         viewModelScope.launch {
             val history = training.workouts().first()
-            val result = next.finish(startedAt, madeUpFor)
+            val result = done.finish(startedAt, madeUpFor)
             actions.finishWorkout(result)
-            _state.value = WorkoutState.Done(DonePresenter(lib).present(result, history, next.equipment))
+            _state.value = WorkoutState.Done(DonePresenter(lib).present(result, history, done.equipment))
         }
+    }
+
+    /** Shows [session], or saves the workout if it is finished; the set being typed is cleared. */
+    private fun show(session: WorkoutSession) {
+        if (session.finished) finish(session) else _state.value = WorkoutState.Logging(session, SetInput(), note = null)
+    }
+
+    private fun change(f: (WorkoutSession) -> WorkoutSession) {
+        val l = _state.value as? WorkoutState.Logging ?: return
+        show(f(l.session))
+    }
+
+    /** Opens exercise [i] of the workout, to log on it or correct its sets. */
+    fun goTo(i: Int) = change { it.goTo(i) }
+
+    /** Corrects set [i] of the exercise shown. */
+    fun editSet(i: Int, reps: Int, weightKg: Double, effort: Effort) = change { it.editSet(i, reps, weightKg, effort) }
+
+    /** Takes set [i] of the exercise shown off, to do it again. */
+    fun deleteSet(i: Int) = change { it.deleteSet(i) }
+
+    fun undoPain() = change { it.undoPain() }
+
+    fun skip() = change { s -> if (s.canSkip) s.skip() else s }
+
+    fun unskip() = change { it.unskip() }
+
+    /** Every exercise is done or skipped: save the workout. */
+    fun finishWorkout() = change { s -> if (s.allComplete) s.finishNow() else s }
+
+    /**
+     * What the exercise shown can be replaced with: others for the same muscle that the equipment allows and that are not
+     * in this workout, with the plan's own exercise first when it was replaced. Pairs of id and name.
+     */
+    fun replacements(): List<Pair<String, String>> {
+        val l = _state.value as? WorkoutState.Logging ?: return emptyList()
+        val ps = planSettings ?: return emptyList()
+        val item = l.session.day.items[l.session.index]
+        val inDay = l.session.day.items.map { it.exerciseId }.toSet()
+        val back = listOf(item.baseId).filter { it != item.exerciseId && it !in inDay }
+        return (back + planner.swapAlternatives(item, l.session.day, ps)).distinct().map { it to lib.exercise(it).name }
+    }
+
+    /**
+     * Does exercise [id] in place of the one shown. With [fromNowOn] the plan swaps it in for good (as on the Week page);
+     * otherwise only this workout changes.
+     */
+    fun replace(id: String, fromNowOn: Boolean) {
+        val l = _state.value as? WorkoutState.Logging ?: return
+        val ps = planSettings ?: return
+        val item = l.session.day.items[l.session.index]
+        val e = lib.exercise(id)
+        val planned = com.homeworkoutcoach.engine.Ramp.plan(
+            e, ps.equipment, Progression.resolveState(e, storedStates[id], ps.equipment, ps.level).atLeast(item.sets),
+        )
+        show(l.session.replace(planned))
+        if (fromNowOn) viewModelScope.launch { actions.swap(item.baseId, id) }
     }
 }

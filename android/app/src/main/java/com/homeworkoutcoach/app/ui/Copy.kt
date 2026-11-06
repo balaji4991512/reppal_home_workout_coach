@@ -97,6 +97,7 @@ object Copy {
         }
     }
 
+    const val SKIPPED_NEXT = "Skipped this time, so it stays the same for next time."
     const val PAIN_NEXT = "You reported pain, so this exercise is removed from your plan. Check with your doctor or physio before trying it again."
 
     /** "up 12% from last time", or null without an earlier figure. */

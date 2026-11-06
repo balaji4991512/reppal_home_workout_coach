@@ -136,7 +136,7 @@ fun WorkoutEditScreen(
 
 /** A value with a minus and a plus either side. */
 @Composable
-private fun Stepper(value: String, label: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+internal fun Stepper(value: String, label: String, onMinus: () -> Unit, onPlus: () -> Unit) {
     val c = AppTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         StepButton("−", "Less $label", onMinus)

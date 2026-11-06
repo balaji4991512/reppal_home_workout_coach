@@ -7,6 +7,9 @@ import com.homeworkoutcoach.app.ui.components.fadeLiftIn
 import com.homeworkoutcoach.app.ui.components.OutlineButton
 import com.homeworkoutcoach.app.ui.components.AccentChip
 import com.homeworkoutcoach.app.ui.components.AccentButton
+import com.homeworkoutcoach.app.ui.components.DeleteAction
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
@@ -117,6 +120,11 @@ fun WorkoutScreen(
             onSave = vm::onSave,
             voice = VoiceHandlers(vm::onVoiceListening, vm::onVoicePartial, vm::onVoiceResult, vm::onVoiceError),
             onHowTo = onHowTo,
+            controls = WorkoutControls(
+                goTo = vm::goTo, editSet = vm::editSet, deleteSet = vm::deleteSet, undoPain = vm::undoPain,
+                skip = vm::skip, unskip = vm::unskip, finish = vm::finishWorkout,
+                replacements = vm::replacements, replace = vm::replace,
+            ),
         )
         is WorkoutState.Done -> DoneContent(s.ui, onWeek)
     }
@@ -160,7 +168,21 @@ class VoiceHandlers(
     val onError: (VoiceError) -> Unit,
 )
 
+/** Moving about the workout and changing it while it runs: other exercises, set corrections, skip and replace. */
+class WorkoutControls(
+    val goTo: (Int) -> Unit = {},
+    val editSet: (Int, Int, Double, Effort) -> Unit = { _, _, _, _ -> },
+    val deleteSet: (Int) -> Unit = {},
+    val undoPain: () -> Unit = {},
+    val skip: () -> Unit = {},
+    val unskip: () -> Unit = {},
+    val finish: () -> Unit = {},
+    val replacements: () -> List<Pair<String, String>> = { emptyList() },
+    val replace: (String, Boolean) -> Unit = { _, _ -> },
+)
+
 /** One exercise at a time [vLog]. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoggingContent(
     state: WorkoutState.Logging,
@@ -172,17 +194,58 @@ fun LoggingContent(
     onSave: () -> Unit,
     voice: VoiceHandlers? = null,
     onHowTo: (String) -> Unit = {},
+    controls: WorkoutControls = WorkoutControls(),
 ) {
     val c = AppTheme.colors
     val session = state.session
     val e = session.exercise
     val target = session.target
     val input = state.input
+    // The sheet open, if any: the exercise list, a set being corrected, or the replacements.
+    var listOpen by remember { mutableStateOf(false) }
+    var editing by remember(session.index, e.id) { mutableStateOf<Int?>(null) }
+    var replacing by remember(session.index, e.id) { mutableStateOf(false) }
+
+    if (listOpen) ExerciseListSheet(session, onPick = { listOpen = false; controls.goTo(it) }, onClose = { listOpen = false })
+    editing?.let { i ->
+        session.logged.getOrNull(i)?.let { set ->
+            EditSetSheet(
+                session, i, set,
+                onSave = { reps, kg, effort -> editing = null; controls.editSet(i, reps, kg, effort) },
+                onDelete = { editing = null; controls.deleteSet(i) },
+                onClose = { editing = null },
+            )
+        }
+    }
+    if (replacing) {
+        ReplaceSheet(
+            name = e.name, logged = session.logged.size, options = remember(session.index, e.id) { controls.replacements() },
+            onPick = { id, keep -> replacing = false; controls.replace(id, keep) },
+            onClose = { replacing = false },
+        )
+    }
+
+    val complete = session.complete(session.index)
     Page {
         ProgressDots(session)
-        Muted("${session.slot}, exercise ${session.index + 1} of ${session.day.items.size}")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            NavArrow(AppIcons.ChevronLeft, "Previous exercise", enabled = session.index > 0) { controls.goTo(session.index - 1) }
+            Row(
+                Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp))
+                    .clickable(role = Role.Button, onClickLabel = "Show all exercises") { listOpen = true },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+            ) {
+                Muted("${session.slot}, exercise ${session.index + 1} of ${session.day.items.size}")
+                Icon(AppIcons.ChevronDown, null, Modifier.padding(start = 4.dp).size(16.dp), tint = c.mut)
+            }
+            NavArrow(AppIcons.ChevronRight, "Next exercise", enabled = session.index < session.day.items.lastIndex) { controls.goTo(session.index + 1) }
+        }
         H1(e.name)
-        TextLink("How to do it", { onHowTo(e.id) })
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            TextLink("How to do it", { onHowTo(e.id) })
+            if (!complete || session.logged.isEmpty()) TextLink("Replace", { replacing = true })
+            if (!complete && session.canSkip) TextLink("Skip", controls.skip)
+        }
 
         // The target in a card, with the sets under it.
         Column(
@@ -190,6 +253,7 @@ fun LoggingContent(
                 .background(Brush.linearGradient(listOf(c.accentSoft, c.tintPeach), start = Offset.Zero, end = Offset(900f, 600f)))
                 .padding(20.dp),
         ) {
+            if (!complete) {
             Text("YOUR TARGET", color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, letterSpacing = 0.08.em, fontWeight = FontWeight.SemiBold))
             Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
@@ -205,7 +269,38 @@ fun LoggingContent(
                     style = AppTheme.type.body.copy(fontSize = 18.sp),
                 )
             }
-            SetPills(session)
+            } else {
+                Text(
+                    when {
+                        session.isSkipped(session.index) -> "SKIPPED"
+                        e.id in session.pain -> "STOPPED FOR PAIN"
+                        else -> "ALL SETS DONE"
+                    },
+                    color = c.mut, style = AppTheme.type.small.copy(fontSize = 11.sp, letterSpacing = 0.08.em, fontWeight = FontWeight.SemiBold),
+                )
+            }
+            SetPills(session) { editing = it }
+            if (session.logged.isNotEmpty()) Small("Tap a done set to change or delete it.", Modifier.padding(top = 10.dp))
+        }
+
+        if (complete) {
+            when {
+                session.isSkipped(session.index) -> {
+                    Body("Left out of this workout. Its plan stays the same for next time.", Modifier.padding(top = 14.dp))
+                    OutlineButton("Do it after all", controls.unskip, tint = c.accent)
+                }
+                e.id in session.pain -> {
+                    Body("You reported pain, so this exercise stops here and leaves your plan when you finish.", Modifier.padding(top = 14.dp))
+                    OutlineButton("Pain was a mistake, carry on", controls.undoPain, tint = c.accent)
+                }
+            }
+            if (session.allComplete) {
+                AccentButton("Finish workout", controls.finish, Modifier.padding(top = 18.dp), icon = AppIcons.Check)
+            } else {
+                val next = session.nextOpen()
+                AccentButton("Next: ${session.lib.exercise(session.day.items[next].exerciseId).name}", { controls.goTo(next) }, Modifier.padding(top = 18.dp))
+            }
+            return@Page
         }
 
         if (state.note != null && session.setIndex > 0) {
@@ -248,6 +343,140 @@ fun LoggingContent(
 }
 
 @Composable
+private fun NavArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Box(
+        Modifier.size(44.dp).clip(CircleShape).clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, Modifier.size(20.dp), tint = if (enabled) c.fg else c.bd) }
+}
+
+/** Every exercise of the workout with how far it got; tapping one opens it. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExerciseListSheet(session: WorkoutSession, onPick: (Int) -> Unit, onClose: () -> Unit) {
+    val c = AppTheme.colors
+    ModalBottomSheet(onDismissRequest = onClose, containerColor = c.bg) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            H2("Exercises", top = 0.dp)
+            session.day.items.forEachIndexed { i, item ->
+                val id = item.exerciseId
+                val done = session.sets[id].orEmpty().size
+                val status = when {
+                    session.isSkipped(i) && done > 0 -> "Skipped after ${if (done == 1) "1 set" else "$done sets"}"
+                    session.isSkipped(i) -> "Skipped"
+                    id in session.pain -> "Stopped for pain"
+                    done >= session.plan[i].sets -> "Done, $done sets"
+                    done > 0 -> "$done of ${session.plan[i].sets} sets"
+                    else -> "Not started"
+                }
+                Row(
+                    Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(16.dp))
+                        .background(if (i == session.index) c.accentSoft else c.soft)
+                        .clickable(role = Role.Button) { onPick(i) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        Modifier.size(30.dp).clip(CircleShape).background(if (session.complete(i) && !session.isSkipped(i)) c.ok else c.bg),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (session.complete(i) && !session.isSkipped(i)) Icon(AppIcons.Check, null, Modifier.size(16.dp), tint = c.bg)
+                        else Text("${i + 1}", color = c.mut, style = AppTheme.type.small)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Body(session.lib.exercise(id).name, strong = i == session.index)
+                        Small(status)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Correcting one logged set: its reps, weight and how it felt, or taking it off. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditSetSheet(
+    session: WorkoutSession,
+    i: Int,
+    set: com.homeworkoutcoach.engine.LoggedSet,
+    onSave: (Int, Double, Effort) -> Unit,
+    onDelete: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val c = AppTheme.colors
+    val e = session.exercise
+    var reps by remember(i) { mutableStateOf(set.reps) }
+    var kg by remember(i) { mutableStateOf(set.weightKg) }
+    var effort by remember(i) { mutableStateOf(set.effort) }
+    val weights = (session.equipment.dumbbells + set.weightKg).distinct().sorted()
+    ModalBottomSheet(onDismissRequest = onClose, containerColor = c.bg) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            H2("Set ${i + 1}", top = 0.dp)
+            Small("${e.name}. Target was ${set.targetReps} reps.")
+            Row(Modifier.padding(top = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Body("Reps", Modifier.weight(1f))
+                Stepper("$reps", "reps", { reps = (reps - 1).coerceAtLeast(1) }, { reps = (reps + 1).coerceAtMost(60) })
+            }
+            if (!e.bodyweight && weights.isNotEmpty()) {
+                Row(Modifier.padding(top = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Body("Weight", Modifier.weight(1f))
+                    val at = weights.indexOfFirst { kotlin.math.abs(it - kg) < 1e-9 }.coerceAtLeast(0)
+                    Stepper("${Copy.kg(kg)} kg", "weight", { kg = weights[(at - 1).coerceAtLeast(0)] }, { kg = weights[(at + 1).coerceAtMost(weights.lastIndex)] })
+                }
+            }
+            Muted("How it felt", Modifier.padding(top = 14.dp))
+            Chips {
+                listOf(Effort.EASY to "Easy", Effort.JUST_RIGHT to "Just right", Effort.HARD to "Hard").forEach { (k, label) ->
+                    AccentChip(label, effort == k, { effort = k })
+                }
+            }
+            AccentButton("Save changes", { onSave(reps, kg, effort) }, Modifier.padding(top = 18.dp))
+            DeleteAction("Delete this set", "Delete set ${i + 1}? You can do it again.", onDelete, gap = 12.dp)
+        }
+    }
+}
+
+/** What the exercise shown can be swapped for, this workout only or from now on. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReplaceSheet(name: String, logged: Int, options: List<Pair<String, String>>, onPick: (String, Boolean) -> Unit, onClose: () -> Unit) {
+    val c = AppTheme.colors
+    var keep by remember { mutableStateOf(false) }
+    ModalBottomSheet(onDismissRequest = onClose, containerColor = c.bg) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            H2("Replace $name", top = 0.dp)
+            if (options.isEmpty()) {
+                Body("Nothing else your equipment allows works the same muscle.", Modifier.padding(top = 8.dp))
+                return@Column
+            }
+            Small("Same muscle, with your equipment.")
+            if (logged > 0) {
+                Text(
+                    "The ${if (logged == 1) "set" else "$logged sets"} logged on $name will be dropped.",
+                    Modifier.padding(top = 8.dp), color = c.bad, style = AppTheme.type.small,
+                )
+            }
+            Chips(Modifier.padding(top = 10.dp)) {
+                AccentChip("This workout only", !keep, { keep = false }, small = true)
+                AccentChip("From now on", keep, { keep = true }, small = true)
+            }
+            options.forEach { (id, label) ->
+                Row(
+                    Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(min = 52.dp).clip(RoundedCornerShape(16.dp)).background(c.soft)
+                        .clickable(role = Role.Button) { onPick(id, keep) }.padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Body(label, Modifier.weight(1f))
+                    Icon(AppIcons.ChevronRight, null, Modifier.size(18.dp), tint = c.mut)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProgressDots(session: WorkoutSession) {
     val c = AppTheme.colors
     Row(
@@ -259,8 +488,9 @@ private fun ProgressDots(session: WorkoutSession) {
             Box(
                 Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp)).background(
                     when {
-                        i < session.index -> c.accent
                         i == session.index -> c.accent.copy(alpha = 0.45f)
+                        session.isSkipped(i) -> c.mut.copy(alpha = 0.35f)
+                        session.complete(i) -> c.accent
                         else -> c.bd
                     },
                 ),
@@ -271,7 +501,7 @@ private fun ProgressDots(session: WorkoutSession) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SetPills(session: WorkoutSession) {
+private fun SetPills(session: WorkoutSession, onEdit: (Int) -> Unit) {
     val c = AppTheme.colors
     val done = session.repsDone
     FlowRow(
@@ -279,12 +509,15 @@ private fun SetPills(session: WorkoutSession) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        repeat(session.planned.sets) { i ->
+        val open = !session.complete(session.index)
+        repeat(maxOf(session.planned.sets, done.size)) { i ->
             val isDone = i < done.size
-            val current = !isDone && i == session.setIndex
+            val current = open && !isDone && i == session.setIndex
+            if (!isDone && !open) return@repeat
             Box(
                 Modifier.widthIn(min = 60.dp).height(44.dp).clip(RoundedCornerShape(99.dp))
                     .background(if (isDone) c.ok else if (current) c.accent else c.bg.copy(alpha = 0.7f))
+                    .then(if (isDone) Modifier.clickable(role = Role.Button, onClickLabel = "Change set ${i + 1}") { onEdit(i) } else Modifier)
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
