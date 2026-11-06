@@ -37,3 +37,11 @@ the workout.
 - Choose "This workout only" (default) or "From now on" (the same as swapping it on the Week page). Sets already logged
   on the old exercise are dropped, and the sheet says so.
 - The new exercise starts from its own stored plan (or a starting one) and progresses from what is done today.
+
+## Weight chips
+- Above "Reps you did", a weighted exercise has "Weight you used": the owned dumbbells nearest the set's target, two
+  either side (more on one side at the ends of the rack), the target chosen to start. Tapping one logs the set at that
+  weight; tapping it again goes back to the target. It also changes the weight of a spoken or typed note.
+- The chips follow each set: after saving, they start again from the next set's target (a ramp's next step, or the
+  weight just used). The weight saved is what the next set follows, as before.
+- Reps you did now runs from two over the target to three under, so a set that beat the target can be logged with a tap.

@@ -116,6 +116,7 @@ fun WorkoutScreen(
             onReps = vm::onReps,
             onEffort = vm::onEffort,
             onPain = vm::onPain,
+            onWeight = vm::onWeight,
             onCheck = vm::onCheck,
             onSave = vm::onSave,
             voice = VoiceHandlers(vm::onVoiceListening, vm::onVoicePartial, vm::onVoiceResult, vm::onVoiceError),
@@ -193,6 +194,7 @@ fun LoggingContent(
     onCheck: () -> Unit,
     onSave: () -> Unit,
     voice: VoiceHandlers? = null,
+    onWeight: (Double) -> Unit = {},
     onHowTo: (String) -> Unit = {},
     controls: WorkoutControls = WorkoutControls(),
 ) {
@@ -322,9 +324,18 @@ fun LoggingContent(
             }
         }
 
+        if (!e.bodyweight) {
+            val kg = input.shownWeight(target.weightKg)
+            Muted("Weight you used", Modifier.padding(top = 10.dp))
+            Chips {
+                weightChoices(session.equipment.dumbbells, target.weightKg, kg).forEach { w ->
+                    AccentChip("${Copy.kg(w)} kg", kotlin.math.abs(w - kg) < 1e-9, { onWeight(w) }, Modifier.widthIn(min = 64.dp))
+                }
+            }
+        }
         Muted("Reps you did", Modifier.padding(top = 10.dp))
         Chips {
-            (0 until 5).map { target.targetReps - it }.filter { it >= 1 }.forEach { n ->
+            repChoices(target.targetReps).forEach { n ->
                 AccentChip("$n", input.shownReps == n, { onReps(n) }, Modifier.widthIn(min = 52.dp))
             }
         }
@@ -341,6 +352,20 @@ fun LoggingContent(
         input.preview?.let { SetPreview(it, onSave) }
     }
 }
+
+/**
+ * The weights to offer for a set: the owned dumbbells nearest the [target], two either side of it (more on one side
+ * near the ends of the rack), and the [shown] weight too if it is not among them.
+ */
+internal fun weightChoices(owned: List<Double>, target: Double, shown: Double): List<Double> {
+    val all = (owned + target + shown).distinct().sorted()
+    val at = all.indexOfFirst { kotlin.math.abs(it - target) < 1e-9 }
+    val from = (at - 2).coerceIn(0, maxOf(0, all.size - 5))
+    return (all.subList(from, minOf(all.size, from + 5)) + shown).distinct().sorted()
+}
+
+/** The reps to offer: two over the [target] down to three under, at least 1. */
+internal fun repChoices(target: Int): List<Int> = (target + 2 downTo target - 3).filter { it >= 1 }
 
 @Composable
 private fun NavArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {

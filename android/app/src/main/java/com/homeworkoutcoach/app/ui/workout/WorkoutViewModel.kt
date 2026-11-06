@@ -35,6 +35,8 @@ data class SetInput(
     /** Null shows "Just right" selected. */
     val effort: Effort? = null,
     val pain: Boolean = false,
+    /** The weight chosen with the chips; null means the set's target weight. */
+    val weightKg: Double? = null,
     val preview: SetRecord? = null,
     val error: String? = null,
     /** The microphone is open; [text] shows what has been heard so far. */
@@ -47,6 +49,9 @@ data class SetInput(
     val shownReps: Int? get() = reps ?: notePreview()?.reps
     val shownEffort: Effort get() = notePreview()?.effort ?: effort ?: Effort.JUST_RIGHT
     val shownPain: Boolean get() = notePreview()?.pain ?: pain
+
+    /** The weight the chips show: what the note said, the one chosen, or the set's [target] weight. */
+    fun shownWeight(target: Double): Double = notePreview()?.weightKg ?: weightKg ?: target
 }
 
 /** A skipped workout that can be made up: its day (epoch day) and a label such as "Mon: Full body A". */
@@ -174,6 +179,13 @@ class WorkoutViewModel(
         l.copy(input = if (input.reps != null) read(l.session, input) else input.copy(preview = null))
     }
 
+    /** A weight chip: the dumbbell used for this set. Tapping the chosen one again goes back to the target weight. */
+    fun onWeight(kg: Double) = editLogging { l ->
+        l.input.notePreview()?.let { return@editLogging l.copy(input = l.input.copy(preview = it.copy(weightKg = kg))) }
+        val input = l.input.copy(weightKg = if (l.input.weightKg == kg) null else kg)
+        l.copy(input = if (input.reps != null) read(l.session, input) else input)
+    }
+
     fun onPain() = editLogging { l ->
         l.input.notePreview()?.let { p ->
             val flags = if (p.pain) p.flags - SetFlag.PAIN else p.flags + SetFlag.PAIN
@@ -212,7 +224,8 @@ class WorkoutViewModel(
     /** Parse the chips (if a rep count is chosen) or the typed text, and check it against this exercise [read]. */
     private fun read(session: WorkoutSession, input: SetInput): SetInput {
         val text = if (input.reps != null) {
-            "${input.reps} reps, ${(input.effort ?: Effort.JUST_RIGHT).key}" + if (input.pain) ", pain" else ""
+            "${input.reps} reps" + (input.weightKg?.let { " at ${Copy.kg(it)} kg" } ?: "") +
+                ", ${(input.effort ?: Effort.JUST_RIGHT).key}" + if (input.pain) ", pain" else ""
         } else input.text.trim()
         if (text.isEmpty()) return input.copy(preview = null, error = "Say or type how the set went.")
         return when (val c = session.check(parser.parse(text))) {

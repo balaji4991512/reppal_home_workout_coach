@@ -226,4 +226,55 @@ class WorkoutChangesViewModelTest {
         val saved = training.workouts().first().single()
         assertEquals(1, saved.sets.values.count { it.isNotEmpty() })
     }
+
+    @Test
+    fun aWeightChipGoesIntoTheSetAndTheNextSetFollowsIt() = runTest {
+        val vm = vm()
+        val target = vm.logging().session.target
+        vm.onReps(target.targetReps)
+        vm.onWeight(6.0)
+        assertEquals(SetRecord(target.targetReps, 6.0, Effort.JUST_RIGHT), vm.logging().input.preview)
+        // tapping it again goes back to the target weight
+        vm.onWeight(6.0)
+        assertEquals(target.weightKg, vm.logging().input.preview!!.weightKg ?: target.weightKg, 0.0)
+        vm.onWeight(6.0)
+        vm.onSave()
+        assertEquals(6.0, vm.logging().session.sets.values.single().single().weightKg, 0.0)
+        assertEquals(6.0, vm.logging().session.target.weightKg, 0.0) // the next set carries on at the weight used
+        assertNull(vm.logging().input.weightKg) // and the chips start again from the new target
+    }
+
+    @Test
+    fun aWeightChipAdjustsASpokenNote() = runTest {
+        val vm = vm()
+        vm.onVoiceResult("ten reps, hard")
+        vm.onWeight(6.0)
+        assertEquals(SetRecord(10, 6.0, Effort.HARD), vm.logging().input.preview)
+    }
+}
+
+class WeightChoicesTest {
+    private val rack = listOf(2.0, 4.5, 7.0, 9.0, 10.0, 11.5, 13.5, 16.0)
+
+    @Test
+    fun twoEitherSideOfTheTarget() {
+        assertEquals(listOf(9.0, 10.0, 11.5, 13.5, 16.0), com.homeworkoutcoach.app.ui.workout.weightChoices(rack, 11.5, 11.5))
+    }
+
+    @Test
+    fun nearTheEndsTheOtherSideMakesUpTheFive() {
+        assertEquals(listOf(2.0, 4.5, 7.0, 9.0, 10.0), com.homeworkoutcoach.app.ui.workout.weightChoices(rack, 2.0, 2.0))
+        assertEquals(listOf(10.0, 11.5, 13.5, 16.0) , com.homeworkoutcoach.app.ui.workout.weightChoices(rack, 16.0, 16.0).takeLast(4))
+    }
+
+    @Test
+    fun aWeightOutsideTheFiveIsStillShownWhenChosen() {
+        assertEquals(listOf(2.0, 9.0, 10.0, 11.5, 13.5, 16.0), com.homeworkoutcoach.app.ui.workout.weightChoices(rack, 11.5, 2.0))
+    }
+
+    @Test
+    fun repsRunFromTwoOverToThreeUnder() {
+        assertEquals(listOf(14, 13, 12, 11, 10, 9), com.homeworkoutcoach.app.ui.workout.repChoices(12))
+        assertEquals(listOf(4, 3, 2, 1), com.homeworkoutcoach.app.ui.workout.repChoices(2))
+    }
 }
