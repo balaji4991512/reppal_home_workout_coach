@@ -76,7 +76,7 @@ class FocusAlarmReceiver : BroadcastReceiver() {
 }
 
 object FocusNotifications {
-    private const val CHANNEL = "focus"
+    private const val CHANNEL = com.homeworkoutcoach.app.reminders.Channels.FOCUS
     private const val ID = 4102
 
     /** True while the Focus screen is on screen: the finished card is enough then, no notification. */
@@ -85,14 +85,8 @@ object FocusNotifications {
 
     fun finished(context: Context, session: FocusSession) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Focus timer", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Tells you when a focus session is finished."
-                    enableVibration(true)
-                },
-            )
-        }
+        // The end of a timer rings on the alarm volume, so it is heard with the phone on vibrate.
+        com.homeworkoutcoach.app.reminders.Channels.ensure(context, CHANNEL, "Focus timer", "Tells you when a focus session is finished.", alarm = true)
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

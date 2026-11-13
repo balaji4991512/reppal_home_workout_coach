@@ -38,7 +38,11 @@ A goal has a title, a kind, a target, a start day and an end day.
   runs out, and the screen is allowed to sleep while paused. The pause is kept with the running timer in settings, so it
   survives the app being closed.
 - The timer runs from an end time, so it keeps counting with the screen off or the app closed. When it ends the phone
-  vibrates and shows a notification ("Focus session finished"). If notifications are not allowed, the finished state
+  plays its notification sound and vibrates: with a notification ("Focus session finished") when the Focus screen is not
+  on show, or just the sound and a buzz when it is. The sound plays on the alarm volume, so it is heard with the phone on
+  vibrate.
+- All notifications (focus, habit and task reminders) play the phone's notification sound and vibrate. Their channels
+  are `focus_sound`, `habits_sound` and `tasks_sound`; the earlier `focus`, `habits` and `tasks` are removed. If notifications are not allowed, the finished state
   shows next time the app opens.
 - Every session is saved: when it started, planned and actual minutes, and the task's title. The Focus screen shows
   today's total, this week's total and recent sessions.

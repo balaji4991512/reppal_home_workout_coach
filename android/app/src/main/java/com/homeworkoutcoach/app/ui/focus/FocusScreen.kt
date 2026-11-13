@@ -167,6 +167,8 @@ fun FocusScreen(vm: FocusViewModel = viewModel(factory = Factories.Focus)) {
                 now = System.currentTimeMillis()
                 if (now >= r.endMillis) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    // On screen there is no notification, so the end is played here.
+                    com.homeworkoutcoach.app.reminders.Chime.play(context)
                     vm.settle(r.startMillis)
                     break
                 }

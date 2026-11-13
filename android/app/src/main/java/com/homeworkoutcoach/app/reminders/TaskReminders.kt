@@ -80,17 +80,11 @@ class TaskReminderReceiver : BroadcastReceiver() {
 }
 
 object TaskNotifications {
-    private const val CHANNEL = "tasks"
+    private const val CHANNEL = Channels.TASKS
 
     fun remind(context: Context, task: Task) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Task reminders", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Reminds you when a task with a time is due to start."
-                },
-            )
-        }
+        Channels.ensure(context, CHANNEL, "Task reminders", "Reminds you when a task with a time is due to start.")
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

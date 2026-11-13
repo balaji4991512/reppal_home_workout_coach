@@ -125,17 +125,11 @@ class HabitRemindersBootReceiver : BroadcastReceiver() {
 }
 
 object HabitNotifications {
-    private const val CHANNEL = "habits"
+    private const val CHANNEL = Channels.HABITS
 
     fun remind(context: Context, habit: StoredHabit, log: HabitLog) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Habit reminders", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Reminds you at the time you set for a habit."
-                },
-            )
-        }
+        Channels.ensure(context, CHANNEL, "Habit reminders", "Reminds you at the time you set for a habit.")
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
