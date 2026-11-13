@@ -160,6 +160,8 @@ class PlanActions(
 
     suspend fun setTheme(mode: ThemeMode) = settings.update { it.copy(theme = mode) }
 
+    suspend fun setListenForWick(on: Boolean) = settings.update { it.copy(listenForWick = on) }
+
     suspend fun storeStates(states: Map<String, ExerciseState>) {
         if (states.isNotEmpty()) training.putExerciseStates(states)
     }

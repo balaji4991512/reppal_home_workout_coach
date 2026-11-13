@@ -24,8 +24,27 @@ class VoiceTest {
     }
 
     @Test
-    fun onlyWhatFollowsTheWakeWordCounts() {
-        assertEquals(start(45), parse("stop it wick focus forty five"))
+    fun theWakeWordMustComeFirst() {
+        assertNull(parse("stop it wick focus forty five"))
+        // What the recogniser made of "I lit the candle wick and went to work".
+        assertNull(parse("cancel wick and wick two work"))
+        assertEquals(start(45), parse("[unk] wick focus forty five"))
+    }
+
+    @Test
+    fun forHeardAsFourIsFor() {
+        // What the recogniser made of the asked-for sentence and of "Wick, study for an hour".
+        assertEquals(start(25, "Study"), parse("wick set timer four twenty five minutes four study"))
+        assertEquals(start(60, "Study"), parse("wick study four and hour"))
+        assertEquals(start(4), parse("wick focus four minutes"))
+        assertEquals(start(4), parse("wick focus four"))
+        assertEquals(start(90, "Study"), parse("wick study for and hour and half"))
+        assertEquals(start(30, "Reading"), parse("wick reading four half and hour"))
+        assertEquals(start(25, "Study"), parse("wick seven a timer for twenty five minutes for study"))
+        assertEquals(start(45, "Coding"), parse("wick focus forty five minutes four coding"))
+        assertTrue("start" !in VoiceCommands.words)
+        val half = listOf("four", "and", "a", "half", "hours")
+        assertEquals(half, VoiceCommands.forNotFour(half))
     }
 
     @Test

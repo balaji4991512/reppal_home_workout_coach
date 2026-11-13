@@ -15,6 +15,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1"
+        // The speech library is native code, about 10 MB per chip type: the phone (arm64) and the emulator (x86_64) only.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     buildTypes {
@@ -65,6 +67,9 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore)
     implementation(libs.kotlinx.serialization.json)
+    // Offline speech for "Wick" voice commands. JNA comes as an Android library (aar), which Vosk needs.
+    implementation(libs.vosk.android) { exclude(group = "net.java.dev.jna") }
+    implementation(libs.jna) { artifact { type = "aar" } }
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

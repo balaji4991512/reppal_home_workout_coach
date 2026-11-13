@@ -29,12 +29,23 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import com.homeworkoutcoach.app.ui.shell.AppShell
 import com.homeworkoutcoach.app.ui.theme.AppTheme
 import com.homeworkoutcoach.app.ui.theme.isDark
+import com.homeworkoutcoach.app.voice.WickListener
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { App() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Android may have stopped the listener while the app was away; opening the app starts it again.
+        val settings = (application as HomeWorkoutCoachApp).container.settings
+        lifecycleScope.launch { WickListener.startIfOn(this@MainActivity, settings.settings.first().listenForWick) }
     }
 
     @Composable
@@ -48,6 +59,15 @@ class MainActivity : ComponentActivity() {
             val bars = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
             else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
             enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+        }
+        // Listening for "Wick" starts (or starts again) whenever the app is open with it switched on.
+        val listen = settings?.listenForWick
+        LaunchedEffect(listen) {
+            when (listen) {
+                true -> WickListener.startIfOn(this@MainActivity, true)
+                false -> WickListener.stop(this@MainActivity)
+                null -> Unit
+            }
         }
         AppTheme(mode) {
             // Wait for settings so the first screen is right (setup or week).
@@ -76,7 +96,7 @@ class MainActivity : ComponentActivity() {
                     onPrivacy = { privacy = true },
                 )
                 else -> AppShell(
-                    appName, s, account, vm::setTheme,
+                    appName, s, account, vm::setTheme, vm::setListenForWick,
                     onSignIn = { signingIn = true },
                     onSignOut = vm::signOut,
                 )

@@ -117,6 +117,8 @@ class HabitRemindersBootReceiver : BroadcastReceiver() {
             try {
                 HabitReminders(context).sync(container.habits.habits().first())
                 TaskReminders(context).sync(container.tasks.tasks().first())
+                // Android 14 and up refuse this after a restart; the listener then posts "Tap to listen again".
+                com.homeworkoutcoach.app.voice.WickListener.startIfOn(context, container.settings.settings.first().listenForWick)
             } finally {
                 pending.finish()
             }

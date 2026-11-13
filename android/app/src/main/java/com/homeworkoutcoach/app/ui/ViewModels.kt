@@ -123,6 +123,10 @@ class AppViewModel(
         viewModelScope.launch { actions.setTheme(mode) }
     }
 
+    fun setListenForWick(on: Boolean) {
+        viewModelScope.launch { actions.setListenForWick(on) }
+    }
+
     fun continueAsGuest() {
         viewModelScope.launch { actions.continueAsGuest() }
     }

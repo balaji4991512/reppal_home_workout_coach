@@ -1,5 +1,14 @@
 package com.homeworkoutcoach.app.ui.shell
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.homeworkoutcoach.app.voice.WickListener
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
@@ -213,7 +222,7 @@ private fun PageTile(
 
 /** Who you are and the plan in a line, with signing in or out; then the theme. */
 @Composable
-fun MeHeader(settings: UserSettings, account: Account?, onTheme: (ThemeMode) -> Unit, onAccount: () -> Unit) {
+fun MeHeader(settings: UserSettings, account: Account?, onTheme: (ThemeMode) -> Unit, onVoice: (Boolean) -> Unit, onAccount: () -> Unit) {
     val c = AppTheme.colors
     val initial = settings.name.trim().firstOrNull()?.uppercase() ?: "W"
     Row(
@@ -246,5 +255,43 @@ fun MeHeader(settings: UserSettings, account: Account?, onTheme: (ThemeMode) -> 
             Chip(label, settings.theme == m, { onTheme(m) }, Modifier.weight(1f), small = true)
         }
     }
+    VoiceSetting(settings.listenForWick, onVoice)
     H2("More", top = 24.dp)
+}
+
+/**
+ * Listen for "Wick": off, or on (asking for the microphone, and on Android 13 and up for notifications, first). What it
+ * costs is said under it.
+ */
+@Composable
+private fun VoiceSetting(on: Boolean, onVoice: (Boolean) -> Unit) {
+    var refused by remember { mutableStateOf(false) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        val mic = granted[Manifest.permission.RECORD_AUDIO] == true
+        refused = !mic
+        if (mic) onVoice(true)
+    }
+    val context = LocalContext.current
+    H2("Voice", top = 24.dp)
+    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Chip("Off", !on, { onVoice(false) }, Modifier.weight(1f), small = true)
+        Chip("Listen for \"Wick\"", on, {
+            if (WickListener.allowed(context) && Build.VERSION.SDK_INT < 33) {
+                onVoice(true)
+            } else {
+                val wanted = listOf(Manifest.permission.RECORD_AUDIO) +
+                    if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()
+                ask.launch(wanted.toTypedArray())
+            }
+        }, Modifier.weight(2f), small = true)
+    }
+    Small(
+        if (refused) {
+            "Allow the microphone to use voice commands."
+        } else {
+            "Say \"Wick, focus 25 minutes for study\", or pause, resume, stop. Works with the phone locked. " +
+                "Heard on the phone only. Uses some battery and keeps a notification up."
+        },
+        Modifier.padding(top = 6.dp),
+    )
 }

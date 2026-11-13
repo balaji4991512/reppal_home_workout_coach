@@ -26,10 +26,13 @@ object VoiceCommands {
         "sixty" to 60, "seventy" to 70, "eighty" to 80, "ninety" to 90,
     )
 
-    /** The words besides tags and numbers that commands use; the recogniser listens for these only. */
+    /**
+     * The words besides tags and numbers that commands use; the recogniser listens for these only (all in its vocabulary).
+     * "Start" is left out: "stop" was heard as "start". It is still understood if heard.
+     */
     val words: List<String> = (
         listOf(WAKE) +
-            "set a an the timer for focus start minute minutes min mins hour hours half and pause hold resume continue carry on unpause stop end finish cancel"
+            "set a an the timer for focus minute minutes min hour hours half and pause hold resume continue carry on stop end finish cancel"
                 .split(" ") +
             UNITS + TENS.keys + "hundred"
         ).distinct()
@@ -39,15 +42,17 @@ object VoiceCommands {
     private val END = Regex("\\b(stop|end|finish|cancel)\\b")
     private val START = Regex("\\b(timer|focus|start|minutes?|mins?|hours?)\\b|\\d")
 
+    private val UNIT_WORDS = setOf("minute", "minutes", "min", "mins", "hour", "hours")
+
     /**
-     * The command in [heard], or null when it holds no "Wick" (not meant for the app). Only what follows the first
-     * "Wick" counts. [tags] are the focus tags that can be named.
+     * The command in [heard], or null when it does not start with "Wick" (not meant for the app: "the candle wick" in
+     * passing should not start anything). [tags] are the focus tags that can be named. The recogniser's "[unk]" for
+     * words it does not know is left out.
      */
     fun parse(heard: String, tags: Collection<String>): VoiceCommand? {
-        val tokens = clean(heard).split(" ").filter { it.isNotEmpty() }
-        val at = tokens.indexOf(WAKE)
-        if (at < 0) return null
-        val rest = tokens.drop(at + 1)
+        val tokens = clean(heard).split(" ").filter { it.isNotEmpty() && it != "unk" }
+        if (tokens.firstOrNull() != WAKE) return null
+        val rest = forNotFour(tokens.drop(1))
         if (rest.isEmpty()) return VoiceCommand.WakeOnly
         val text = numbersToDigits(rest).joinToString(" ")
         return when {
@@ -56,13 +61,25 @@ object VoiceCommands {
             END.containsMatchIn(text) -> VoiceCommand.End
             else -> {
                 val tag = tagIn(text, tags)
-                if (tag == null && !START.containsMatchIn(text) && !Regex("\\ban hour\\b").containsMatchIn(text)) {
+                if (tag == null && !START.containsMatchIn(text) && !Regex("\\ban?d? hour\\b").containsMatchIn(text)) {
                     return VoiceCommand.Unclear
                 }
                 val minutes = minutesIn(text) ?: DEFAULT_MINUTES
                 if (Focus.problem(minutes) != null) VoiceCommand.Unclear else VoiceCommand.StartFocus(minutes, tag)
             }
         }
+    }
+
+    /**
+     * The recogniser often hears "for" as "four". "Four" is kept as a number only when a length unit or "and a half"
+     * follows it, or it ends the sentence ("focus four"); otherwise it is "for".
+     */
+    internal fun forNotFour(tokens: List<String>): List<String> = tokens.mapIndexed { i, w ->
+        if (w != "four") return@mapIndexed w
+        val next = tokens.getOrNull(i + 1)
+        val keep = next == null || next in UNIT_WORDS ||
+            (next == "and" && (tokens.getOrNull(i + 2) == "half" || (tokens.getOrNull(i + 2) == "a" && tokens.getOrNull(i + 3) == "half")))
+        if (keep) w else "for"
     }
 
     /** Lower case, punctuation and hyphens to spaces, "wick" spelt the way the recogniser may write it. */
@@ -108,10 +125,10 @@ object VoiceCommands {
         var hours = 0.0
         var any = false
         var rest = text
-        Regex("\\bhalf (an )?hour\\b").find(rest)?.let {
+        Regex("\\bhalf (an?d? )?hour\\b").find(rest)?.let {
             hours += 0.5; any = true; rest = rest.replaceFirst(it.value, " ")
         }
-        Regex("\\b(an|a|\\d+(?:\\.\\d+)?)( and a half)? hours?( and a half)?\\b").find(rest)?.let { m ->
+        Regex("\\b(an|a|and|\\d+(?:\\.\\d+)?)( and (?:a )?half)? hours?( and (?:a )?half)?\\b").find(rest)?.let { m ->
             val n = m.groupValues[1].toDoubleOrNull() ?: 1.0
             hours += n + if (m.groupValues[2].isNotEmpty() || m.groupValues[3].isNotEmpty()) 0.5 else 0.0
             any = true

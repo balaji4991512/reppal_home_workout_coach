@@ -14,6 +14,10 @@
     <!-- Voice input for set notes. Asked for only when the Mic button is first tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Listening for "Wick" voice commands while switched on: a microphone service with its own notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
     <!-- Reading the Bluetooth scale. It broadcasts weights; the app only listens and never connects. -->
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
@@ -48,6 +52,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".voice.WickListener"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <receiver android:name=".focus.FocusAlarmReceiver" android:exported="false" />
         <receiver android:name=".reminders.HabitReminderReceiver" android:exported="false" />

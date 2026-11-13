@@ -146,6 +146,7 @@ fun AppShell(
     settings: UserSettings,
     account: Account?,
     onTheme: (ThemeMode) -> Unit,
+    onVoice: (Boolean) -> Unit,
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -210,7 +211,7 @@ fun AppShell(
                 },
                 me = {
                     HubScreen(Tab.Me, settings.started, { r -> guarded { open(r) } }) {
-                        MeHeader(settings, account, onTheme) { if (account == null) onSignIn() else onSignOut() }
+                        MeHeader(settings, account, onTheme, onVoice) { if (account == null) onSignIn() else onSignOut() }
                     }
                 },
             )

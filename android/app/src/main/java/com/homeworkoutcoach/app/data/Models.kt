@@ -78,6 +78,8 @@ data class UserSettings(
     val characterFocus: CharacterFocus? = null,
     /** The "tap the circle to mark it done" hint on the habit lists has been dismissed. */
     val habitTickHintSeen: Boolean = false,
+    /** Listen for "Wick" voice commands (a microphone service with a notification). Off until switched on. */
+    val listenForWick: Boolean = false,
 ) {
     fun equipment(): Equipment = Equipment(bench, dumbbellsKg.toSet())
 

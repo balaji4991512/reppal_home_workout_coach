@@ -9,3 +9,6 @@ captures/
 
 # Firebase config for this project; kept out of the public repo.
 app/google-services.json
+
+# Offline speech model for voice commands (about 37 MB); tools/get-voice-model.sh puts it here.
+app/src/main/assets/model-en-in/
